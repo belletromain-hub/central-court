@@ -20,13 +20,14 @@ import { useApp } from '../../src/context/AppContext';
 import { formatDateRange, formatDate, formatDateShort, getDaysUntil, isDeadlineSoon, getWeekDay } from '../../src/utils/dateFormatter';
 import { getSurfaceColor, getSurfaceIcon, getEnvironmentIcon } from '../../src/data/tournaments';
 import { getEventTypeColor, getEventTypeIcon, getEventTypeLabel, EventType, CalendarEvent } from '../../src/data/events';
+import { Recommendation } from '../../src/types';
 
 type FilterType = 'all' | 'tournament' | 'media' | 'medical' | 'training' | 'travel' | 'sponsor';
 type StatusFilter = 'all' | 'confirmed' | 'pending';
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
-  const { tournaments, events, updateTournamentStatus, addEvent, deleteEvent } = useApp();
+  const { tournaments, events, updateTournamentStatus, addEvent, deleteEvent, recommendations } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [typeFilter, setTypeFilter] = useState<FilterType>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
