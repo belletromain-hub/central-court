@@ -1,10 +1,14 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import Colors from '../../src/constants/colors';
+import { useApp } from '../../src/context/AppContext';
 
 export default function TabLayout() {
+  const { channels } = useApp();
+  const totalUnread = channels.reduce((sum, c) => sum + c.unreadCount, 0);
+
   return (
     <Tabs
       screenOptions={{
@@ -25,9 +29,25 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({ color, size }) => (
+            <View>
+              <Ionicons name="chatbubbles" size={size} color={color} />
+              {totalUnread > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{totalUnread}</Text>
+                </View>
+              )}
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="vault"
         options={{
-          title: 'Coffre-fort',
+          title: 'Documents',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="folder-open" size={size} color={color} />
           ),
@@ -65,7 +85,24 @@ const styles = StyleSheet.create({
     height: Platform.OS === 'ios' ? 88 : 64,
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: Colors.danger,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

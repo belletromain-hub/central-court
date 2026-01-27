@@ -17,19 +17,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import Colors from '../../src/constants/colors';
 import { useApp } from '../../src/context/AppContext';
-import { Document, documentCategories } from '../../src/types';
+import { Document, teamTypes, TeamType } from '../../src/types';
 import { formatDate, getDaysUntil } from '../../src/utils/dateFormatter';
 
 export default function VaultScreen() {
   const insets = useSafeAreaInsets();
-  const { documents, addDocument, deleteDocument } = useApp();
+  const { documents, addDocument, deleteDocument, updateDocumentSharing } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('identity');
   const [newDoc, setNewDoc] = useState({
     name: '',
     expiryDate: '',
     notes: '',
   });
+  const [selectedTeams, setSelectedTeams] = useState<TeamType[]>([]);
 
   const getCategoryIcon = (category: string): string => {
     switch (category) {
@@ -71,6 +74,14 @@ export default function VaultScreen() {
     }
   };
 
+  const toggleTeam = (teamId: TeamType) => {
+    setSelectedTeams(prev =>
+      prev.includes(teamId)
+        ? prev.filter(t => t !== teamId)
+        : [...prev, teamId]
+    );
+  };
+
   const handleAddDocument = () => {
     if (!newDoc.name) {
       Alert.alert('Erreur', 'Veuillez sélectionner un document');
@@ -85,11 +96,27 @@ export default function VaultScreen() {
       uploadedAt: new Date().toISOString(),
       expiryDate: newDoc.expiryDate || undefined,
       notes: newDoc.notes || undefined,
+      sharedWith: selectedTeams,
     };
 
     addDocument(doc);
     setShowAddModal(false);
     setNewDoc({ name: '', expiryDate: '', notes: '' });
+    setSelectedTeams([]);
+  };
+
+  const handleOpenShare = (doc: Document) => {
+    setSelectedDoc(doc);
+    setSelectedTeams(doc.sharedWith || []);
+    setShowShareModal(true);
+  };
+
+  const handleSaveSharing = () => {
+    if (selectedDoc) {
+      updateDocumentSharing(selectedDoc.id, selectedTeams);
+    }
+    setShowShareModal(false);
+    setSelectedDoc(null);
   };
 
   const handleDeleteDocument = (id: string, name: string) => {
@@ -112,22 +139,38 @@ export default function VaultScreen() {
   const renderDocumentCard = (doc: Document) => {
     const expiringSoon = isExpiringSoon(doc.expiryDate);
     const expired = doc.expiryDate && getDaysUntil(doc.expiryDate) < 0;
+    const sharedCount = doc.sharedWith?.length || 0;
 
     return (
       <TouchableOpacity
         key={doc.id}
         style={styles.documentCard}
+        onPress={() => handleOpenShare(doc)}
         onLongPress={() => handleDeleteDocument(doc.id, doc.name)}
       >
         <View style={styles.docIconContainer}>
           <Ionicons
             name={doc.fileType === 'pdf' ? 'document-text' : 'image'}
-            size={32}
+            size={28}
             color={Colors.primary}
           />
         </View>
         <Text style={styles.docName} numberOfLines={2}>{doc.name}</Text>
-        <Text style={styles.docDate}>Ajouté le {formatDate(doc.uploadedAt)}</Text>
+        
+        {/* Sharing indicator */}
+        <View style={styles.sharingRow}>
+          {sharedCount > 0 ? (
+            <View style={styles.sharedBadge}>
+              <Ionicons name="people" size={12} color={Colors.success} />
+              <Text style={styles.sharedText}>{sharedCount} équipe{sharedCount > 1 ? 's' : ''}</Text>
+            </View>
+          ) : (
+            <View style={styles.privateBadge}>
+              <Ionicons name="lock-closed" size={12} color={Colors.text.muted} />
+              <Text style={styles.privateText}>Privé</Text>
+            </View>
+          )}
+        </View>
         
         {doc.expiryDate && (
           <View style={[
@@ -145,7 +188,7 @@ export default function VaultScreen() {
               expired && styles.expiryTextExpired,
               expiringSoon && !expired && styles.expiryTextSoon
             ]}>
-              {expired ? 'Expiré' : `Expire: ${formatDate(doc.expiryDate)}`}
+              {expired ? 'Expiré' : formatDate(doc.expiryDate)}
             </Text>
           </View>
         )}
@@ -164,8 +207,8 @@ export default function VaultScreen() {
       >
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.headerTitle}>Coffre-fort</Text>
-            <Text style={styles.headerSubtitle}>Documents sécurisés</Text>
+            <Text style={styles.headerTitle}>Documents</Text>
+            <Text style={styles.headerSubtitle}>Coffre-fort sécurisé</Text>
           </View>
           <View style={styles.lockIcon}>
             <Ionicons name="lock-closed" size={24} color="rgba(255,255,255,0.9)" />
@@ -182,14 +225,16 @@ export default function VaultScreen() {
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
-            {documents.filter(d => isExpiringSoon(d.expiryDate)).length}
+            {documents.filter(d => (d.sharedWith?.length || 0) > 0).length}
           </Text>
-          <Text style={styles.statLabel}>Expirent bientôt</Text>
+          <Text style={styles.statLabel}>Partagés</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{categories.length}</Text>
-          <Text style={styles.statLabel}>Catégories</Text>
+          <Text style={[styles.statNumber, documents.filter(d => isExpiringSoon(d.expiryDate)).length > 0 && styles.statDanger]}>
+            {documents.filter(d => isExpiringSoon(d.expiryDate)).length}
+          </Text>
+          <Text style={styles.statLabel}>Expirent</Text>
         </View>
       </View>
 
@@ -197,7 +242,6 @@ export default function VaultScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {categories.map(category => {
           const categoryDocs = getDocumentsByCategory(category);
-          const hasExpiring = categoryDocs.some(d => isExpiringSoon(d.expiryDate));
 
           return (
             <View key={category} style={styles.categorySection}>
@@ -214,18 +258,12 @@ export default function VaultScreen() {
                   <View style={styles.categoryBadge}>
                     <Text style={styles.categoryCount}>{categoryDocs.length}</Text>
                   </View>
-                  {hasExpiring && (
-                    <View style={styles.alertBadge}>
-                      <Ionicons name="alert-circle" size={14} color={Colors.warning} />
-                    </View>
-                  )}
                 </View>
               </View>
 
               <View style={styles.documentsGrid}>
                 {categoryDocs.map(doc => renderDocumentCard(doc))}
                 
-                {/* Add Document Card */}
                 <TouchableOpacity
                   style={styles.addDocCard}
                   onPress={() => {
@@ -257,55 +295,129 @@ export default function VaultScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.selectedCategoryBadge}>
-              <Ionicons
-                name={getCategoryIcon(selectedCategory) as any}
-                size={16}
-                color={Colors.primary}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.selectedCategoryBadge}>
+                <Ionicons
+                  name={getCategoryIcon(selectedCategory) as any}
+                  size={16}
+                  color={Colors.primary}
+                />
+                <Text style={styles.selectedCategoryText}>
+                  {getCategoryLabel(selectedCategory)}
+                </Text>
+              </View>
+
+              <TouchableOpacity style={styles.pickButton} onPress={handlePickDocument}>
+                <Ionicons name="cloud-upload-outline" size={40} color={Colors.primary} />
+                <Text style={styles.pickButtonText}>
+                  {newDoc.name || 'Sélectionner un fichier'}
+                </Text>
+                <Text style={styles.pickButtonHint}>PDF ou Image</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.inputLabel}>Date d'expiration (optionnel)</Text>
+              <TextInput
+                style={styles.input}
+                value={newDoc.expiryDate}
+                onChangeText={expiryDate => setNewDoc({ ...newDoc, expiryDate })}
+                placeholder="YYYY-MM-DD (ex: 2027-06-15)"
+                placeholderTextColor={Colors.text.muted}
               />
-              <Text style={styles.selectedCategoryText}>
-                {getCategoryLabel(selectedCategory)}
-              </Text>
-            </View>
 
-            <TouchableOpacity style={styles.pickButton} onPress={handlePickDocument}>
-              <Ionicons name="cloud-upload-outline" size={40} color={Colors.primary} />
-              <Text style={styles.pickButtonText}>
-                {newDoc.name || 'Sélectionner un fichier'}
-              </Text>
-              <Text style={styles.pickButtonHint}>PDF ou Image</Text>
-            </TouchableOpacity>
+              {/* Team Sharing */}
+              <Text style={styles.inputLabel}>Partager avec</Text>
+              <View style={styles.teamGrid}>
+                {teamTypes.map(team => (
+                  <TouchableOpacity
+                    key={team.id}
+                    style={[
+                      styles.teamOption,
+                      selectedTeams.includes(team.id) && { backgroundColor: team.color + '20', borderColor: team.color }
+                    ]}
+                    onPress={() => toggleTeam(team.id)}
+                  >
+                    <Ionicons
+                      name={team.icon as any}
+                      size={20}
+                      color={selectedTeams.includes(team.id) ? team.color : Colors.text.secondary}
+                    />
+                    <Text style={[
+                      styles.teamOptionText,
+                      selectedTeams.includes(team.id) && { color: team.color }
+                    ]}>
+                      {team.label}
+                    </Text>
+                    {selectedTeams.includes(team.id) && (
+                      <Ionicons name="checkmark-circle" size={16} color={team.color} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={styles.inputLabel}>Date d'expiration (optionnel)</Text>
-            <TextInput
-              style={styles.input}
-              value={newDoc.expiryDate}
-              onChangeText={expiryDate => setNewDoc({ ...newDoc, expiryDate })}
-              placeholder="YYYY-MM-DD (ex: 2027-06-15)"
-              placeholderTextColor={Colors.text.muted}
-            />
-
-            <Text style={styles.inputLabel}>Notes (optionnel)</Text>
-            <TextInput
-              style={[styles.input, styles.inputMultiline]}
-              value={newDoc.notes}
-              onChangeText={notes => setNewDoc({ ...newDoc, notes })}
-              placeholder="Notes supplémentaires..."
-              placeholderTextColor={Colors.text.muted}
-              multiline
-              numberOfLines={3}
-            />
-
-            <TouchableOpacity
-              style={[styles.submitBtn, !newDoc.name && styles.submitBtnDisabled]}
-              onPress={handleAddDocument}
-              disabled={!newDoc.name}
-            >
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={styles.submitBtnText}>Enregistrer le document</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitBtn, !newDoc.name && styles.submitBtnDisabled]}
+                onPress={handleAddDocument}
+                disabled={!newDoc.name}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={styles.submitBtnText}>Enregistrer</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Share Document Modal */}
+      <Modal visible={showShareModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Partager le document</Text>
+              <TouchableOpacity onPress={() => setShowShareModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedDoc && (
+              <View style={styles.docPreview}>
+                <Ionicons name="document-text" size={32} color={Colors.primary} />
+                <Text style={styles.docPreviewName}>{selectedDoc.name}</Text>
+              </View>
+            )}
+
+            <Text style={styles.shareLabel}>Choisir les équipes</Text>
+            <View style={styles.teamList}>
+              {teamTypes.map(team => (
+                <TouchableOpacity
+                  key={team.id}
+                  style={[
+                    styles.teamListItem,
+                    selectedTeams.includes(team.id) && styles.teamListItemSelected
+                  ]}
+                  onPress={() => toggleTeam(team.id)}
+                >
+                  <View style={[styles.teamListIcon, { backgroundColor: team.color + '20' }]}>
+                    <Ionicons name={team.icon as any} size={22} color={team.color} />
+                  </View>
+                  <Text style={styles.teamListName}>{team.label}</Text>
+                  <View style={[
+                    styles.checkbox,
+                    selectedTeams.includes(team.id) && { backgroundColor: team.color, borderColor: team.color }
+                  ]}>
+                    {selectedTeams.includes(team.id) && (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.submitBtn} onPress={handleSaveSharing}>
+              <Ionicons name="share-social" size={20} color="#fff" />
+              <Text style={styles.submitBtnText}>Enregistrer le partage</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -365,6 +477,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.primary,
   },
+  statDanger: {
+    color: Colors.danger,
+  },
   statLabel: {
     fontSize: 12,
     color: Colors.text.secondary,
@@ -416,9 +531,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text.secondary,
   },
-  alertBadge: {
-    marginLeft: 8,
-  },
   documentsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -428,7 +540,7 @@ const styles = StyleSheet.create({
     width: '47%',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 14,
+    padding: 12,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -437,32 +549,57 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   docIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(29, 161, 242, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   docName: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: Colors.text.primary,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  docDate: {
-    fontSize: 11,
-    color: Colors.text.secondary,
+  sharingRow: {
+    marginBottom: 6,
+  },
+  sharedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(23, 191, 99, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  sharedText: {
+    fontSize: 10,
+    color: Colors.success,
+    fontWeight: '600',
+  },
+  privateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.background.secondary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  privateText: {
+    fontSize: 10,
+    color: Colors.text.muted,
   },
   expiryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 6,
     backgroundColor: Colors.background.secondary,
   },
@@ -473,7 +610,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.danger,
   },
   expiryText: {
-    fontSize: 10,
+    fontSize: 9,
     color: Colors.text.secondary,
   },
   expiryTextSoon: {
@@ -488,7 +625,7 @@ const styles = StyleSheet.create({
     width: '47%',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 14,
+    padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -497,7 +634,7 @@ const styles = StyleSheet.create({
     minHeight: 130,
   },
   addDocText: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.primary,
     fontWeight: '600',
     marginTop: 6,
@@ -512,6 +649,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -543,7 +681,7 @@ const styles = StyleSheet.create({
   pickButton: {
     backgroundColor: Colors.background.secondary,
     borderRadius: 12,
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 2,
     borderStyle: 'dashed',
@@ -551,10 +689,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   pickButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: Colors.text.primary,
-    marginTop: 10,
+    marginTop: 8,
   },
   pickButtonHint: {
     fontSize: 12,
@@ -565,7 +703,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: Colors.text.secondary,
-    marginBottom: 6,
+    marginBottom: 8,
     marginTop: 8,
   },
   input: {
@@ -577,9 +715,83 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border.light,
   },
-  inputMultiline: {
-    minHeight: 80,
-    textAlignVertical: 'top',
+  teamGrid: {
+    gap: 8,
+  },
+  teamOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: Colors.background.secondary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  teamOptionText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+  },
+  docPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.background.secondary,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  docPreviewName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  shareLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 12,
+  },
+  teamList: {
+    gap: 8,
+  },
+  teamListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: Colors.background.secondary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  teamListItemSelected: {
+    backgroundColor: '#fff',
+  },
+  teamListIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teamListName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: Colors.text.primary,
+    marginLeft: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.border.medium,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   submitBtn: {
     flexDirection: 'row',
