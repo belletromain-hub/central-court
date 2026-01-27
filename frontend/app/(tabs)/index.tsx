@@ -297,6 +297,39 @@ export default function CalendarScreen() {
         </LinearGradient>
       </View>
 
+      {/* Smart Recommendations */}
+      {recommendations.length > 0 && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.recommendationsScroll}
+          contentContainerStyle={styles.recommendationsContainer}
+        >
+          {recommendations.map(rec => (
+            <TouchableOpacity key={rec.id} style={[styles.recommendationCard, { borderLeftColor: rec.color }]}>
+              <View style={styles.recHeader}>
+                <View style={[styles.recIconContainer, { backgroundColor: rec.color + '20' }]}>
+                  <Ionicons name={rec.icon as any} size={18} color={rec.color} />
+                </View>
+                <View style={[styles.recPriorityBadge, { backgroundColor: rec.priority === 'high' ? Colors.danger + '20' : Colors.warning + '20' }]}>
+                  <Text style={[styles.recPriorityText, { color: rec.priority === 'high' ? Colors.danger : Colors.warning }]}>
+                    {rec.priority === 'high' ? 'Important' : 'Suggestion'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.recTitle}>{rec.title}</Text>
+              <Text style={styles.recDescription} numberOfLines={3}>{rec.description}</Text>
+              {rec.actionLabel && (
+                <View style={styles.recAction}>
+                  <Text style={[styles.recActionText, { color: rec.color }]}>{rec.actionLabel}</Text>
+                  <Ionicons name="arrow-forward" size={14} color={rec.color} />
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
       {/* Type Filters */}
       <ScrollView
         horizontal
