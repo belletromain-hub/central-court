@@ -943,4 +943,71 @@ const styles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.5,
   },
+  // Recommendations styles
+  recommendationsScroll: {
+    marginTop: 12,
+    maxHeight: 160,
+  },
+  recommendationsContainer: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  recommendationCard: {
+    width: 280,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  recHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  recIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recPriorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  recPriorityText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  recTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 6,
+  },
+  recDescription: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+    lineHeight: 17,
+  },
+  recAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.light,
+  },
+  recActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });
