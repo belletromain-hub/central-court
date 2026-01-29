@@ -28,14 +28,17 @@ export default function VaultScreen() {
   const { documents, addDocument, deleteDocument, updateDocumentSharing } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showDocModal, setShowDocModal] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('identity');
   const [newDoc, setNewDoc] = useState({
     name: '',
     expiryDate: '',
     notes: '',
+    fileUri: '',
   });
   const [selectedTeams, setSelectedTeams] = useState<TeamType[]>([]);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const getCategoryIcon = (category: string): string => {
     switch (category) {
