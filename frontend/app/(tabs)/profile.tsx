@@ -353,7 +353,10 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Paramètres</Text>
           <View style={styles.menuCard}>
-            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
+            <TouchableOpacity 
+              style={[styles.menuItem, styles.menuItemBorder]}
+              onPress={() => router.push('/(tabs)/settings')}
+            >
               <View style={styles.menuItemLeft}>
                 <Ionicons name="notifications-outline" size={22} color={Colors.text.secondary} />
                 <Text style={styles.menuItemLabel}>Notifications</Text>
