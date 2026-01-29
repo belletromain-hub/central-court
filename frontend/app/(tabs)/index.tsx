@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,18 +11,17 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
-  Dimensions,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Calendar, CalendarList, LocaleConfig } from 'react-native-calendars';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
 import Colors from '../../src/constants/colors';
 import { useApp } from '../../src/context/AppContext';
-import { formatDateRange, formatDate, formatDateShort, getDaysUntil, isDeadlineSoon, getWeekDay } from '../../src/utils/dateFormatter';
+import { formatDateRange, formatDate, formatDateShort, getDaysUntil, isDeadlineSoon, getWeekDay, isDateToday } from '../../src/utils/dateFormatter';
 import { getSurfaceColor, getSurfaceIcon, getEnvironmentIcon } from '../../src/data/tournaments';
 import { getEventTypeColor, getEventTypeIcon, getEventTypeLabel, EventType, CalendarEvent } from '../../src/data/events';
-import { Recommendation } from '../../src/types';
 
 // Configure French locale
 LocaleConfig.locales['fr'] = {
@@ -34,21 +33,19 @@ LocaleConfig.locales['fr'] = {
 };
 LocaleConfig.defaultLocale = 'fr';
 
-type ViewMode = 'timeline' | 'week' | 'month';
-type FilterType = 'all' | 'tournament' | 'media' | 'medical' | 'training' | 'travel' | 'sponsor';
-type StatusFilter = 'all' | 'confirmed' | 'pending';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+type ViewMode = 'today' | 'week' | 'month' | 'list';
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
-  const { tournaments, events, updateTournamentStatus, addEvent, deleteEvent, recommendations } = useApp();
+  const { tournaments, events, updateTournamentStatus, addEvent, recommendations } = useApp();
   const [refreshing, setRefreshing] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('timeline');
+  const [viewMode, setViewMode] = useState<ViewMode>('today');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [typeFilter, setTypeFilter] = useState<FilterType>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [selectedEventForReschedule, setSelectedEventForReschedule] = useState<any>(null);
+  const [rescheduleData, setRescheduleData] = useState({ newTime: '', reason: '' });
   const [newEvent, setNewEvent] = useState<Partial<CalendarEvent>>({
     type: 'training',
     title: '',
@@ -59,7 +56,9 @@ export default function CalendarScreen() {
     priority: 'medium',
   });
 
-  // Combine tournaments and events into unified timeline
+  const today = new Date().toISOString().split('T')[0];
+
+  // Combine tournaments and events
   const allItems = useMemo(() => {
     const tournamentItems = tournaments.map(t => ({
       id: `t-${t.id}`,
@@ -67,7 +66,8 @@ export default function CalendarScreen() {
       title: t.name,
       date: t.dates.start,
       endDate: t.dates.end,
-      location: `${t.location}, ${t.country} ${t.countryFlag}`,
+      location: `${t.location}, ${t.country}`,
+      locationFlag: t.countryFlag,
       status: t.status,
       priority: 'high' as const,
       tournament: t,
@@ -83,42 +83,59 @@ export default function CalendarScreen() {
     );
   }, [tournaments, events]);
 
+  // Today's events
+  const todayEvents = useMemo(() => {
+    return allItems.filter(item => item.date === today);
+  }, [allItems, today]);
+
+  // Upcoming events (next 7 days, excluding today)
+  const upcomingEvents = useMemo(() => {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return allItems.filter(item => {
+      const itemDate = new Date(item.date);
+      const todayDate = new Date(today);
+      return itemDate > todayDate && itemDate <= nextWeek;
+    }).slice(0, 5);
+  }, [allItems, today]);
+
+  // Urgent items (deadlines soon)
+  const urgentItems = useMemo(() => {
+    return tournaments.filter(t => 
+      t.status === 'pending' && isDeadlineSoon(t.deadline, 72)
+    ).slice(0, 2);
+  }, [tournaments]);
+
   // Create marked dates for calendar
   const markedDates = useMemo(() => {
     const marks: any = {};
-    
     allItems.forEach(item => {
       const color = item.type === 'tournament' 
-        ? (item as any).tournament ? getSurfaceColor((item as any).tournament.surface) : Colors.primary
+        ? getSurfaceColor((item as any).tournament?.surface || 'Hard')
         : getEventTypeColor(item.type);
-      
       if (!marks[item.date]) {
         marks[item.date] = { dots: [], marked: true };
       }
       marks[item.date].dots.push({ color });
     });
-    
-    // Add selected date styling
     if (marks[selectedDate]) {
       marks[selectedDate] = { ...marks[selectedDate], selected: true, selectedColor: Colors.primary };
     } else {
       marks[selectedDate] = { selected: true, selectedColor: Colors.primary };
     }
-    
     return marks;
   }, [allItems, selectedDate]);
 
-  // Get events for selected date
+  // Selected date events
   const selectedDateEvents = useMemo(() => {
     return allItems.filter(item => item.date === selectedDate);
   }, [allItems, selectedDate]);
 
-  // Get events for the selected week
+  // Week events
   const weekEvents = useMemo(() => {
     const selected = new Date(selectedDate);
     const startOfWeek = new Date(selected);
-    startOfWeek.setDate(selected.getDate() - selected.getDay() + 1); // Monday
-    
+    startOfWeek.setDate(selected.getDate() - selected.getDay() + 1);
     const weekDays = [];
     for (let i = 0; i < 7; i++) {
       const day = new Date(startOfWeek);
@@ -130,34 +147,54 @@ export default function CalendarScreen() {
     return weekDays;
   }, [allItems, selectedDate]);
 
-  // Apply filters
-  const filteredItems = useMemo(() => {
-    return allItems.filter(item => {
-      if (typeFilter !== 'all' && item.type !== typeFilter) return false;
-      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
-      return true;
-    });
-  }, [allItems, typeFilter, statusFilter]);
-
-  // Stats
-  const stats = useMemo(() => {
-    const thisMonth = new Date().getMonth();
-    const tournamentsThisMonth = tournaments.filter(t => 
-      new Date(t.dates.start).getMonth() === thisMonth
-    ).length;
-    const confirmed = allItems.filter(i => i.status === 'confirmed').length;
-    const pending = allItems.filter(i => i.status === 'pending').length;
-    return { tournamentsThisMonth, confirmed, pending };
-  }, [tournaments, allItems]);
-
   const onRefresh = () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1000);
   };
 
+  // Open location in Maps
+  const openInMaps = (location: string) => {
+    const encodedLocation = encodeURIComponent(location);
+    const url = Platform.select({
+      ios: `maps:0,0?q=${encodedLocation}`,
+      android: `geo:0,0?q=${encodedLocation}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${encodedLocation}`,
+    });
+    Linking.openURL(url).catch(() => {
+      // Fallback to Google Maps web
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodedLocation}`);
+    });
+  };
+
+  // Handle reschedule request
+  const handleRescheduleRequest = (event: any) => {
+    if (event.type === 'training' || event.type === 'medical') {
+      setSelectedEventForReschedule(event);
+      setRescheduleData({ newTime: event.time || '', reason: '' });
+      setShowRescheduleModal(true);
+    }
+  };
+
+  const submitRescheduleRequest = () => {
+    if (!rescheduleData.newTime) {
+      Alert.alert('Erreur', 'Veuillez indiquer le nouvel horaire souhaité');
+      return;
+    }
+    
+    // Here we would send notification to staff - for now show confirmation
+    Alert.alert(
+      'Demande envoyée',
+      `Votre demande de modification pour "${selectedEventForReschedule?.title}" a été envoyée au staff concerné.`,
+      [{ text: 'OK' }]
+    );
+    
+    setShowRescheduleModal(false);
+    setSelectedEventForReschedule(null);
+    setRescheduleData({ newTime: '', reason: '' });
+  };
+
   const handleAddEvent = () => {
     if (!newEvent.title || !newEvent.date) return;
-    
     const event: CalendarEvent = {
       id: `new-${Date.now()}`,
       type: newEvent.type as EventType,
@@ -169,18 +206,9 @@ export default function CalendarScreen() {
       priority: newEvent.priority as 'high' | 'medium' | 'low',
       description: newEvent.description,
     };
-    
     addEvent(event);
     setShowAddModal(false);
-    setNewEvent({
-      type: 'training',
-      title: '',
-      date: '',
-      time: '',
-      location: '',
-      status: 'pending',
-      priority: 'medium',
-    });
+    setNewEvent({ type: 'training', title: '', date: '', time: '', location: '', status: 'pending', priority: 'medium' });
   };
 
   const navigateWeek = (direction: number) => {
@@ -190,191 +218,170 @@ export default function CalendarScreen() {
   };
 
   const goToToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(today);
+    setViewMode('today');
   };
 
-  const renderEventCompact = (item: any) => {
+  // Compact event card for today view
+  const renderEventSimple = (item: any, showDate = false) => {
     const color = item.type === 'tournament'
       ? getSurfaceColor(item.tournament?.surface || 'Hard')
       : getEventTypeColor(item.type);
     const icon = item.type === 'tournament' ? 'trophy' : getEventTypeIcon(item.type);
+    const canReschedule = item.type === 'training' || item.type === 'medical';
 
     return (
       <TouchableOpacity
         key={item.id}
-        style={[styles.eventCompact, { borderLeftColor: color }]}
+        style={styles.eventSimple}
+        onLongPress={() => canReschedule && handleRescheduleRequest(item)}
+        delayLongPress={500}
       >
-        <View style={[styles.eventCompactIcon, { backgroundColor: color + '20' }]}>
-          <Ionicons name={icon as any} size={14} color={color} />
+        <View style={[styles.eventSimpleBar, { backgroundColor: color }]} />
+        <View style={styles.eventSimpleContent}>
+          <View style={styles.eventSimpleHeader}>
+            <View style={styles.eventSimpleLeft}>
+              <Ionicons name={icon as any} size={16} color={color} />
+              <Text style={styles.eventSimpleTitle} numberOfLines={1}>{item.title}</Text>
+            </View>
+            {item.status === 'confirmed' && (
+              <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+            )}
+          </View>
+          <View style={styles.eventSimpleMeta}>
+            {item.time && (
+              <View style={styles.eventSimpleMetaItem}>
+                <Ionicons name="time-outline" size={12} color={Colors.text.secondary} />
+                <Text style={styles.eventSimpleMetaText}>{item.time}</Text>
+              </View>
+            )}
+            {item.location && (
+              <TouchableOpacity 
+                style={styles.eventSimpleMetaItem}
+                onPress={() => openInMaps(item.location)}
+              >
+                <Ionicons name="location" size={12} color={Colors.primary} />
+                <Text style={[styles.eventSimpleMetaText, { color: Colors.primary }]} numberOfLines={1}>
+                  {item.locationFlag || ''} {item.location.split(',')[0]}
+                </Text>
+                <Ionicons name="open-outline" size={10} color={Colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          {showDate && (
+            <Text style={styles.eventSimpleDate}>{formatDateShort(item.date)}</Text>
+          )}
         </View>
-        <View style={styles.eventCompactContent}>
-          <Text style={styles.eventCompactTitle} numberOfLines={1}>{item.title}</Text>
-          {item.time && <Text style={styles.eventCompactTime}>{item.time}</Text>}
-        </View>
-        {item.status === 'confirmed' && (
-          <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+        {canReschedule && (
+          <TouchableOpacity 
+            style={styles.rescheduleBtn}
+            onPress={() => handleRescheduleRequest(item)}
+          >
+            <Ionicons name="time" size={18} color={Colors.text.muted} />
+          </TouchableOpacity>
         )}
       </TouchableOpacity>
     );
   };
 
-  const renderTournamentCard = (item: any) => {
-    const t = item.tournament;
-    const daysUntilDeadline = getDaysUntil(t.deadline);
-    const isUrgent = isDeadlineSoon(t.deadline);
-
-    return (
-      <View style={styles.tournamentCard}>
-        <View style={styles.tournamentHeader}>
-          <View style={styles.tournamentInfo}>
-            <Text style={styles.tournamentTitle}>{t.name}</Text>
-            <Text style={styles.tournamentLocation}>
-              {t.countryFlag} {t.location}, {t.country}
-            </Text>
-          </View>
-          <View style={[styles.surfaceBadge, { backgroundColor: getSurfaceColor(t.surface) }]}>
-            <Text style={styles.surfaceText}>{getSurfaceIcon(t.surface)} {t.surface}</Text>
-          </View>
+  // Today View - Clean and focused
+  const renderTodayView = () => (
+    <ScrollView
+      style={styles.todayContainer}
+      contentContainerStyle={styles.todayContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Today's Events */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Aujourd'hui</Text>
+          <Text style={styles.sectionDate}>{formatDate(today)}</Text>
         </View>
         
-        <View style={styles.tournamentDetails}>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Dates</Text>
-            <Text style={styles.detailValue}>{formatDateRange(t.dates.start, t.dates.end)}</Text>
+        {todayEvents.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="sunny-outline" size={40} color={Colors.text.muted} />
+            <Text style={styles.emptyStateText}>Journée libre</Text>
+            <Text style={styles.emptyStateSubtext}>Aucun événement prévu</Text>
           </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Environnement</Text>
-            <Text style={styles.detailValue}>{getEnvironmentIcon(t.environment)} {t.environment}</Text>
+        ) : (
+          <View style={styles.eventsList}>
+            {todayEvents.map(item => renderEventSimple(item))}
           </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Prize Money</Text>
-            <Text style={styles.detailValue}>{t.prize}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Tableau</Text>
-            <Text style={styles.detailValue}>SGL {t.draw.sgl} / DBL {t.draw.dbl}</Text>
-          </View>
-        </View>
+        )}
+      </View>
 
-        <View style={styles.deadlineRow}>
-          <View style={[styles.deadlineBadge, isUrgent && styles.deadlineUrgent]}>
-            <Ionicons name="time-outline" size={14} color={isUrgent ? '#fff' : Colors.warning} />
-            <Text style={[styles.deadlineText, isUrgent && styles.deadlineTextUrgent]}>
-              Deadline: {formatDate(t.deadline)} {isUrgent ? `(${daysUntilDeadline}j)` : ''}
-            </Text>
+      {/* Urgent Actions */}
+      {urgentItems.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.urgentHeader}>
+              <Ionicons name="alert-circle" size={18} color={Colors.danger} />
+              <Text style={[styles.sectionTitle, { color: Colors.danger }]}>Action requise</Text>
+            </View>
           </View>
-        </View>
-
-        <View style={styles.tournamentActions}>
-          {t.status === 'pending' ? (
+          {urgentItems.map(t => (
             <TouchableOpacity
-              style={styles.btnPrimary}
+              key={t.id}
+              style={styles.urgentCard}
               onPress={() => updateTournamentStatus(t.id, 'confirmed')}
             >
-              <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <Text style={styles.btnPrimaryText}>Confirmer</Text>
+              <View style={styles.urgentInfo}>
+                <Text style={styles.urgentTitle}>{t.name}</Text>
+                <Text style={styles.urgentDeadline}>
+                  Deadline: {formatDate(t.deadline)} ({getDaysUntil(t.deadline)}j)
+                </Text>
+              </View>
+              <View style={styles.urgentAction}>
+                <Text style={styles.urgentActionText}>Confirmer</Text>
+                <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+              </View>
             </TouchableOpacity>
-          ) : (
-            <View style={styles.confirmedBadge}>
-              <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-              <Text style={styles.confirmedText}>Confirmé</Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => Linking.openURL(`tel:${t.contact}`)}
-          >
-            <Ionicons name="call" size={18} color={Colors.text.secondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => Linking.openURL(t.links.registration)}
-          >
-            <Ionicons name="open-outline" size={18} color={Colors.text.secondary} />
-            <Text style={styles.btnSecondaryText}>Zone Joueur</Text>
-          </TouchableOpacity>
+          ))}
         </View>
-      </View>
-    );
-  };
+      )}
 
-  const renderEventCard = (item: CalendarEvent & { id: string }) => {
-    const color = getEventTypeColor(item.type);
-    const icon = getEventTypeIcon(item.type);
-    const label = getEventTypeLabel(item.type);
-
-    return (
-      <View style={[styles.eventCard, { borderLeftColor: color }]}>
-        <View style={styles.eventHeader}>
-          <View style={[styles.eventTypeBadge, { backgroundColor: color }]}>
-            <Ionicons name={icon as any} size={14} color="#fff" />
-            <Text style={styles.eventTypeText}>{label}</Text>
+      {/* Upcoming */}
+      {upcomingEvents.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>À venir</Text>
+            <TouchableOpacity onPress={() => setViewMode('list')}>
+              <Text style={styles.seeAllText}>Voir tout</Text>
+            </TouchableOpacity>
           </View>
-          {item.status === 'confirmed' ? (
-            <View style={styles.eventStatusConfirmed}>
-              <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-            </View>
-          ) : (
-            <View style={styles.eventStatusPending}>
-              <Ionicons name="time" size={16} color={Colors.warning} />
-            </View>
-          )}
+          <View style={styles.eventsList}>
+            {upcomingEvents.map(item => renderEventSimple(item, true))}
+          </View>
         </View>
-        
-        <Text style={styles.eventTitle}>{item.title}</Text>
-        {item.description && (
-          <Text style={styles.eventDescription}>{item.description}</Text>
-        )}
-        
-        <View style={styles.eventMeta}>
-          {item.time && (
-            <View style={styles.eventMetaItem}>
-              <Ionicons name="time-outline" size={14} color={Colors.text.secondary} />
-              <Text style={styles.eventMetaText}>
-                {item.time}{item.endTime ? ` - ${item.endTime}` : ''}
-              </Text>
-            </View>
-          )}
-          {item.location && (
-            <View style={styles.eventMetaItem}>
-              <Ionicons name="location-outline" size={14} color={Colors.text.secondary} />
-              <Text style={styles.eventMetaText}>{item.location}</Text>
-            </View>
-          )}
-        </View>
+      )}
 
-        {item.contact && (
-          <TouchableOpacity
-            style={styles.eventContact}
-            onPress={() => Linking.openURL(`tel:${item.contact}`)}
-          >
-            <Ionicons name="call-outline" size={14} color={Colors.primary} />
-            <Text style={styles.eventContactText}>{item.contact}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
+      {/* Recommendations Button */}
+      {recommendations.length > 0 && (
+        <TouchableOpacity 
+          style={styles.recommendationsButton}
+          onPress={() => setShowRecommendations(true)}
+        >
+          <Ionicons name="bulb-outline" size={20} color={Colors.warning} />
+          <Text style={styles.recommendationsButtonText}>
+            {recommendations.length} suggestion{recommendations.length > 1 ? 's' : ''} disponible{recommendations.length > 1 ? 's' : ''}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.text.secondary} />
+        </TouchableOpacity>
+      )}
 
-  const typeFilters: { key: FilterType; label: string; icon: string }[] = [
-    { key: 'all', label: 'Tout', icon: 'apps' },
-    { key: 'tournament', label: 'Tournois', icon: 'trophy' },
-    { key: 'media', label: 'Média', icon: 'camera' },
-    { key: 'medical', label: 'Médical', icon: 'medkit' },
-    { key: 'training', label: 'Training', icon: 'fitness' },
-    { key: 'travel', label: 'Voyages', icon: 'airplane' },
-    { key: 'sponsor', label: 'Sponsors', icon: 'briefcase' },
-  ];
+      <View style={{ height: 100 }} />
+    </ScrollView>
+  );
 
-  // Week View Render
+  // Week View
   const renderWeekView = () => {
     const weekStart = new Date(weekEvents[0].date);
-    const weekEnd = new Date(weekEvents[6].date);
     const monthYear = weekStart.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 
     return (
       <View style={styles.weekViewContainer}>
-        {/* Week Header */}
         <View style={styles.weekHeader}>
           <TouchableOpacity onPress={() => navigateWeek(-1)} style={styles.weekNavBtn}>
             <Ionicons name="chevron-back" size={24} color={Colors.primary} />
@@ -390,20 +397,16 @@ export default function CalendarScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Days Row */}
         <View style={styles.weekDaysRow}>
           {weekEvents.map((dayData, index) => {
-            const isToday = dayData.date === new Date().toISOString().split('T')[0];
+            const isToday = dayData.date === today;
             const isSelected = dayData.date === selectedDate;
             const hasEvents = dayData.events.length > 0;
 
             return (
               <TouchableOpacity
                 key={dayData.date}
-                style={[
-                  styles.weekDayColumn,
-                  isSelected && styles.weekDaySelected,
-                ]}
+                style={[styles.weekDayColumn, isSelected && styles.weekDaySelected]}
                 onPress={() => setSelectedDate(dayData.date)}
               >
                 <Text style={[styles.weekDayName, isSelected && styles.weekDayTextSelected]}>
@@ -443,22 +446,17 @@ export default function CalendarScreen() {
           })}
         </View>
 
-        {/* Selected Day Events */}
         <ScrollView style={styles.weekEventsContainer}>
           <Text style={styles.selectedDayTitle}>
             {getWeekDay(selectedDate)} {formatDate(selectedDate)}
           </Text>
           {selectedDateEvents.length === 0 ? (
             <View style={styles.noEventsContainer}>
-              <Ionicons name="calendar-outline" size={40} color={Colors.text.muted} />
+              <Ionicons name="calendar-outline" size={36} color={Colors.text.muted} />
               <Text style={styles.noEventsText}>Aucun événement</Text>
             </View>
           ) : (
-            selectedDateEvents.map(item => 
-              item.type === 'tournament' && (item as any).tournament
-                ? <View key={item.id}>{renderTournamentCard(item)}</View>
-                : <View key={item.id}>{renderEventCard(item as CalendarEvent & { id: string })}</View>
-            )
+            selectedDateEvents.map(item => renderEventSimple(item))
           )}
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -466,180 +464,84 @@ export default function CalendarScreen() {
     );
   };
 
-  // Month View Render
-  const renderMonthView = () => {
-    return (
-      <View style={styles.monthViewContainer}>
-        <Calendar
-          current={selectedDate}
-          onDayPress={(day: any) => setSelectedDate(day.dateString)}
-          markingType={'multi-dot'}
-          markedDates={markedDates}
-          theme={{
-            backgroundColor: Colors.background.secondary,
-            calendarBackground: '#fff',
-            textSectionTitleColor: Colors.text.secondary,
-            selectedDayBackgroundColor: Colors.primary,
-            selectedDayTextColor: '#fff',
-            todayTextColor: Colors.primary,
-            dayTextColor: Colors.text.primary,
-            textDisabledColor: Colors.text.muted,
-            dotColor: Colors.primary,
-            arrowColor: Colors.primary,
-            monthTextColor: Colors.text.primary,
-            textDayFontWeight: '500',
-            textMonthFontWeight: '700',
-            textDayHeaderFontWeight: '600',
-            textDayFontSize: 15,
-            textMonthFontSize: 18,
-            textDayHeaderFontSize: 13,
-          }}
-          style={styles.calendar}
-        />
-
-        {/* Selected Day Events */}
-        <ScrollView style={styles.monthEventsContainer}>
-          <Text style={styles.selectedDayTitle}>
-            {getWeekDay(selectedDate)} {formatDate(selectedDate)}
-          </Text>
-          {selectedDateEvents.length === 0 ? (
-            <View style={styles.noEventsContainerSmall}>
-              <Text style={styles.noEventsTextSmall}>Aucun événement ce jour</Text>
-            </View>
-          ) : (
-            selectedDateEvents.map(item => renderEventCompact(item))
-          )}
-        </ScrollView>
-      </View>
-    );
-  };
-
-  // Timeline View Render (original)
-  const renderTimelineView = () => {
-    return (
-      <>
-        {/* Smart Recommendations */}
-        {recommendations.length > 0 && (
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.recommendationsScroll}
-            contentContainerStyle={styles.recommendationsContainer}
-          >
-            {recommendations.map(rec => (
-              <TouchableOpacity key={rec.id} style={[styles.recommendationCard, { borderLeftColor: rec.color }]}>
-                <View style={styles.recHeader}>
-                  <View style={[styles.recIconContainer, { backgroundColor: rec.color + '20' }]}>
-                    <Ionicons name={rec.icon as any} size={18} color={rec.color} />
-                  </View>
-                  <View style={[styles.recPriorityBadge, { backgroundColor: rec.priority === 'high' ? Colors.danger + '20' : Colors.warning + '20' }]}>
-                    <Text style={[styles.recPriorityText, { color: rec.priority === 'high' ? Colors.danger : Colors.warning }]}>
-                      {rec.priority === 'high' ? 'Important' : 'Suggestion'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.recTitle}>{rec.title}</Text>
-                <Text style={styles.recDescription} numberOfLines={3}>{rec.description}</Text>
-                {rec.actionLabel && (
-                  <View style={styles.recAction}>
-                    <Text style={[styles.recActionText, { color: rec.color }]}>{rec.actionLabel}</Text>
-                    <Ionicons name="arrow-forward" size={14} color={rec.color} />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+  // Month View
+  const renderMonthView = () => (
+    <View style={styles.monthViewContainer}>
+      <Calendar
+        current={selectedDate}
+        onDayPress={(day: any) => setSelectedDate(day.dateString)}
+        markingType={'multi-dot'}
+        markedDates={markedDates}
+        theme={{
+          backgroundColor: Colors.background.secondary,
+          calendarBackground: '#fff',
+          textSectionTitleColor: Colors.text.secondary,
+          selectedDayBackgroundColor: Colors.primary,
+          selectedDayTextColor: '#fff',
+          todayTextColor: Colors.primary,
+          dayTextColor: Colors.text.primary,
+          textDisabledColor: Colors.text.muted,
+          arrowColor: Colors.primary,
+          monthTextColor: Colors.text.primary,
+          textDayFontWeight: '500',
+          textMonthFontWeight: '700',
+          textDayHeaderFontWeight: '600',
+          textDayFontSize: 15,
+          textMonthFontSize: 18,
+          textDayHeaderFontSize: 13,
+        }}
+        style={styles.calendar}
+      />
+      <ScrollView style={styles.monthEventsContainer}>
+        <Text style={styles.selectedDayTitle}>
+          {getWeekDay(selectedDate)} {formatDate(selectedDate)}
+        </Text>
+        {selectedDateEvents.length === 0 ? (
+          <View style={styles.noEventsContainerSmall}>
+            <Text style={styles.noEventsTextSmall}>Aucun événement</Text>
+          </View>
+        ) : (
+          selectedDateEvents.map(item => renderEventSimple(item))
         )}
+      </ScrollView>
+    </View>
+  );
 
-        {/* Type Filters */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterContainer}
-        >
-          {typeFilters.map(f => (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.filterBtn, typeFilter === f.key && styles.filterBtnActive]}
-              onPress={() => setTypeFilter(f.key)}
-            >
-              <Ionicons
-                name={f.icon as any}
-                size={16}
-                color={typeFilter === f.key ? '#fff' : Colors.text.secondary}
-              />
-              <Text style={[styles.filterText, typeFilter === f.key && styles.filterTextActive]}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Status Filters */}
-        <View style={styles.statusFilters}>
-          {['all', 'confirmed', 'pending'].map(s => (
-            <TouchableOpacity
-              key={s}
-              style={[styles.statusBtn, statusFilter === s && styles.statusBtnActive]}
-              onPress={() => setStatusFilter(s as StatusFilter)}
-            >
-              <Text style={[styles.statusText, statusFilter === s && styles.statusTextActive]}>
-                {s === 'all' ? 'Tous' : s === 'confirmed' ? 'Confirmés' : 'En attente'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Timeline */}
-        <ScrollView
-          style={styles.timeline}
-          contentContainerStyle={styles.timelineContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          {filteredItems.map((item, index) => {
-            const showDate = index === 0 || 
-              filteredItems[index - 1].date !== item.date;
-            
-            return (
-              <View key={item.id}>
-                {showDate && (
-                  <View style={styles.dateHeader}>
-                    <View style={styles.dateDot} />
-                    <Text style={styles.dateText}>
-                      {getWeekDay(item.date)} {formatDate(item.date)}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.timelineItem}>
-                  {item.type === 'tournament' && (item as any).tournament
-                    ? renderTournamentCard(item)
-                    : renderEventCard(item as CalendarEvent & { id: string })
-                  }
-                </View>
+  // List View (all events)
+  const renderListView = () => (
+    <ScrollView
+      style={styles.listContainer}
+      contentContainerStyle={styles.listContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      {allItems.map((item, index) => {
+        const showDate = index === 0 || allItems[index - 1].date !== item.date;
+        return (
+          <View key={item.id}>
+            {showDate && (
+              <View style={styles.listDateHeader}>
+                <Text style={styles.listDateText}>
+                  {isDateToday(item.date) ? "Aujourd'hui" : `${getWeekDay(item.date)} ${formatDate(item.date)}`}
+                </Text>
               </View>
-            );
-          })}
-          <View style={{ height: 100 }} />
-        </ScrollView>
-      </>
-    );
-  };
+            )}
+            {renderEventSimple(item)}
+          </View>
+        );
+      })}
+      <View style={{ height: 100 }} />
+    </ScrollView>
+  );
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
         colors={['#1e3c72', '#2a5298']}
-        style={[styles.header, { paddingTop: insets.top + 12 }]}
+        style={[styles.header, { paddingTop: insets.top + 8 }]}
       >
         <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.headerTitle}>Le Central Court</Text>
-            <Text style={styles.headerSubtitle}>Calendrier Unifié</Text>
-          </View>
+          <Text style={styles.headerTitle}>Central Court</Text>
           <TouchableOpacity onPress={goToToday} style={styles.todayBtn}>
             <Text style={styles.todayBtnText}>Aujourd'hui</Text>
           </TouchableOpacity>
@@ -648,9 +550,10 @@ export default function CalendarScreen() {
         {/* View Mode Switcher */}
         <View style={styles.viewModeSwitcher}>
           {[
-            { mode: 'timeline' as ViewMode, icon: 'list', label: 'Liste' },
+            { mode: 'today' as ViewMode, icon: 'today', label: 'Accueil' },
             { mode: 'week' as ViewMode, icon: 'calendar', label: 'Semaine' },
             { mode: 'month' as ViewMode, icon: 'grid', label: 'Mois' },
+            { mode: 'list' as ViewMode, icon: 'list', label: 'Liste' },
           ].map(item => (
             <TouchableOpacity
               key={item.mode}
@@ -659,7 +562,7 @@ export default function CalendarScreen() {
             >
               <Ionicons
                 name={item.icon as any}
-                size={18}
+                size={16}
                 color={viewMode === item.mode ? Colors.primary : 'rgba(255,255,255,0.7)'}
               />
               <Text style={[styles.viewModeText, viewMode === item.mode && styles.viewModeTextActive]}>
@@ -670,39 +573,125 @@ export default function CalendarScreen() {
         </View>
       </LinearGradient>
 
-      {/* Stats Dashboard (only for timeline) */}
-      {viewMode === 'timeline' && (
-        <View style={styles.dashboard}>
-          <LinearGradient colors={['#667eea', '#764ba2']} style={styles.statCard}>
-            <Text style={styles.statLabel}>Ce mois</Text>
-            <Text style={styles.statValue}>{stats.tournamentsThisMonth}</Text>
-            <Text style={styles.statSublabel}>tournois</Text>
-          </LinearGradient>
-          <LinearGradient colors={['#17bf63', '#10a956']} style={styles.statCard}>
-            <Text style={styles.statLabel}>Confirmés</Text>
-            <Text style={styles.statValue}>{stats.confirmed}</Text>
-            <Text style={styles.statSublabel}>événements</Text>
-          </LinearGradient>
-          <LinearGradient colors={['#ffad1f', '#f59e0b']} style={styles.statCard}>
-            <Text style={styles.statLabel}>En attente</Text>
-            <Text style={styles.statValue}>{stats.pending}</Text>
-            <Text style={styles.statSublabel}>décisions</Text>
-          </LinearGradient>
-        </View>
-      )}
-
-      {/* Content based on view mode */}
-      {viewMode === 'timeline' && renderTimelineView()}
+      {/* Content */}
+      {viewMode === 'today' && renderTodayView()}
       {viewMode === 'week' && renderWeekView()}
       {viewMode === 'month' && renderMonthView()}
+      {viewMode === 'list' && renderListView()}
 
-      {/* Add Event FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setShowAddModal(true)}
-      >
+      {/* FAB */}
+      <TouchableOpacity style={styles.fab} onPress={() => setShowAddModal(true)}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
+
+      {/* Reschedule Modal */}
+      <Modal visible={showRescheduleModal} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Modifier l'horaire</Text>
+              <TouchableOpacity onPress={() => setShowRescheduleModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedEventForReschedule && (
+              <View style={styles.rescheduleEventInfo}>
+                <View style={[styles.rescheduleEventIcon, { backgroundColor: getEventTypeColor(selectedEventForReschedule.type) + '20' }]}>
+                  <Ionicons 
+                    name={getEventTypeIcon(selectedEventForReschedule.type) as any} 
+                    size={24} 
+                    color={getEventTypeColor(selectedEventForReschedule.type)} 
+                  />
+                </View>
+                <View style={styles.rescheduleEventDetails}>
+                  <Text style={styles.rescheduleEventTitle}>{selectedEventForReschedule.title}</Text>
+                  <Text style={styles.rescheduleEventDate}>
+                    {formatDate(selectedEventForReschedule.date)} à {selectedEventForReschedule.time}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <Text style={styles.inputLabel}>Nouvel horaire souhaité *</Text>
+            <TextInput
+              style={styles.input}
+              value={rescheduleData.newTime}
+              onChangeText={newTime => setRescheduleData({ ...rescheduleData, newTime })}
+              placeholder="Ex: 10:00 ou 14:30"
+              placeholderTextColor={Colors.text.muted}
+            />
+
+            <Text style={styles.inputLabel}>Raison (optionnel)</Text>
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              value={rescheduleData.reason}
+              onChangeText={reason => setRescheduleData({ ...rescheduleData, reason })}
+              placeholder="Ex: Conflit avec autre RDV..."
+              placeholderTextColor={Colors.text.muted}
+              multiline
+              numberOfLines={3}
+            />
+
+            <View style={styles.rescheduleInfo}>
+              <Ionicons name="notifications" size={16} color={Colors.primary} />
+              <Text style={styles.rescheduleInfoText}>
+                Une notification sera envoyée au staff concerné
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitBtn, !rescheduleData.newTime && styles.submitBtnDisabled]}
+              onPress={submitRescheduleRequest}
+              disabled={!rescheduleData.newTime}
+            >
+              <Ionicons name="send" size={20} color="#fff" />
+              <Text style={styles.submitBtnText}>Envoyer la demande</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Recommendations Modal */}
+      <Modal visible={showRecommendations} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Ionicons name="bulb" size={24} color={Colors.warning} />
+                <Text style={styles.modalTitle}>Suggestions</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowRecommendations(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.recommendationsList}>
+              {recommendations.map(rec => (
+                <View key={rec.id} style={[styles.recommendationItem, { borderLeftColor: rec.color }]}>
+                  <View style={[styles.recIconContainer, { backgroundColor: rec.color + '20' }]}>
+                    <Ionicons name={rec.icon as any} size={22} color={rec.color} />
+                  </View>
+                  <View style={styles.recContent}>
+                    <View style={styles.recHeaderRow}>
+                      <Text style={styles.recTitle}>{rec.title}</Text>
+                      <View style={[styles.recPriorityBadge, { backgroundColor: rec.priority === 'high' ? Colors.danger + '20' : Colors.warning + '20' }]}>
+                        <Text style={[styles.recPriorityText, { color: rec.priority === 'high' ? Colors.danger : Colors.warning }]}>
+                          {rec.priority === 'high' ? 'Important' : 'Suggestion'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.recDescription}>{rec.description}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Add Event Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent>
@@ -735,10 +724,7 @@ export default function CalendarScreen() {
                       size={18}
                       color={newEvent.type === type ? '#fff' : getEventTypeColor(type)}
                     />
-                    <Text style={[
-                      styles.typeOptionText,
-                      newEvent.type === type && { color: '#fff' }
-                    ]}>
+                    <Text style={[styles.typeOptionText, newEvent.type === type && { color: '#fff' }]}>
                       {getEventTypeLabel(type)}
                     </Text>
                   </TouchableOpacity>
@@ -750,7 +736,8 @@ export default function CalendarScreen() {
                 style={styles.input}
                 value={newEvent.title}
                 onChangeText={title => setNewEvent({ ...newEvent, title })}
-                placeholder="Ex: Interview L'Équipe"
+                placeholder="Ex: Séance kiné"
+                placeholderTextColor={Colors.text.muted}
               />
 
               <Text style={styles.inputLabel}>Date * (YYYY-MM-DD)</Text>
@@ -759,6 +746,7 @@ export default function CalendarScreen() {
                 value={newEvent.date}
                 onChangeText={date => setNewEvent({ ...newEvent, date })}
                 placeholder="2026-02-15"
+                placeholderTextColor={Colors.text.muted}
               />
 
               <Text style={styles.inputLabel}>Heure</Text>
@@ -767,6 +755,7 @@ export default function CalendarScreen() {
                 value={newEvent.time}
                 onChangeText={time => setNewEvent({ ...newEvent, time })}
                 placeholder="14:00"
+                placeholderTextColor={Colors.text.muted}
               />
 
               <Text style={styles.inputLabel}>Lieu</Text>
@@ -774,26 +763,17 @@ export default function CalendarScreen() {
                 style={styles.input}
                 value={newEvent.location}
                 onChangeText={location => setNewEvent({ ...newEvent, location })}
-                placeholder="Paris - Studio"
-              />
-
-              <Text style={styles.inputLabel}>Description</Text>
-              <TextInput
-                style={[styles.input, styles.inputMultiline]}
-                value={newEvent.description}
-                onChangeText={description => setNewEvent({ ...newEvent, description })}
-                placeholder="Détails de l'événement..."
-                multiline
-                numberOfLines={3}
+                placeholder="Paris - Centre sportif"
+                placeholderTextColor={Colors.text.muted}
               />
             </ScrollView>
 
             <TouchableOpacity
-              style={[styles.btnPrimary, styles.modalBtn, (!newEvent.title || !newEvent.date) && styles.btnDisabled]}
+              style={[styles.submitBtn, (!newEvent.title || !newEvent.date) && styles.submitBtnDisabled]}
               onPress={handleAddEvent}
               disabled={!newEvent.title || !newEvent.date}
             >
-              <Text style={styles.btnPrimaryText}>Ajouter l'événement</Text>
+              <Text style={styles.submitBtnText}>Ajouter</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -809,22 +789,17 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '700',
     color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
   },
   todayBtn: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -839,59 +814,195 @@ const styles = StyleSheet.create({
   },
   viewModeSwitcher: {
     flexDirection: 'row',
-    marginTop: 12,
+    marginTop: 10,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 10,
-    padding: 4,
+    padding: 3,
   },
   viewModeBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 8,
-    gap: 6,
+    gap: 4,
   },
   viewModeBtnActive: {
     backgroundColor: '#fff',
   },
   viewModeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.7)',
   },
   viewModeTextActive: {
     color: Colors.primary,
   },
-  dashboard: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginTop: -10,
-    gap: 10,
-  },
-  statCard: {
+  // Today View
+  todayContainer: {
     flex: 1,
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
   },
-  statLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
-    textTransform: 'uppercase',
+  todayContent: {
+    padding: 16,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
+  sectionDate: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+  },
+  seeAllText: {
+    fontSize: 14,
+    color: Colors.primary,
     fontWeight: '600',
   },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#fff',
+  urgentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  statSublabel: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.7)',
+  eventsList: {
+    gap: 10,
   },
-  // Week View Styles
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginTop: 12,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginTop: 4,
+  },
+  // Simple Event Card
+  eventSimple: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  eventSimpleBar: {
+    width: 4,
+    alignSelf: 'stretch',
+  },
+  eventSimpleContent: {
+    flex: 1,
+    padding: 14,
+  },
+  eventSimpleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  eventSimpleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  eventSimpleTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    flex: 1,
+  },
+  eventSimpleMeta: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 6,
+  },
+  eventSimpleMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  eventSimpleMetaText: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+  },
+  eventSimpleDate: {
+    fontSize: 11,
+    color: Colors.text.muted,
+    marginTop: 6,
+  },
+  rescheduleBtn: {
+    padding: 14,
+    borderLeftWidth: 1,
+    borderLeftColor: Colors.border.light,
+  },
+  // Urgent Card
+  urgentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.danger + '30',
+    marginBottom: 8,
+  },
+  urgentInfo: {
+    flex: 1,
+  },
+  urgentTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  urgentDeadline: {
+    fontSize: 13,
+    color: Colors.danger,
+    marginTop: 2,
+  },
+  urgentAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  urgentActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  // Recommendations Button
+  recommendationsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.warning + '30',
+  },
+  recommendationsButtonText: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    flex: 1,
+  },
+  // Week View
   weekViewContainer: {
     flex: 1,
   },
@@ -910,13 +1021,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   weekTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.text.primary,
     textTransform: 'capitalize',
   },
   weekSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.text.secondary,
     marginTop: 2,
   },
@@ -931,25 +1042,25 @@ const styles = StyleSheet.create({
   weekDayColumn: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
   weekDaySelected: {
     backgroundColor: 'rgba(29, 161, 242, 0.1)',
   },
   weekDayName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: Colors.text.secondary,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   weekDayTextSelected: {
     color: Colors.primary,
   },
   weekDayNumber: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -960,7 +1071,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   weekDayNumberText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.text.primary,
   },
@@ -972,21 +1083,20 @@ const styles = StyleSheet.create({
   },
   weekDayDots: {
     flexDirection: 'row',
-    marginTop: 6,
-    gap: 3,
+    marginTop: 4,
+    gap: 2,
   },
   weekDayDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   weekEventsContainer: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    padding: 16,
   },
   selectedDayTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.text.primary,
     marginBottom: 12,
@@ -994,23 +1104,22 @@ const styles = StyleSheet.create({
   },
   noEventsContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 32,
   },
   noEventsText: {
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.text.muted,
-    marginTop: 12,
+    marginTop: 8,
   },
   noEventsContainerSmall: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 16,
   },
   noEventsTextSmall: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.text.muted,
   },
-  // Month View Styles
+  // Month View
   monthViewContainer: {
     flex: 1,
   },
@@ -1020,403 +1129,26 @@ const styles = StyleSheet.create({
   },
   monthEventsContainer: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    padding: 16,
   },
-  eventCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-  },
-  eventCompactIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eventCompactContent: {
+  // List View
+  listContainer: {
     flex: 1,
-    marginLeft: 10,
   },
-  eventCompactTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.primary,
+  listContent: {
+    padding: 16,
   },
-  eventCompactTime: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-    marginTop: 2,
-  },
-  // Recommendations
-  recommendationsScroll: {
-    marginTop: 12,
-    maxHeight: 160,
-  },
-  recommendationsContainer: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  recommendationCard: {
-    width: 280,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  recHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  recIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recPriorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  recPriorityText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  recTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text.primary,
-    marginBottom: 6,
-  },
-  recDescription: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-    lineHeight: 17,
-  },
-  recAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
-  },
-  recActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  filterScroll: {
-    marginTop: 16,
-    maxHeight: 50,
-  },
-  filterContainer: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  filterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
+  listDateHeader: {
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
+    marginTop: 8,
   },
-  filterBtnActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterText: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-    fontWeight: '500',
-  },
-  filterTextActive: {
-    color: '#fff',
-  },
-  statusFilters: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginTop: 12,
-    gap: 8,
-  },
-  statusBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-  },
-  statusBtnActive: {
-    backgroundColor: Colors.text.primary,
-    borderColor: Colors.text.primary,
-  },
-  statusText: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-    fontWeight: '500',
-  },
-  statusTextActive: {
-    color: '#fff',
-  },
-  timeline: {
-    flex: 1,
-    marginTop: 16,
-  },
-  timelineContent: {
-    paddingHorizontal: 16,
-  },
-  dateHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  dateDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.primary,
-    marginRight: 10,
-  },
-  dateText: {
+  listDateText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.text.primary,
+    color: Colors.text.secondary,
     textTransform: 'capitalize',
   },
-  timelineItem: {
-    marginBottom: 12,
-    marginLeft: 20,
-    borderLeftWidth: 2,
-    borderLeftColor: Colors.border.light,
-    paddingLeft: 16,
-  },
-  tournamentCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tournamentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  tournamentInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  tournamentTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text.primary,
-  },
-  tournamentLocation: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-    marginTop: 4,
-  },
-  surfaceBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  surfaceText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  tournamentDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 12,
-  },
-  detailItem: {
-    width: '45%',
-  },
-  detailLabel: {
-    fontSize: 11,
-    color: Colors.text.secondary,
-    textTransform: 'uppercase',
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    marginTop: 2,
-  },
-  deadlineRow: {
-    marginBottom: 12,
-  },
-  deadlineBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 173, 31, 0.1)',
-    alignSelf: 'flex-start',
-  },
-  deadlineUrgent: {
-    backgroundColor: Colors.danger,
-  },
-  deadlineText: {
-    fontSize: 12,
-    color: Colors.warning,
-    fontWeight: '600',
-  },
-  deadlineTextUrgent: {
-    color: '#fff',
-  },
-  tournamentActions: {
-    flexDirection: 'row',
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
-    paddingTop: 12,
-  },
-  btnPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  btnPrimaryText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  btnSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.background.secondary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  btnSecondaryText: {
-    color: Colors.text.secondary,
-    fontWeight: '500',
-    fontSize: 13,
-  },
-  confirmedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  confirmedText: {
-    color: Colors.success,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  eventCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 14,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  eventHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  eventTypeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  eventTypeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  eventStatusConfirmed: {
-    padding: 2,
-  },
-  eventStatusPending: {
-    padding: 2,
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  eventDescription: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-    marginTop: 4,
-  },
-  eventMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 10,
-  },
-  eventMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  eventMetaText: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-  },
-  eventContact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
-  },
-  eventContactText: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '500',
-  },
+  // FAB
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -1433,6 +1165,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
+  // Modals
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1449,7 +1182,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   modalTitle: {
     fontSize: 20,
@@ -1457,7 +1195,7 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   modalForm: {
-    maxHeight: 400,
+    maxHeight: 350,
   },
   inputLabel: {
     fontSize: 13,
@@ -1500,11 +1238,117 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.text.secondary,
   },
-  modalBtn: {
-    marginTop: 20,
+  submitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 16,
     marginBottom: Platform.OS === 'ios' ? 20 : 0,
   },
-  btnDisabled: {
+  submitBtnDisabled: {
     opacity: 0.5,
+  },
+  submitBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Reschedule
+  rescheduleEventInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background.secondary,
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  rescheduleEventIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rescheduleEventDetails: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  rescheduleEventTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  rescheduleEventDate: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    marginTop: 2,
+  },
+  rescheduleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary + '10',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 16,
+  },
+  rescheduleInfoText: {
+    fontSize: 13,
+    color: Colors.primary,
+    flex: 1,
+  },
+  // Recommendations
+  recommendationsList: {
+    maxHeight: 400,
+  },
+  recommendationItem: {
+    flexDirection: 'row',
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+  },
+  recIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  recHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  recTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    flex: 1,
+  },
+  recPriorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  recPriorityText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  recDescription: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    lineHeight: 18,
   },
 });
