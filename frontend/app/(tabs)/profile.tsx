@@ -277,7 +277,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Team Management (Player only) */}
-        {user.role === 'player' && (
+        {displayUser.role === 'player' && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Mon équipe</Text>
