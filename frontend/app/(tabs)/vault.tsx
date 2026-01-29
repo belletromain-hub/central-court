@@ -73,10 +73,79 @@ export default function VaultScreen() {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        setNewDoc(prev => ({ ...prev, name: file.name }));
+        setNewDoc(prev => ({ 
+          ...prev, 
+          name: file.name,
+          fileUri: file.uri 
+        }));
       }
     } catch (error) {
       console.error('Error picking document:', error);
+    }
+  };
+
+  // Open document preview modal
+  const handleOpenDoc = (doc: Document) => {
+    setSelectedDoc(doc);
+    setShowDocModal(true);
+  };
+
+  // Download/share document
+  const handleDownloadDoc = async (doc: Document) => {
+    if (!doc.fileUri) {
+      Alert.alert('Erreur', 'Ce document n\'a pas de fichier associé');
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      if (Platform.OS === 'web') {
+        // On web, use native download
+        const link = document.createElement('a');
+        link.href = doc.fileUri;
+        link.download = doc.name;
+        link.click();
+      } else {
+        // On mobile, use sharing
+        const isSharingAvailable = await Sharing.isAvailableAsync();
+        if (isSharingAvailable) {
+          // Copy to a shareable location if needed
+          const filename = doc.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const targetUri = `${FileSystem.cacheDirectory}${filename}`;
+          
+          // If the file is already in the cache, share directly
+          // Otherwise, we need to handle the case where file is external
+          try {
+            const fileInfo = await FileSystem.getInfoAsync(doc.fileUri);
+            if (fileInfo.exists) {
+              await Sharing.shareAsync(doc.fileUri, {
+                mimeType: doc.fileType === 'pdf' ? 'application/pdf' : 'image/*',
+                dialogTitle: `Partager ${doc.name}`,
+              });
+            } else {
+              // File doesn't exist, show demo message
+              Alert.alert(
+                'Démo', 
+                'Dans la version complète, ce document serait téléchargé depuis le serveur et partagé.',
+                [{ text: 'OK' }]
+              );
+            }
+          } catch {
+            Alert.alert(
+              'Partager', 
+              `Le document "${doc.name}" serait partagé ici.`,
+              [{ text: 'OK' }]
+            );
+          }
+        } else {
+          Alert.alert('Erreur', 'Le partage n\'est pas disponible sur cet appareil');
+        }
+      }
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      Alert.alert('Erreur', 'Impossible de télécharger le document');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
