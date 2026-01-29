@@ -204,21 +204,65 @@ export default function CalendarScreen() {
   };
 
   const handleAddEvent = () => {
-    if (!newEvent.title || !newEvent.date) return;
-    const event: CalendarEvent = {
-      id: `new-${Date.now()}`,
-      type: newEvent.type as EventType,
-      title: newEvent.title,
-      date: newEvent.date,
-      time: newEvent.time,
-      location: newEvent.location,
-      status: newEvent.status as 'pending' | 'confirmed' | 'cancelled',
-      priority: newEvent.priority as 'high' | 'medium' | 'low',
-      description: newEvent.description,
-    };
-    addEvent(event);
+    if (!newEvent.title || !newEvent.date) {
+      Alert.alert('Erreur', 'Veuillez remplir le titre et la date');
+      return;
+    }
+
+    addEvent({
+      ...newEvent,
+      id: `event-${Date.now()}`,
+    } as CalendarEvent);
+
     setShowAddModal(false);
-    setNewEvent({ type: 'training', title: '', date: '', time: '', location: '', status: 'pending', priority: 'medium' });
+    setNewEvent({
+      type: 'training',
+      title: '',
+      date: '',
+      time: '',
+      location: '',
+      status: 'pending',
+      priority: 'medium',
+    });
+    setLocationSearch('');
+  };
+
+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (date) {
+      setSelectedDateObj(date);
+      const dateStr = date.toISOString().split('T')[0];
+      setNewEvent({ ...newEvent, date: dateStr });
+    }
+  };
+
+  const handleTimeChange = (event: DateTimePickerEvent, time?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (time) {
+      setSelectedTimeObj(time);
+      const hours = time.getHours().toString().padStart(2, '0');
+      const minutes = time.getMinutes().toString().padStart(2, '0');
+      setNewEvent({ ...newEvent, time: `${hours}:${minutes}` });
+    }
+  };
+
+  const filteredLocations = useMemo(() => {
+    if (!locationSearch || locationSearch.length < 2) return [];
+    const search = locationSearch.toLowerCase();
+    return popularLocations.filter(
+      loc => loc.name.toLowerCase().includes(search) || 
+             loc.address.toLowerCase().includes(search)
+    ).slice(0, 5);
+  }, [locationSearch]);
+
+  const selectLocation = (loc: typeof popularLocations[0]) => {
+    setNewEvent({ ...newEvent, location: loc.name });
+    setLocationSearch(loc.name);
+    setShowLocationSuggestions(false);
   };
 
   const navigateWeek = (direction: number) => {
