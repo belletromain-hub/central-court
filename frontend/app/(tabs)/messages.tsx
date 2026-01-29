@@ -451,13 +451,51 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
     backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: Colors.border.light,
+  },
+  quickRepliesContainer: {
+    paddingBottom: 8,
+  },
+  quickRepliesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  quickRepliesTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  quickRepliesTitleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+  },
+  quickRepliesList: {
+    gap: 8,
+  },
+  quickReplyChip: {
+    backgroundColor: Colors.primary + '15',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  quickReplyText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingBottom: 8,
   },
   input: {
     flex: 1,
