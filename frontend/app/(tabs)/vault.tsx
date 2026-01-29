@@ -495,6 +495,99 @@ export default function VaultScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Document Preview Modal */}
+      <Modal visible={showDocModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Document</Text>
+              <TouchableOpacity onPress={() => setShowDocModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedDoc && (
+              <>
+                {/* Document Info */}
+                <View style={styles.docPreviewLarge}>
+                  <View style={styles.docPreviewIcon}>
+                    <Ionicons 
+                      name={selectedDoc.fileType === 'pdf' ? 'document-text' : 'image'} 
+                      size={48} 
+                      color={Colors.primary} 
+                    />
+                  </View>
+                  <View style={styles.docPreviewInfo}>
+                    <Text style={styles.docPreviewTitle}>{selectedDoc.name}</Text>
+                    <Text style={styles.docPreviewMeta}>
+                      Ajouté le {formatDate(selectedDoc.uploadedAt)}
+                    </Text>
+                    {selectedDoc.expiryDate && (
+                      <Text style={[
+                        styles.docPreviewMeta,
+                        getDaysUntil(selectedDoc.expiryDate) < 30 && { color: Colors.warning }
+                      ]}>
+                        Expire le {formatDate(selectedDoc.expiryDate)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Sharing Status */}
+                <View style={styles.docSharingSection}>
+                  <Text style={styles.docSharingTitle}>Partagé avec</Text>
+                  {selectedDoc.sharedWith && selectedDoc.sharedWith.length > 0 ? (
+                    <View style={styles.docSharingList}>
+                      {selectedDoc.sharedWith.map(teamId => {
+                        const team = teamTypes.find(t => t.id === teamId);
+                        if (!team) return null;
+                        return (
+                          <View key={teamId} style={[styles.docSharingBadge, { backgroundColor: team.color + '20' }]}>
+                            <Ionicons name={team.icon as any} size={14} color={team.color} />
+                            <Text style={[styles.docSharingBadgeText, { color: team.color }]}>{team.label}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text style={styles.docSharingNone}>Document privé</Text>
+                  )}
+                </View>
+
+                {/* Action Buttons */}
+                <View style={styles.docActions}>
+                  <TouchableOpacity 
+                    style={styles.docActionBtn}
+                    onPress={() => {
+                      setShowDocModal(false);
+                      handleOpenShare(selectedDoc);
+                    }}
+                  >
+                    <Ionicons name="people-outline" size={22} color={Colors.primary} />
+                    <Text style={styles.docActionBtnText}>Partager</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.docActionBtn, styles.docActionBtnPrimary]}
+                    onPress={() => handleDownloadDoc(selectedDoc)}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="download-outline" size={22} color="#fff" />
+                        <Text style={styles.docActionBtnTextPrimary}>Télécharger</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
