@@ -25,6 +25,7 @@ interface AppContextType extends AppState {
   updateDocumentSharing: (id: string, sharedWith: TeamType[]) => void;
   updateCountryDays: (countryCode: string, days: number) => void;
   addCountry: (country: CountryDays) => void;
+  setTaxHistory: (history: CountryDays[]) => void;
   sendMessage: (channelId: string, content: string) => void;
   markChannelAsRead: (channelId: string) => void;
 }
