@@ -40,11 +40,9 @@ const STORAGE_KEYS = {
 };
 
 const initialTaxHistory: CountryDays[] = [
-  { country: 'France', countryCode: 'FR', flag: '🇫🇷', days: 45, limit: 183 },
-  { country: 'Espagne', countryCode: 'ES', flag: '🇪🇸', days: 22, limit: 183 },
-  { country: 'États-Unis', countryCode: 'US', flag: '🇺🇸', days: 18, limit: 183 },
-  { country: 'Australie', countryCode: 'AU', flag: '🇦🇺', days: 14, limit: 183 },
-  { country: 'Émirats Arabes Unis', countryCode: 'AE', flag: '🇦🇪', days: 8, limit: 183 },
+  { country: 'Monaco', countryCode: 'MC', flag: '🇲🇨', days: 20, limit: 183 },
+  { country: 'France', countryCode: 'FR', flag: '🇫🇷', days: 5, limit: 183 },
+  { country: 'Australie', countryCode: 'AU', flag: '🇦🇺', days: 3, limit: 183 },
 ];
 
 const initialChannels: Channel[] = [
