@@ -981,4 +981,98 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  // Document Preview Modal Styles
+  docPreviewLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background.secondary,
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  docPreviewIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    backgroundColor: Colors.primary + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  docPreviewInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  docPreviewTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 4,
+  },
+  docPreviewMeta: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    marginTop: 2,
+  },
+  docSharingSection: {
+    marginBottom: 20,
+  },
+  docSharingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginBottom: 10,
+  },
+  docSharingList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  docSharingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  docSharingBadgeText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  docSharingNone: {
+    fontSize: 14,
+    color: Colors.text.muted,
+    fontStyle: 'italic',
+  },
+  docActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 10,
+    marginBottom: Platform.OS === 'ios' ? 20 : 0,
+  },
+  docActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  docActionBtnPrimary: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  docActionBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  docActionBtnTextPrimary: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
 });
