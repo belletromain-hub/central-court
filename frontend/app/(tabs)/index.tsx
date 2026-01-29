@@ -57,6 +57,14 @@ export default function CalendarScreen() {
     status: 'pending',
     priority: 'medium',
   });
+  
+  // Date/Time picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedDateObj, setSelectedDateObj] = useState(new Date());
+  const [selectedTimeObj, setSelectedTimeObj] = useState(new Date());
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [locationSearch, setLocationSearch] = useState('');
 
   const today = new Date().toISOString().split('T')[0];
 
