@@ -8,6 +8,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../../src/constants/colors';
 import { useApp } from '../../src/context/AppContext';
 import { Channel } from '../../src/types';
+import { generateQuickReplies, QuickReply } from '../../src/utils/aiService';
 
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
