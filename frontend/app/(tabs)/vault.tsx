@@ -168,6 +168,7 @@ export default function VaultScreen() {
       category: selectedCategory as 'identity' | 'contracts' | 'invoices' | 'medical',
       name: newDoc.name,
       fileType: newDoc.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image',
+      fileUri: newDoc.fileUri || undefined,
       uploadedAt: new Date().toISOString(),
       expiryDate: newDoc.expiryDate || undefined,
       notes: newDoc.notes || undefined,
@@ -176,7 +177,7 @@ export default function VaultScreen() {
 
     addDocument(doc);
     setShowAddModal(false);
-    setNewDoc({ name: '', expiryDate: '', notes: '' });
+    setNewDoc({ name: '', expiryDate: '', notes: '', fileUri: '' });
     setSelectedTeams([]);
   };
 
