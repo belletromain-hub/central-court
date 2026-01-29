@@ -431,6 +431,108 @@ async def remove_team_member(user_id: str, user: User = Depends(require_player))
     
     return {"success": True}
 
+# ============ AI QUICK REPLIES ============
+
+class QuickReplyContext(BaseModel):
+    channelType: str
+    lastMessages: List[str]
+    senderRole: str
+
+class QuickReply(BaseModel):
+    id: str
+    text: str
+    tone: str
+
+@app.post("/api/ai/quick-replies")
+async def generate_quick_replies(context: QuickReplyContext):
+    """Generate AI-powered quick reply suggestions using OpenAI via Emergent LLM Key"""
+    try:
+        emergent_key = os.getenv("EMERGENT_LLM_KEY", "")
+        
+        if not emergent_key:
+            # Return fallback replies if no key
+            return {"replies": get_fallback_replies(context)}
+        
+        # Build prompt for OpenAI
+        last_msg = context.lastMessages[-1] if context.lastMessages else ""
+        
+        prompt = f"""Tu es un assistant pour un joueur de tennis professionnel. 
+Génère 3 réponses courtes et appropriées pour ce message de son {context.senderRole} ({context.channelType}):
+
+Message reçu: "{last_msg}"
+
+Réponds en français avec 3 suggestions de réponses différentes:
+1. Une réponse courte et directe
+2. Une réponse amicale et chaleureuse
+3. Une réponse professionnelle et formelle
+
+Format de réponse JSON:
+[{{"id": "1", "text": "...", "tone": "brief"}}, {{"id": "2", "text": "...", "tone": "friendly"}}, {{"id": "3", "text": "...", "tone": "formal"}}]"""
+
+        # Call OpenAI via Emergent integration
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {emergent_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 300,
+                    "temperature": 0.7
+                },
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                content = data["choices"][0]["message"]["content"]
+                
+                # Parse JSON from response
+                import json
+                try:
+                    # Extract JSON array from response
+                    start = content.find('[')
+                    end = content.rfind(']') + 1
+                    if start >= 0 and end > start:
+                        replies = json.loads(content[start:end])
+                        return {"replies": replies}
+                except:
+                    pass
+        
+        # Fallback if AI fails
+        return {"replies": get_fallback_replies(context)}
+        
+    except Exception as e:
+        print(f"AI reply error: {e}")
+        return {"replies": get_fallback_replies(context)}
+
+def get_fallback_replies(context: QuickReplyContext) -> List[dict]:
+    """Fallback replies when AI is unavailable"""
+    last_msg = context.lastMessages[-1].lower() if context.lastMessages else ""
+    
+    if 'confirmé' in last_msg or 'rdv' in last_msg:
+        return [
+            {"id": "1", "text": "Parfait, merci !", "tone": "brief"},
+            {"id": "2", "text": "Super, j'y serai ! 👍", "tone": "friendly"},
+            {"id": "3", "text": "Bien reçu, je confirme ma présence.", "tone": "formal"}
+        ]
+    
+    if '?' in last_msg:
+        return [
+            {"id": "1", "text": "Je vérifie et te dis.", "tone": "brief"},
+            {"id": "2", "text": "Bonne question ! Je regarde ça.", "tone": "friendly"},
+            {"id": "3", "text": "Je vous reviens rapidement.", "tone": "formal"}
+        ]
+    
+    return [
+        {"id": "1", "text": "Merci !", "tone": "brief"},
+        {"id": "2", "text": "Parfait, merci pour l'info ! 😊", "tone": "friendly"},
+        {"id": "3", "text": "Bien noté, merci.", "tone": "formal"}
+    ]
+
 # ============ HEALTH CHECK ============
 
 @app.get("/api/health")
