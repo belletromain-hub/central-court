@@ -221,7 +221,7 @@ export default function VaultScreen() {
       <TouchableOpacity
         key={doc.id}
         style={styles.documentCard}
-        onPress={() => handleOpenShare(doc)}
+        onPress={() => handleOpenDoc(doc)}
         onLongPress={() => handleDeleteDocument(doc.id, doc.name)}
       >
         <View style={styles.docIconContainer}>
