@@ -232,24 +232,24 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              {user.picture ? (
-                <Text style={styles.avatarInitial}>{user.name.charAt(0)}</Text>
+              {displayUser.picture ? (
+                <Text style={styles.avatarInitial}>{displayUser.name.charAt(0)}</Text>
               ) : (
                 <Ionicons name="person" size={48} color="#fff" />
               )}
             </View>
-            {user.role === 'player' && (
+            {displayUser.role === 'player' && (
               <View style={styles.rankBadge}>
                 <Ionicons name="tennisball" size={14} color="#fff" />
               </View>
             )}
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.playerName}>{user.name}</Text>
-            <Text style={styles.playerEmail}>{user.email}</Text>
-            <View style={[styles.roleTag, { backgroundColor: getRoleColor(user.role) }]}>
-              <Ionicons name={getRoleIcon(user.role) as any} size={14} color="#fff" />
-              <Text style={styles.roleText}>{getRoleLabel(user.role)}</Text>
+            <Text style={styles.playerName}>{displayUser.name}</Text>
+            <Text style={styles.playerEmail}>{displayUser.email}</Text>
+            <View style={[styles.roleTag, { backgroundColor: getRoleColor(displayUser.role) }]}>
+              <Ionicons name={getRoleIcon(displayUser.role) as any} size={14} color="#fff" />
+              <Text style={styles.roleText}>{getRoleLabel(displayUser.role)}</Text>
             </View>
           </View>
         </View>
