@@ -1425,6 +1425,125 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  // Date/Time Pickers
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+    gap: 10,
+  },
+  pickerButtonText: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.text.primary,
+  },
+  pickerButtonPlaceholder: {
+    color: Colors.text.muted,
+  },
+  datePickerContainer: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 12,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  pickerDoneBtn: {
+    backgroundColor: Colors.primary,
+    padding: 12,
+    alignItems: 'center',
+  },
+  pickerDoneBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  // Location Autocomplete
+  locationInputContainer: {
+    position: 'relative',
+  },
+  locationInput: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 10,
+    padding: 14,
+    paddingLeft: 42,
+    fontSize: 15,
+    color: Colors.text.primary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  locationIcon: {
+    position: 'absolute',
+    left: 14,
+    top: 14,
+  },
+  locationSuggestions: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    maxHeight: 200,
+  },
+  locationSuggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
+    gap: 10,
+  },
+  locationSuggestionText: {
+    flex: 1,
+  },
+  locationSuggestionName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.text.primary,
+  },
+  locationSuggestionAddress: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+    marginTop: 1,
+  },
+  inputLabelSmall: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: Colors.text.muted,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  quickLocations: {
+    flexDirection: 'row',
+  },
+  quickLocationChip: {
+    backgroundColor: Colors.background.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  quickLocationChipSelected: {
+    backgroundColor: Colors.primary + '15',
+    borderColor: Colors.primary,
+  },
+  quickLocationText: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+  },
+  quickLocationTextSelected: {
+    color: Colors.primary,
+    fontWeight: '500',
+  },
   // Reschedule
   rescheduleEventInfo: {
     flexDirection: 'row',
