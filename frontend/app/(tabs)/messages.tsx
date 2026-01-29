@@ -80,6 +80,14 @@ export default function MessagesScreen() {
     if (!newMessage.trim() || !selectedChannel) return;
     sendMessage(selectedChannel.id, newMessage.trim());
     setNewMessage('');
+    setShowQuickReplies(true);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
+  const handleQuickReply = (reply: QuickReply) => {
+    if (!selectedChannel) return;
+    sendMessage(selectedChannel.id, reply.text);
+    setShowQuickReplies(false);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
