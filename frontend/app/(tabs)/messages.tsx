@@ -215,21 +215,53 @@ export default function MessagesScreen() {
 
       {/* Input */}
       <View style={[styles.inputContainer, { paddingBottom: insets.bottom || 16 }]}>
-        <TextInput
-          style={styles.input}
-          value={newMessage}
-          onChangeText={setNewMessage}
-          placeholder="Votre message..."
-          placeholderTextColor={Colors.text.muted}
-          multiline
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!newMessage.trim()}
-        >
-          <Ionicons name="send" size={20} color="#fff" />
-        </TouchableOpacity>
+        {/* Quick Replies */}
+        {showQuickReplies && quickReplies.length > 0 && (
+          <View style={styles.quickRepliesContainer}>
+            <View style={styles.quickRepliesHeader}>
+              <View style={styles.quickRepliesTitle}>
+                <Ionicons name="flash" size={14} color={Colors.primary} />
+                <Text style={styles.quickRepliesTitleText}>Réponses rapides</Text>
+              </View>
+              {isLoadingReplies && (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              )}
+            </View>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickRepliesList}
+            >
+              {quickReplies.map(reply => (
+                <TouchableOpacity
+                  key={reply.id}
+                  style={styles.quickReplyChip}
+                  onPress={() => handleQuickReply(reply)}
+                >
+                  <Text style={styles.quickReplyText}>{reply.text}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            placeholder="Votre message..."
+            placeholderTextColor={Colors.text.muted}
+            multiline
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
+            onPress={handleSend}
+            disabled={!newMessage.trim()}
+          >
+            <Ionicons name="send" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
