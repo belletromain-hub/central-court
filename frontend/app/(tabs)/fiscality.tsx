@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,19 +10,57 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import Colors from '../../src/constants/colors';
 import { useApp } from '../../src/context/AppContext';
 import { CountryDays } from '../../src/types';
 
 const TAX_LIMIT = 183;
+const STORAGE_KEY_ONBOARDING = '@central_court_fiscal_onboarding';
+const STORAGE_KEY_RESIDENCE = '@central_court_fiscal_residence';
+const STORAGE_KEY_LOCATION_ENABLED = '@central_court_location_enabled';
+
+interface FiscalOnboarding {
+  completed: boolean;
+  residenceCountry: {
+    country: string;
+    countryCode: string;
+    flag: string;
+  } | null;
+  locationEnabled: boolean;
+}
+
+const availableCountries = [
+  { flag: '🇲🇨', code: 'MC', name: 'Monaco', taxInfo: 'Pas d\'impôt sur le revenu' },
+  { flag: '🇦🇪', code: 'AE', name: 'Émirats Arabes Unis', taxInfo: 'Pas d\'impôt sur le revenu' },
+  { flag: '🇨🇭', code: 'CH', name: 'Suisse', taxInfo: 'Forfait fiscal possible' },
+  { flag: '🇪🇸', code: 'ES', name: 'Espagne', taxInfo: 'Régime Beckham disponible' },
+  { flag: '🇫🇷', code: 'FR', name: 'France', taxInfo: 'Imposition progressive' },
+  { flag: '🇬🇧', code: 'GB', name: 'Royaume-Uni', taxInfo: 'Régime résident non-domicilié' },
+  { flag: '🇺🇸', code: 'US', name: 'États-Unis', taxInfo: 'Imposition mondiale' },
+  { flag: '🇮🇹', code: 'IT', name: 'Italie', taxInfo: 'Régime forfaitaire possible' },
+  { flag: '🇵🇹', code: 'PT', name: 'Portugal', taxInfo: 'Régime NHR disponible' },
+  { flag: '🇧🇪', code: 'BE', name: 'Belgique', taxInfo: 'Pas de plus-values mobilières' },
+];
 
 export default function FiscalityScreen() {
   const insets = useSafeAreaInsets();
-  const { taxHistory, currentYear, updateCountryDays, addCountry } = useApp();
+  const { taxHistory, currentYear, updateCountryDays, addCountry, setTaxHistory } = useApp();
+  
+  // Onboarding state
+  const [onboardingStep, setOnboardingStep] = useState<'loading' | 'residence' | 'location' | 'complete'>('loading');
+  const [selectedResidence, setSelectedResidence] = useState<typeof availableCountries[0] | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
+  const [isTrackingLocation, setIsTrackingLocation] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<string | null>(null);
+  
+  // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryDays | null>(null);
@@ -34,32 +72,189 @@ export default function FiscalityScreen() {
   });
   const [editDays, setEditDays] = useState('');
 
+  // Load onboarding state on mount
+  useEffect(() => {
+    loadOnboardingState();
+  }, []);
+
+  const loadOnboardingState = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY_ONBOARDING);
+      if (stored) {
+        const data: FiscalOnboarding = JSON.parse(stored);
+        if (data.completed) {
+          setOnboardingStep('complete');
+          if (data.residenceCountry) {
+            setSelectedResidence({
+              flag: data.residenceCountry.flag,
+              code: data.residenceCountry.countryCode,
+              name: data.residenceCountry.country,
+              taxInfo: ''
+            });
+          }
+          if (data.locationEnabled) {
+            checkLocationPermission();
+          }
+        } else {
+          setOnboardingStep('residence');
+        }
+      } else {
+        setOnboardingStep('residence');
+      }
+    } catch (error) {
+      console.error('Error loading onboarding:', error);
+      setOnboardingStep('residence');
+    }
+  };
+
+  const saveOnboardingState = async (data: Partial<FiscalOnboarding>) => {
+    try {
+      const existing = await AsyncStorage.getItem(STORAGE_KEY_ONBOARDING);
+      const current: FiscalOnboarding = existing ? JSON.parse(existing) : {
+        completed: false,
+        residenceCountry: null,
+        locationEnabled: false
+      };
+      const updated = { ...current, ...data };
+      await AsyncStorage.setItem(STORAGE_KEY_ONBOARDING, JSON.stringify(updated));
+    } catch (error) {
+      console.error('Error saving onboarding:', error);
+    }
+  };
+
+  const handleSelectResidence = (country: typeof availableCountries[0]) => {
+    setSelectedResidence(country);
+  };
+
+  const handleConfirmResidence = async () => {
+    if (!selectedResidence) return;
+    
+    await saveOnboardingState({
+      residenceCountry: {
+        country: selectedResidence.name,
+        countryCode: selectedResidence.code,
+        flag: selectedResidence.flag
+      }
+    });
+    
+    // Initialize tax history with residence country
+    const residenceEntry: CountryDays = {
+      country: selectedResidence.name,
+      countryCode: selectedResidence.code,
+      flag: selectedResidence.flag,
+      days: 0,
+      limit: TAX_LIMIT,
+      isResidence: true,
+    };
+    
+    // Reset tax history with just the residence
+    if (setTaxHistory) {
+      setTaxHistory([residenceEntry]);
+    }
+    
+    setOnboardingStep('location');
+  };
+
+  const checkLocationPermission = async () => {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    setLocationStatus(status === 'granted' ? 'granted' : 'denied');
+    if (status === 'granted') {
+      getCurrentCountry();
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    setIsTrackingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        setLocationStatus('granted');
+        await saveOnboardingState({ locationEnabled: true });
+        await getCurrentCountry();
+      } else {
+        setLocationStatus('denied');
+      }
+    } catch (error) {
+      console.error('Error requesting location:', error);
+      setLocationStatus('denied');
+    } finally {
+      setIsTrackingLocation(false);
+    }
+  };
+
+  const getCurrentCountry = async () => {
+    try {
+      const location = await Location.getCurrentPositionAsync({});
+      const [geocode] = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+      if (geocode?.country) {
+        setCurrentLocation(geocode.country);
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+    }
+  };
+
+  const handleSkipLocation = async () => {
+    await saveOnboardingState({ completed: true, locationEnabled: false });
+    setOnboardingStep('complete');
+  };
+
+  const handleEnableLocation = async () => {
+    await requestLocationPermission();
+    await saveOnboardingState({ completed: true, locationEnabled: locationStatus === 'granted' });
+    setOnboardingStep('complete');
+  };
+
   // Stats
   const stats = useMemo(() => {
     const totalDays = taxHistory.reduce((sum, c) => sum + c.days, 0);
     const countriesVisited = taxHistory.length;
-    const atRisk = taxHistory.filter(c => c.days >= 150).length;
-    return { totalDays, countriesVisited, atRisk };
+    const residenceCountry = taxHistory.find(c => (c as any).isResidence);
+    const daysInResidence = residenceCountry?.days || 0;
+    const daysNeeded = Math.max(0, TAX_LIMIT - daysInResidence);
+    return { totalDays, countriesVisited, daysInResidence, daysNeeded };
   }, [taxHistory]);
 
   // Sort countries by days (descending)
   const sortedCountries = useMemo(() => {
-    return [...taxHistory].sort((a, b) => b.days - a.days);
+    return [...taxHistory].sort((a, b) => {
+      // Residence country always first
+      if ((a as any).isResidence) return -1;
+      if ((b as any).isResidence) return 1;
+      return b.days - a.days;
+    });
   }, [taxHistory]);
 
-  const getProgressColor = (days: number, limit: number): string => {
+  const getProgressColor = (days: number, limit: number, isResidence: boolean): string => {
     const percentage = (days / limit) * 100;
-    if (percentage >= 95) return Colors.danger;
-    if (percentage >= 80) return Colors.warning;
-    return Colors.success;
+    if (isResidence) {
+      // For residence: green when approaching limit (good)
+      if (percentage >= 80) return Colors.success;
+      if (percentage >= 50) return Colors.primary;
+      return Colors.warning;
+    } else {
+      // For other countries: red when approaching limit (bad)
+      if (percentage >= 95) return Colors.danger;
+      if (percentage >= 80) return Colors.warning;
+      return Colors.success;
+    }
   };
 
-  const getStatusText = (days: number, limit: number): string => {
+  const getStatusText = (days: number, limit: number, isResidence: boolean): string => {
     const remaining = limit - days;
-    if (remaining <= 0) return 'Limite atteinte !';
-    if (remaining <= 8) return `Attention: ${remaining}j restants`;
-    if (remaining <= 33) return `Vigilance: ${remaining}j restants`;
-    return `${remaining}j restants`;
+    if (isResidence) {
+      if (days >= limit) return '✓ Objectif atteint !';
+      if (remaining <= 30) return `Plus que ${remaining}j pour l'objectif`;
+      return `${remaining}j restants pour être résident`;
+    } else {
+      if (remaining <= 0) return 'Limite atteinte !';
+      if (remaining <= 8) return `Attention: ${remaining}j restants`;
+      if (remaining <= 33) return `Vigilance: ${remaining}j restants`;
+      return `${remaining}j restants`;
+    }
   };
 
   const handleEditCountry = (country: CountryDays) => {
@@ -108,6 +303,170 @@ export default function FiscalityScreen() {
     { flag: '🇨🇭', code: 'CH', name: 'Suisse' },
   ];
 
+  // LOADING STATE
+  if (onboardingStep === 'loading') {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  // ONBOARDING STEP 1: Choose residence country
+  if (onboardingStep === 'residence') {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#667eea', '#764ba2']}
+          style={[styles.onboardingHeader, { paddingTop: insets.top + 20 }]}
+        >
+          <View style={styles.onboardingIconContainer}>
+            <Ionicons name="globe-outline" size={48} color="#fff" />
+          </View>
+          <Text style={styles.onboardingTitle}>Configuration fiscale</Text>
+          <Text style={styles.onboardingSubtitle}>
+            Choisissez le pays où vous souhaitez établir votre résidence fiscale
+          </Text>
+        </LinearGradient>
+
+        <ScrollView 
+          style={styles.onboardingContent}
+          contentContainerStyle={styles.onboardingContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.onboardingInstruction}>
+            La règle des 183 jours : vous devez passer au moins 183 jours par an dans un pays pour y être résident fiscal.
+          </Text>
+
+          {availableCountries.map(country => (
+            <TouchableOpacity
+              key={country.code}
+              style={[
+                styles.residenceOption,
+                selectedResidence?.code === country.code && styles.residenceOptionSelected
+              ]}
+              onPress={() => handleSelectResidence(country)}
+            >
+              <Text style={styles.residenceFlag}>{country.flag}</Text>
+              <View style={styles.residenceInfo}>
+                <Text style={styles.residenceName}>{country.name}</Text>
+                <Text style={styles.residenceTaxInfo}>{country.taxInfo}</Text>
+              </View>
+              {selectedResidence?.code === country.code && (
+                <View style={styles.selectedCheck}>
+                  <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+
+        <View style={[styles.onboardingFooter, { paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            style={[styles.onboardingBtn, !selectedResidence && styles.onboardingBtnDisabled]}
+            onPress={handleConfirmResidence}
+            disabled={!selectedResidence}
+          >
+            <Text style={styles.onboardingBtnText}>Continuer</Text>
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ONBOARDING STEP 2: Location permission
+  if (onboardingStep === 'location') {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#11998e', '#38ef7d']}
+          style={[styles.onboardingHeader, { paddingTop: insets.top + 20 }]}
+        >
+          <View style={styles.onboardingIconContainer}>
+            <Ionicons name="location-outline" size={48} color="#fff" />
+          </View>
+          <Text style={styles.onboardingTitle}>Géolocalisation</Text>
+          <Text style={styles.onboardingSubtitle}>
+            Facilitez le suivi de vos jours avec la localisation automatique
+          </Text>
+        </LinearGradient>
+
+        <View style={styles.locationContent}>
+          <View style={styles.residenceChosen}>
+            <Text style={styles.residenceChosenLabel}>Résidence fiscale choisie</Text>
+            <View style={styles.residenceChosenCard}>
+              <Text style={styles.residenceChosenFlag}>{selectedResidence?.flag}</Text>
+              <Text style={styles.residenceChosenName}>{selectedResidence?.name}</Text>
+            </View>
+          </View>
+
+          <View style={styles.locationBenefits}>
+            <Text style={styles.locationBenefitsTitle}>Avantages de la géolocalisation</Text>
+            
+            <View style={styles.benefitItem}>
+              <View style={[styles.benefitIcon, { backgroundColor: '#4CAF50' + '20' }]}>
+                <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+              </View>
+              <View style={styles.benefitText}>
+                <Text style={styles.benefitTitle}>Comptage automatique</Text>
+                <Text style={styles.benefitDesc}>Vos jours sont comptés automatiquement</Text>
+              </View>
+            </View>
+
+            <View style={styles.benefitItem}>
+              <View style={[styles.benefitIcon, { backgroundColor: Colors.primary + '20' }]}>
+                <Ionicons name="notifications" size={24} color={Colors.primary} />
+              </View>
+              <View style={styles.benefitText}>
+                <Text style={styles.benefitTitle}>Alertes intelligentes</Text>
+                <Text style={styles.benefitDesc}>Soyez prévenu quand vous approchez des limites</Text>
+              </View>
+            </View>
+
+            <View style={styles.benefitItem}>
+              <View style={[styles.benefitIcon, { backgroundColor: Colors.warning + '20' }]}>
+                <Ionicons name="shield-checkmark" size={24} color={Colors.warning} />
+              </View>
+              <View style={styles.benefitText}>
+                <Text style={styles.benefitTitle}>Données sécurisées</Text>
+                <Text style={styles.benefitDesc}>Vos données restent sur votre appareil</Text>
+              </View>
+            </View>
+          </View>
+
+          {isTrackingLocation && (
+            <View style={styles.locationLoading}>
+              <ActivityIndicator color={Colors.primary} />
+              <Text style={styles.locationLoadingText}>Demande d'autorisation...</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={[styles.onboardingFooter, { paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            style={styles.onboardingBtnSecondary}
+            onPress={handleSkipLocation}
+          >
+            <Text style={styles.onboardingBtnSecondaryText}>Pas maintenant</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.onboardingBtn}
+            onPress={handleEnableLocation}
+            disabled={isTrackingLocation}
+          >
+            <Ionicons name="location" size={20} color="#fff" />
+            <Text style={styles.onboardingBtnText}>Activer la localisation</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // MAIN SCREEN (onboardingStep === 'complete')
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -118,10 +477,17 @@ export default function FiscalityScreen() {
         <View style={styles.headerContent}>
           <View>
             <Text style={styles.headerTitle}>Fiscalité {currentYear}</Text>
-            <Text style={styles.headerSubtitle}>Règle des 183 jours</Text>
+            <Text style={styles.headerSubtitle}>
+              {selectedResidence ? `Objectif: ${selectedResidence.name}` : 'Règle des 183 jours'}
+            </Text>
           </View>
-          <View style={styles.globeIcon}>
-            <Ionicons name="globe" size={24} color="rgba(255,255,255,0.9)" />
+          <View style={styles.headerRight}>
+            {locationStatus === 'granted' && (
+              <View style={styles.locationBadge}>
+                <Ionicons name="location" size={14} color="#fff" />
+                <Text style={styles.locationBadgeText}>GPS actif</Text>
+              </View>
+            )}
           </View>
         </View>
       </LinearGradient>
@@ -134,24 +500,34 @@ export default function FiscalityScreen() {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{stats.countriesVisited}</Text>
-          <Text style={styles.statLabel}>Pays visités</Text>
+          <Text style={[styles.statNumber, { color: Colors.success }]}>{stats.daysInResidence}</Text>
+          <Text style={styles.statLabel}>En résidence</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, stats.atRisk > 0 && styles.statNumberDanger]}>
-            {stats.atRisk}
+          <Text style={[styles.statNumber, stats.daysNeeded > 100 ? { color: Colors.warning } : { color: Colors.success }]}>
+            {stats.daysNeeded}
           </Text>
-          <Text style={styles.statLabel}>À risque</Text>
+          <Text style={styles.statLabel}>Jours requis</Text>
         </View>
       </View>
+
+      {/* Current Location */}
+      {currentLocation && (
+        <View style={styles.currentLocationCard}>
+          <Ionicons name="navigate" size={18} color={Colors.primary} />
+          <Text style={styles.currentLocationText}>
+            Position actuelle : <Text style={styles.currentLocationCountry}>{currentLocation}</Text>
+          </Text>
+        </View>
+      )}
 
       {/* Info Card */}
       <View style={styles.infoCard}>
         <Ionicons name="information-circle" size={20} color={Colors.primary} />
         <Text style={styles.infoText}>
-          La règle des 183 jours détermine votre résidence fiscale. 
-          Dépasser cette limite dans un pays peut entraîner une imposition locale.
+          Pour être résident fiscal {selectedResidence ? `en ${selectedResidence.name}` : ''}, 
+          vous devez y passer au moins 183 jours par an.
         </Text>
       </View>
 
@@ -169,17 +545,27 @@ export default function FiscalityScreen() {
         </View>
 
         {sortedCountries.map(country => {
+          const isResidence = (country as any).isResidence;
           const progressPercent = Math.min((country.days / country.limit) * 100, 100);
-          const progressColor = getProgressColor(country.days, country.limit);
-          const statusText = getStatusText(country.days, country.limit);
-          const isAtRisk = country.days >= 150;
+          const progressColor = getProgressColor(country.days, country.limit, isResidence);
+          const statusText = getStatusText(country.days, country.limit, isResidence);
 
           return (
             <TouchableOpacity
               key={country.countryCode}
-              style={[styles.countryCard, isAtRisk && styles.countryCardAtRisk]}
+              style={[
+                styles.countryCard,
+                isResidence && styles.countryCardResidence
+              ]}
               onPress={() => handleEditCountry(country)}
             >
+              {isResidence && (
+                <View style={styles.residenceBadge}>
+                  <Ionicons name="home" size={12} color={Colors.success} />
+                  <Text style={styles.residenceBadgeText}>Résidence fiscale</Text>
+                </View>
+              )}
+              
               <View style={styles.countryHeader}>
                 <View style={styles.countryInfo}>
                   <Text style={styles.countryFlag}>{country.flag}</Text>
@@ -189,7 +575,7 @@ export default function FiscalityScreen() {
                   </View>
                 </View>
                 <View style={styles.daysContainer}>
-                  <Text style={[styles.daysCount, isAtRisk && styles.daysCountAtRisk]}>
+                  <Text style={[styles.daysCount, isResidence && styles.daysCountResidence]}>
                     {country.days}
                   </Text>
                   <Text style={styles.daysLimit}>/ {country.limit}j</Text>
@@ -210,15 +596,6 @@ export default function FiscalityScreen() {
                 </Text>
               </View>
 
-              {isAtRisk && (
-                <View style={styles.alertBanner}>
-                  <Ionicons name="warning" size={14} color={Colors.danger} />
-                  <Text style={styles.alertText}>
-                    Approche de la limite fiscale
-                  </Text>
-                </View>
-              )}
-
               <View style={styles.editHint}>
                 <Ionicons name="create-outline" size={14} color={Colors.text.muted} />
                 <Text style={styles.editHintText}>Appuyer pour modifier</Text>
@@ -227,15 +604,31 @@ export default function FiscalityScreen() {
           );
         })}
 
-        {/* Manual Entry Note */}
+        {/* Location Status Note */}
         <View style={styles.noteCard}>
-          <Ionicons name="hand-left-outline" size={20} color={Colors.text.secondary} />
+          <Ionicons 
+            name={locationStatus === 'granted' ? 'location' : 'hand-left-outline'} 
+            size={20} 
+            color={locationStatus === 'granted' ? Colors.success : Colors.text.secondary} 
+          />
           <View style={styles.noteContent}>
-            <Text style={styles.noteTitle}>Saisie manuelle</Text>
-            <Text style={styles.noteText}>
-              Actuellement, les jours sont saisis manuellement. 
-              Le tracking GPS automatique sera disponible prochainement.
+            <Text style={styles.noteTitle}>
+              {locationStatus === 'granted' ? 'Tracking GPS actif' : 'Saisie manuelle'}
             </Text>
+            <Text style={styles.noteText}>
+              {locationStatus === 'granted' 
+                ? 'Vos déplacements sont suivis automatiquement pour le comptage des jours.'
+                : 'Ajoutez vos jours manuellement. Activez le GPS pour un suivi automatique.'}
+            </Text>
+            {locationStatus !== 'granted' && (
+              <TouchableOpacity 
+                style={styles.enableLocationBtn}
+                onPress={requestLocationPermission}
+              >
+                <Ionicons name="location-outline" size={16} color={Colors.primary} />
+                <Text style={styles.enableLocationBtnText}>Activer le GPS</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -278,7 +671,7 @@ export default function FiscalityScreen() {
                 <TouchableOpacity
                   key={num}
                   style={styles.quickBtn}
-                  onPress={() => setEditDays((parseInt(editDays) || 0 + num).toString())}
+                  onPress={() => setEditDays(String((parseInt(editDays) || 0) + num))}
                 >
                   <Text style={styles.quickBtnText}>+{num}</Text>
                 </TouchableOpacity>
@@ -338,27 +731,7 @@ export default function FiscalityScreen() {
               placeholderTextColor={Colors.text.muted}
             />
 
-            <Text style={styles.inputLabel}>Code pays (2 lettres)</Text>
-            <TextInput
-              style={styles.input}
-              value={newCountry.countryCode}
-              onChangeText={code => setNewCountry({ ...newCountry, countryCode: code.toUpperCase() })}
-              placeholder="Ex: FR"
-              placeholderTextColor={Colors.text.muted}
-              maxLength={2}
-              autoCapitalize="characters"
-            />
-
-            <Text style={styles.inputLabel}>Emoji drapeau</Text>
-            <TextInput
-              style={styles.input}
-              value={newCountry.flag}
-              onChangeText={flag => setNewCountry({ ...newCountry, flag })}
-              placeholder="Ex: 🇫🇷"
-              placeholderTextColor={Colors.text.muted}
-            />
-
-            <Text style={styles.inputLabel}>Jours déjà passés</Text>
+            <Text style={styles.inputLabel}>Jours passés</Text>
             <TextInput
               style={styles.input}
               value={newCountry.days}
@@ -391,6 +764,205 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.secondary,
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Onboarding styles
+  onboardingHeader: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    alignItems: 'center',
+  },
+  onboardingIconContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  onboardingTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  onboardingSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 22,
+  },
+  onboardingContent: {
+    flex: 1,
+  },
+  onboardingContentContainer: {
+    padding: 20,
+  },
+  onboardingInstruction: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    lineHeight: 20,
+    marginBottom: 20,
+    backgroundColor: Colors.background.primary,
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  residenceOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  residenceOptionSelected: {
+    borderColor: Colors.success,
+    backgroundColor: Colors.success + '08',
+  },
+  residenceFlag: {
+    fontSize: 36,
+    marginRight: 14,
+  },
+  residenceInfo: {
+    flex: 1,
+  },
+  residenceName: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  residenceTaxInfo: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    marginTop: 2,
+  },
+  selectedCheck: {
+    marginLeft: 10,
+  },
+  onboardingFooter: {
+    padding: 20,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.light,
+    gap: 12,
+  },
+  onboardingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  onboardingBtnDisabled: {
+    opacity: 0.5,
+  },
+  onboardingBtnText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  onboardingBtnSecondary: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  onboardingBtnSecondaryText: {
+    color: Colors.text.secondary,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  // Location step
+  locationContent: {
+    flex: 1,
+    padding: 20,
+  },
+  residenceChosen: {
+    marginBottom: 24,
+  },
+  residenceChosenLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  residenceChosenCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  residenceChosenFlag: {
+    fontSize: 32,
+  },
+  residenceChosenName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  locationBenefits: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+  },
+  locationBenefitsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 16,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  benefitIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  benefitText: {
+    flex: 1,
+  },
+  benefitTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  benefitDesc: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    marginTop: 2,
+  },
+  locationLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: Colors.primary + '10',
+    borderRadius: 12,
+  },
+  locationLoadingText: {
+    fontSize: 14,
+    color: Colors.primary,
+  },
+  // Main screen styles
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -406,17 +978,26 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: 'rgba(255,255,255,0.9)',
     marginTop: 4,
   },
-  globeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  headerRight: {
+    alignItems: 'flex-end',
+  },
+  locationBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  locationBadgeText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
   },
   statsRow: {
     flexDirection: 'row',
@@ -440,11 +1021,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.primary,
   },
-  statNumberDanger: {
-    color: Colors.danger,
-  },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.text.secondary,
     marginTop: 2,
   },
@@ -453,11 +1031,29 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border.light,
     marginVertical: 4,
   },
+  currentLocationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary + '10',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 10,
+    padding: 12,
+    gap: 8,
+  },
+  currentLocationText: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+  },
+  currentLocationCountry: {
+    fontWeight: '600',
+    color: Colors.primary,
+  },
   infoCard: {
     flexDirection: 'row',
     backgroundColor: 'rgba(29, 161, 242, 0.1)',
     marginHorizontal: 16,
-    marginTop: 16,
+    marginTop: 12,
     borderRadius: 10,
     padding: 12,
     gap: 10,
@@ -509,9 +1105,26 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  countryCardAtRisk: {
-    borderWidth: 1,
-    borderColor: 'rgba(224, 36, 94, 0.3)',
+  countryCardResidence: {
+    borderWidth: 2,
+    borderColor: Colors.success + '50',
+    backgroundColor: Colors.success + '05',
+  },
+  residenceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.success + '15',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  residenceBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.success,
   },
   countryHeader: {
     flexDirection: 'row',
@@ -545,8 +1158,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text.primary,
   },
-  daysCountAtRisk: {
-    color: Colors.danger,
+  daysCountResidence: {
+    color: Colors.success,
   },
   daysLimit: {
     fontSize: 14,
@@ -570,21 +1183,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 6,
-  },
-  alertBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(224, 36, 94, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginTop: 8,
-  },
-  alertText: {
-    fontSize: 12,
-    color: Colors.danger,
-    fontWeight: '500',
   },
   editHint: {
     flexDirection: 'row',
@@ -623,6 +1221,23 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     lineHeight: 18,
   },
+  enableLocationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    backgroundColor: Colors.primary + '15',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  enableLocationBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
