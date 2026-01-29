@@ -24,6 +24,9 @@ export default function MessagesScreen() {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
+  const [isLoadingReplies, setIsLoadingReplies] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(true);
 
   const channelMessages = selectedChannel
     ? messages.filter(m => m.channelId === selectedChannel.id)
@@ -33,8 +36,45 @@ export default function MessagesScreen() {
     if (selectedChannel) {
       markChannelAsRead(selectedChannel.id);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      // Load AI quick replies
+      loadQuickReplies();
     }
   }, [selectedChannel]);
+
+  // Reload quick replies when messages change
+  useEffect(() => {
+    if (selectedChannel && channelMessages.length > 0) {
+      loadQuickReplies();
+    }
+  }, [messages.length]);
+
+  const loadQuickReplies = async () => {
+    if (!selectedChannel) return;
+    
+    const lastMessages = channelMessages
+      .filter(m => m.senderId !== 'player')
+      .slice(-3)
+      .map(m => m.content);
+    
+    if (lastMessages.length === 0) {
+      setQuickReplies([]);
+      return;
+    }
+
+    setIsLoadingReplies(true);
+    try {
+      const replies = await generateQuickReplies({
+        channelType: selectedChannel.type,
+        lastMessages,
+        senderRole: channelMessages[channelMessages.length - 1]?.senderRole || selectedChannel.type,
+      });
+      setQuickReplies(replies);
+    } catch (error) {
+      console.error('Error loading quick replies:', error);
+    } finally {
+      setIsLoadingReplies(false);
+    }
+  };
 
   const handleSend = () => {
     if (!newMessage.trim() || !selectedChannel) return;
