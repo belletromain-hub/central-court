@@ -363,6 +363,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateDocumentSharing,
         updateCountryDays,
         addCountry,
+        setTaxHistory,
         sendMessage,
         markChannelAsRead,
       }}
