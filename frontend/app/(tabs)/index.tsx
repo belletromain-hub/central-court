@@ -17,11 +17,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Colors from '../../src/constants/colors';
 import { useApp } from '../../src/context/AppContext';
 import { formatDateRange, formatDate, formatDateShort, getDaysUntil, isDeadlineSoon, getWeekDay, isDateToday } from '../../src/utils/dateFormatter';
 import { getSurfaceColor, getSurfaceIcon, getEnvironmentIcon } from '../../src/data/tournaments';
 import { getEventTypeColor, getEventTypeIcon, getEventTypeLabel, EventType, CalendarEvent } from '../../src/data/events';
+import { popularLocations } from '../../src/utils/locationService';
 
 // Configure French locale
 LocaleConfig.locales['fr'] = {
