@@ -761,7 +761,8 @@ export default function CalendarScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalForm}>
+            <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              {/* Event Type Selector */}
               <Text style={styles.inputLabel}>Type</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeSelector}>
                 {(['media', 'medical', 'training', 'travel', 'sponsor'] as EventType[]).map(type => (
@@ -785,6 +786,7 @@ export default function CalendarScreen() {
                 ))}
               </ScrollView>
 
+              {/* Title */}
               <Text style={styles.inputLabel}>Titre *</Text>
               <TextInput
                 style={styles.input}
@@ -794,32 +796,143 @@ export default function CalendarScreen() {
                 placeholderTextColor={Colors.text.muted}
               />
 
-              <Text style={styles.inputLabel}>Date * (YYYY-MM-DD)</Text>
-              <TextInput
-                style={styles.input}
-                value={newEvent.date}
-                onChangeText={date => setNewEvent({ ...newEvent, date })}
-                placeholder="2026-02-15"
-                placeholderTextColor={Colors.text.muted}
-              />
+              {/* Date Picker */}
+              <Text style={styles.inputLabel}>Date *</Text>
+              <TouchableOpacity 
+                style={styles.pickerButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
+                <Text style={[
+                  styles.pickerButtonText,
+                  !newEvent.date && styles.pickerButtonPlaceholder
+                ]}>
+                  {newEvent.date ? formatDate(newEvent.date) : 'Sélectionner une date'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={Colors.text.muted} />
+              </TouchableOpacity>
 
+              {showDatePicker && (
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={selectedDateObj}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    locale="fr-FR"
+                    minimumDate={new Date()}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity 
+                      style={styles.pickerDoneBtn}
+                      onPress={() => setShowDatePicker(false)}
+                    >
+                      <Text style={styles.pickerDoneBtnText}>Confirmer</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* Time Picker */}
               <Text style={styles.inputLabel}>Heure</Text>
-              <TextInput
-                style={styles.input}
-                value={newEvent.time}
-                onChangeText={time => setNewEvent({ ...newEvent, time })}
-                placeholder="14:00"
-                placeholderTextColor={Colors.text.muted}
-              />
+              <TouchableOpacity 
+                style={styles.pickerButton}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Ionicons name="time-outline" size={20} color={Colors.primary} />
+                <Text style={[
+                  styles.pickerButtonText,
+                  !newEvent.time && styles.pickerButtonPlaceholder
+                ]}>
+                  {newEvent.time || 'Sélectionner une heure'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={Colors.text.muted} />
+              </TouchableOpacity>
 
+              {showTimePicker && (
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={selectedTimeObj}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleTimeChange}
+                    locale="fr-FR"
+                    is24Hour={true}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity 
+                      style={styles.pickerDoneBtn}
+                      onPress={() => setShowTimePicker(false)}
+                    >
+                      <Text style={styles.pickerDoneBtnText}>Confirmer</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* Location with Autocomplete */}
               <Text style={styles.inputLabel}>Lieu</Text>
-              <TextInput
-                style={styles.input}
-                value={newEvent.location}
-                onChangeText={location => setNewEvent({ ...newEvent, location })}
-                placeholder="Paris - Centre sportif"
-                placeholderTextColor={Colors.text.muted}
-              />
+              <View style={styles.locationInputContainer}>
+                <TextInput
+                  style={styles.locationInput}
+                  value={locationSearch}
+                  onChangeText={(text) => {
+                    setLocationSearch(text);
+                    setNewEvent({ ...newEvent, location: text });
+                    setShowLocationSuggestions(text.length >= 2);
+                  }}
+                  onFocus={() => setShowLocationSuggestions(locationSearch.length >= 2)}
+                  placeholder="Rechercher un lieu..."
+                  placeholderTextColor={Colors.text.muted}
+                />
+                <Ionicons name="location-outline" size={20} color={Colors.text.muted} style={styles.locationIcon} />
+              </View>
+
+              {/* Location Suggestions */}
+              {showLocationSuggestions && filteredLocations.length > 0 && (
+                <View style={styles.locationSuggestions}>
+                  {filteredLocations.map((loc, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.locationSuggestionItem}
+                      onPress={() => selectLocation(loc)}
+                    >
+                      <Ionicons name="location" size={16} color={Colors.primary} />
+                      <View style={styles.locationSuggestionText}>
+                        <Text style={styles.locationSuggestionName}>{loc.name}</Text>
+                        <Text style={styles.locationSuggestionAddress}>{loc.address}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Quick Location Buttons */}
+              <Text style={styles.inputLabelSmall}>Lieux fréquents</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickLocations}>
+                {popularLocations.slice(0, 5).map((loc, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.quickLocationChip,
+                      newEvent.location === loc.name && styles.quickLocationChipSelected
+                    ]}
+                    onPress={() => {
+                      setNewEvent({ ...newEvent, location: loc.name });
+                      setLocationSearch(loc.name);
+                    }}
+                  >
+                    <Text style={[
+                      styles.quickLocationText,
+                      newEvent.location === loc.name && styles.quickLocationTextSelected
+                    ]}>
+                      {loc.name.length > 20 ? loc.name.substring(0, 20) + '...' : loc.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={{ height: 20 }} />
             </ScrollView>
 
             <TouchableOpacity
@@ -827,7 +940,8 @@ export default function CalendarScreen() {
               onPress={handleAddEvent}
               disabled={!newEvent.title || !newEvent.date}
             >
-              <Text style={styles.submitBtnText}>Ajouter</Text>
+              <Ionicons name="add-circle" size={20} color="#fff" />
+              <Text style={styles.submitBtnText}>Ajouter l'événement</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
