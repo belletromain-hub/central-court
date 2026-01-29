@@ -213,13 +213,14 @@ export default function ProfileScreen() {
     { id: 'logistics', label: 'Logistique', icon: 'airplane', color: '#ff9800' },
   ];
 
-  if (!user) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
+  // Demo user when not authenticated
+  const displayUser = user || {
+    user_id: 'demo',
+    email: 'lucas.martin@tennis.fr',
+    name: 'Lucas Martin',
+    role: 'player' as const,
+    picture: null,
+  };
 
   return (
     <View style={styles.container}>
