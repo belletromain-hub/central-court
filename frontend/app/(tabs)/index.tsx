@@ -84,8 +84,9 @@ export default function CalendarScreenV1() {
     const marks: Record<string, any> = {};
     
     weekTournaments.forEach(week => {
-      if (week.selectedTournamentId) {
-        const tournament = week.tournaments.find(t => t.id === week.selectedTournamentId);
+      // Mark tournaments that have registrations
+      week.registrations.forEach(reg => {
+        const tournament = week.tournaments.find(t => t.id === reg.tournamentId);
         if (tournament) {
           // Mark all days of the tournament
           let currentDate = new Date(tournament.startDate);
@@ -100,7 +101,7 @@ export default function CalendarScreenV1() {
             currentDate.setDate(currentDate.getDate() + 1);
           }
         }
-      }
+      });
     });
     
     return marks;
