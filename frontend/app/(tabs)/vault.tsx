@@ -125,7 +125,40 @@ export default function DocumentsScreen() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showFinanceModal, setShowFinanceModal] = useState(false);
+  const [showOCRResultModal, setShowOCRResultModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [accountantEmail, setAccountantEmail] = useState<string | null>(null);
+  
+  // OCR Result state
+  const [ocrResult, setOcrResult] = useState<{
+    uri: string;
+    type: 'pdf' | 'image';
+    date: string;
+    amount: string;
+    category: DocumentCategory;
+    merchant: string;
+    confidence: string;
+  } | null>(null);
+  
+  // Load accountant email from profile
+  useEffect(() => {
+    loadAccountantEmail();
+  }, []);
+  
+  const loadAccountantEmail = async () => {
+    try {
+      const profileData = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
+      if (profileData) {
+        const profile = JSON.parse(profileData);
+        if (profile.accountantEmail) {
+          setAccountantEmail(profile.accountantEmail);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading accountant email:', error);
+    }
+  };
   
   // Available months
   const availableMonths = useMemo(() => {
