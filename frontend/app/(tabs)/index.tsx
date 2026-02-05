@@ -357,12 +357,14 @@ export default function CalendarScreenV1() {
     
     const dayEvents = getEventsForDate(selectedDate);
     const week = getWeekForDate(selectedDate);
-    const selectedTournament = week?.tournaments.find(t => t.id === week.selectedTournamentId);
     
-    // Check if selected date is during a tournament
-    const isTournamentDay = selectedTournament && 
-      new Date(selectedDate) >= new Date(selectedTournament.startDate) &&
-      new Date(selectedDate) <= new Date(selectedTournament.endDate);
+    // Get all registered tournaments for this week that include this date
+    const tournamentsForDay = week ? week.registrations
+      .map(reg => week.tournaments.find(t => t.id === reg.tournamentId))
+      .filter(t => t && 
+        new Date(selectedDate) >= new Date(t.startDate) &&
+        new Date(selectedDate) <= new Date(t.endDate)
+      ) : [];
     
     return (
       <View style={styles.dayEventsContainer}>
@@ -385,23 +387,23 @@ export default function CalendarScreenV1() {
           </TouchableOpacity>
         </View>
         
-        {/* Tournament info if applicable */}
-        {isTournamentDay && selectedTournament && (
-          <View style={[styles.eventCard, { borderLeftColor: EVENT_CATEGORIES.tournament.color }]}>
+        {/* Tournament info if applicable - show all registered tournaments for this day */}
+        {tournamentsForDay.map(tournament => tournament && (
+          <View key={tournament.id} style={[styles.eventCard, { borderLeftColor: EVENT_CATEGORIES.tournament.color }]}>
             <View style={styles.eventCardContent}>
               <View style={styles.eventTypeRow}>
                 <Text style={styles.eventEmoji}>{EVENT_CATEGORIES.tournament.icon}</Text>
                 <Text style={[styles.eventType, { color: EVENT_CATEGORIES.tournament.color }]}>
-                  {selectedTournament.category}
+                  {tournament.category}
                 </Text>
               </View>
-              <Text style={styles.eventTitle}>{selectedTournament.name}</Text>
+              <Text style={styles.eventTitle}>{tournament.name}</Text>
               <Text style={styles.eventLocation}>
-                {selectedTournament.countryFlag} {selectedTournament.city}, {selectedTournament.country}
+                {tournament.countryFlag} {tournament.city}, {tournament.country}
               </Text>
             </View>
           </View>
-        )}
+        ))}
         
         {/* Regular events */}
         {dayEvents.map(event => {
