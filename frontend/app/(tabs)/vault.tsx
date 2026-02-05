@@ -919,6 +919,101 @@ export default function DocumentsScreen() {
           </View>
         </View>
       </Modal>
+      
+      {/* Document Preview Modal */}
+      <Modal visible={showDocumentPreview} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📄 Détails du document</Text>
+              <TouchableOpacity onPress={() => {
+                setShowDocumentPreview(false);
+                setSelectedDocument(null);
+              }}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            {selectedDocument && (
+              <>
+                {/* Document Preview */}
+                {selectedDocument.fileUri ? (
+                  <View style={styles.previewContainer}>
+                    {selectedDocument.fileType === 'image' ? (
+                      <Image 
+                        source={{ uri: selectedDocument.fileUri }} 
+                        style={styles.previewImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <View style={styles.pdfPreview}>
+                        <Ionicons name="document-text" size={64} color={Colors.text.muted} />
+                        <Text style={styles.pdfPreviewText}>Aperçu PDF non disponible</Text>
+                        <Text style={styles.pdfPreviewHint}>Utilisez l'export pour consulter le fichier</Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.noPreviewContainer}>
+                    <Ionicons name="image-outline" size={64} color={Colors.text.muted} />
+                    <Text style={styles.noPreviewText}>Fichier de démonstration</Text>
+                  </View>
+                )}
+                
+                {/* Document Info */}
+                <View style={styles.docDetailInfo}>
+                  <View style={styles.docDetailRow}>
+                    <Ionicons name="document" size={20} color={Colors.text.secondary} />
+                    <Text style={styles.docDetailLabel}>Nom:</Text>
+                    <Text style={styles.docDetailValue}>{selectedDocument.name}</Text>
+                  </View>
+                  
+                  <View style={styles.docDetailRow}>
+                    <Ionicons name="folder" size={20} color={Colors.text.secondary} />
+                    <Text style={styles.docDetailLabel}>Catégorie:</Text>
+                    <Text style={styles.docDetailValue}>
+                      {DOCUMENT_CATEGORIES[selectedDocument.category].emoji} {DOCUMENT_CATEGORIES[selectedDocument.category].name}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.docDetailRow}>
+                    <Ionicons name="calendar" size={20} color={Colors.text.secondary} />
+                    <Text style={styles.docDetailLabel}>Date:</Text>
+                    <Text style={styles.docDetailValue}>
+                      {new Date(selectedDocument.uploadedAt).toLocaleDateString('fr-FR', {
+                        day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </Text>
+                  </View>
+                  
+                  {selectedDocument.amount && (
+                    <View style={styles.docDetailRow}>
+                      <Ionicons name="cash" size={20} color={Colors.text.secondary} />
+                      <Text style={styles.docDetailLabel}>Montant:</Text>
+                      <Text style={[styles.docDetailValue, { color: Colors.success, fontWeight: '700' }]}>
+                        {selectedDocument.amount}€
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                
+                {/* Delete Button */}
+                <TouchableOpacity
+                  style={styles.deleteDocBtn}
+                  onPress={() => {
+                    setShowDocumentPreview(false);
+                    handleDeleteDocument(selectedDocument.id, selectedDocument.name);
+                    setSelectedDocument(null);
+                  }}
+                >
+                  <Ionicons name="trash" size={20} color="#f44336" />
+                  <Text style={styles.deleteDocBtnText}>Supprimer ce document</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
