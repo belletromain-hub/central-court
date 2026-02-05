@@ -1467,4 +1467,60 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.text.secondary,
   },
+  // Locked tournament styles (when accepted/participating)
+  lockedTournamentMessage: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  lockedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  lockedBadgeEmoji: {
+    fontSize: 18,
+    color: '#fff',
+  },
+  lockedBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  lockedTournamentName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  lockedTournamentHint: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+  },
+  // Cancel registration button
+  cancelRegistrationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#f44336',
+    borderRadius: 8,
+  },
+  cancelRegistrationText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#f44336',
+  },
 });
