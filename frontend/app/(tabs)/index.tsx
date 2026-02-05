@@ -1613,4 +1613,82 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.text.secondary,
   },
+  // Multi-registration styles
+  registeredTournamentsContainer: {
+    gap: 6,
+  },
+  registeredTournamentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  tournamentNameSmall: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.text.primary,
+  },
+  statusBadgeSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusTextSmall: {
+    fontSize: 12,
+    color: '#fff',
+  },
+  moreAvailableText: {
+    fontSize: 12,
+    color: Colors.text.muted,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  // Current status badge
+  currentStatusBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currentStatusEmoji: {
+    fontSize: 14,
+    color: '#fff',
+  },
+  // Inline status selection
+  statusSectionInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 8,
+  },
+  statusGridInline: {
+    flexDirection: 'row',
+    gap: 6,
+    flex: 1,
+  },
+  statusOptionSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background.secondary,
+    borderWidth: 2,
+    borderColor: Colors.border.light,
+  },
+  statusOptionEmojiSmall: {
+    fontSize: 16,
+  },
+  hideInlineBtnContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+  },
 });
