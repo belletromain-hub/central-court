@@ -168,6 +168,8 @@ export default function CalendarScreenV1() {
       }
       return week;
     }));
+    // Close modal after status selection
+    setShowTournamentModal(false);
   };
   
   // Available status options for UI
