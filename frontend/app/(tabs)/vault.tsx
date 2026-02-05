@@ -769,6 +769,124 @@ export default function DocumentsScreen() {
           </View>
         </View>
       </Modal>
+      
+      {/* OCR Analysis Modal */}
+      <Modal visible={isAnalyzing} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.analyzingContent}>
+            <View style={styles.analyzingIcon}>
+              <Ionicons name="scan" size={48} color={Colors.primary} />
+            </View>
+            <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />
+            <Text style={styles.analyzingTitle}>🤖 Analyse IA en cours...</Text>
+            <Text style={styles.analyzingSubtitle}>
+              Extraction automatique de la date, du montant et de la catégorie
+            </Text>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* OCR Result Modal */}
+      <Modal visible={showOCRResultModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>🔍 Données extraites</Text>
+              <TouchableOpacity onPress={() => {
+                setShowOCRResultModal(false);
+                setOcrResult(null);
+              }}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            {ocrResult && (
+              <>
+                {/* Confidence badge */}
+                <View style={[
+                  styles.confidenceBadge,
+                  ocrResult.confidence === 'high' && styles.confidenceHigh,
+                  ocrResult.confidence === 'medium' && styles.confidenceMedium,
+                  ocrResult.confidence === 'low' && styles.confidenceLow,
+                ]}>
+                  <Ionicons 
+                    name={ocrResult.confidence === 'high' ? 'checkmark-circle' : 'information-circle'} 
+                    size={16} 
+                    color="#fff" 
+                  />
+                  <Text style={styles.confidenceText}>
+                    Confiance {ocrResult.confidence === 'high' ? 'élevée' : ocrResult.confidence === 'medium' ? 'moyenne' : 'faible'}
+                  </Text>
+                </View>
+                
+                <ScrollView style={styles.ocrForm}>
+                  {/* Merchant */}
+                  <Text style={styles.ocrLabel}>🏪 Commerce / Prestataire</Text>
+                  <TextInput
+                    style={styles.ocrInput}
+                    value={ocrResult.merchant}
+                    onChangeText={(text) => setOcrResult({ ...ocrResult, merchant: text })}
+                    placeholder="Nom du commerce"
+                    placeholderTextColor={Colors.text.muted}
+                  />
+                  
+                  {/* Date */}
+                  <Text style={styles.ocrLabel}>📅 Date</Text>
+                  <TextInput
+                    style={styles.ocrInput}
+                    value={ocrResult.date}
+                    onChangeText={(text) => setOcrResult({ ...ocrResult, date: text })}
+                    placeholder="JJ/MM/AAAA"
+                    placeholderTextColor={Colors.text.muted}
+                  />
+                  
+                  {/* Amount */}
+                  <Text style={styles.ocrLabel}>💰 Montant (€)</Text>
+                  <TextInput
+                    style={styles.ocrInput}
+                    value={ocrResult.amount}
+                    onChangeText={(text) => setOcrResult({ ...ocrResult, amount: text })}
+                    placeholder="0.00"
+                    placeholderTextColor={Colors.text.muted}
+                    keyboardType="decimal-pad"
+                  />
+                  
+                  {/* Category */}
+                  <Text style={styles.ocrLabel}>📁 Catégorie</Text>
+                  <View style={styles.categorySelector}>
+                    {(Object.entries(DOCUMENT_CATEGORIES) as [DocumentCategory, typeof DOCUMENT_CATEGORIES.travel][]).map(([key, cat]) => (
+                      <TouchableOpacity
+                        key={key}
+                        style={[
+                          styles.categorySelectorItem,
+                          ocrResult.category === key && { backgroundColor: cat.color + '20', borderColor: cat.color }
+                        ]}
+                        onPress={() => setOcrResult({ ...ocrResult, category: key })}
+                      >
+                        <Text style={styles.categorySelectorEmoji}>{cat.emoji}</Text>
+                        <Text style={[
+                          styles.categorySelectorText,
+                          ocrResult.category === key && { color: cat.color, fontWeight: '600' }
+                        ]}>
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+                
+                <TouchableOpacity
+                  style={styles.confirmOCRBtn}
+                  onPress={handleConfirmOCR}
+                >
+                  <Ionicons name="checkmark-circle" size={22} color="#fff" />
+                  <Text style={styles.confirmOCRBtnText}>Confirmer et ajouter</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
