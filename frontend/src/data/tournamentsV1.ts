@@ -202,7 +202,8 @@ export const TOURNAMENT_STATUS_LABELS: Record<TournamentStatus, { label: string;
   interested: { label: 'Intéressé', emoji: '🤔', color: '#ff9800' },
   pending: { label: 'En attente', emoji: '⏳', color: '#2196f3' },
   registered: { label: 'Inscrit', emoji: '✓', color: '#4caf50' },
-  accepted: { label: 'Accepté', emoji: '🎾', color: '#388e3c' },
+  accepted: { label: 'Accepté', emoji: '✅', color: '#388e3c' },
+  participating: { label: 'Participe', emoji: '🎾', color: '#6a1b9a' },
   declined: { label: 'Refusé', emoji: '❌', color: '#f44336' },
   none: { label: 'Aucun', emoji: '—', color: '#9e9e9e' }
 };
