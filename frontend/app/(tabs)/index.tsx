@@ -661,6 +661,35 @@ export default function CalendarScreenV1() {
                   ) : (
                     <Text style={styles.noObservationsText}>Aucune observation pour le moment</Text>
                   )}
+                  
+                  {/* Add observation form */}
+                  <View style={styles.addObservationSection}>
+                    <Text style={styles.addObservationLabel}>Ajouter une observation</Text>
+                    <TextInput
+                      style={styles.observationInput}
+                      placeholder="Ex: Focus service slice. 45 min travail rebond haut."
+                      placeholderTextColor={Colors.text.muted}
+                      multiline
+                      numberOfLines={3}
+                      maxLength={200}
+                      onChangeText={(text) => {
+                        // Store temporarily - will be used on submit
+                        setNewObservationText(text);
+                      }}
+                      value={newObservationText}
+                    />
+                    <View style={styles.observationFooter}>
+                      <Text style={styles.charCount}>{newObservationText.length}/200</Text>
+                      <TouchableOpacity
+                        style={[styles.addObservationBtn, !newObservationText.trim() && styles.addObservationBtnDisabled]}
+                        onPress={handleAddObservation}
+                        disabled={!newObservationText.trim()}
+                      >
+                        <Ionicons name="send" size={16} color="#fff" />
+                        <Text style={styles.addObservationBtnText}>Envoyer</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
               </ScrollView>
             )}
