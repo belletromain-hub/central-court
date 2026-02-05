@@ -435,6 +435,104 @@ async def remove_team_member(user_id: str, user: User = Depends(require_player))
     
     return {"success": True}
 
+# ============ OCR RECEIPT ANALYSIS ============
+
+class OCRResult(BaseModel):
+    success: bool
+    date: Optional[str] = None
+    amount: Optional[float] = None
+    category: Optional[str] = None
+    merchant: Optional[str] = None
+    confidence: str = "low"
+    error: Optional[str] = None
+
+class OCRRequest(BaseModel):
+    image_base64: str
+
+@app.post("/api/ocr/analyze-receipt", response_model=OCRResult)
+async def analyze_receipt(request: OCRRequest):
+    """Analyze a receipt image using GPT-4o Vision to extract date, amount, and category"""
+    try:
+        emergent_key = os.getenv("EMERGENT_LLM_KEY", "")
+        
+        if not emergent_key:
+            return OCRResult(
+                success=False,
+                error="EMERGENT_LLM_KEY not configured"
+            )
+        
+        # Initialize LlmChat with GPT-4o for vision
+        chat = LlmChat(
+            api_key=emergent_key,
+            session_id=f"ocr_{uuid.uuid4().hex[:8]}",
+            system_message="""Tu es un assistant expert en analyse de reçus et factures. 
+Ton travail est d'extraire les informations clés des images de reçus.
+Réponds UNIQUEMENT en JSON valide, sans texte avant ou après."""
+        ).with_model("openai", "gpt-4o")
+        
+        # Create image content
+        image_content = ImageContent(
+            image_base64=request.image_base64
+        )
+        
+        # Create message with image
+        user_message = UserMessage(
+            text="""Analyse cette image de reçu/facture et extrait les informations suivantes.
+            
+Réponds UNIQUEMENT avec ce JSON (pas de texte avant ou après):
+{
+    "date": "DD/MM/YYYY ou null si non trouvé",
+    "amount": nombre décimal ou null si non trouvé,
+    "merchant": "nom du commerce/prestataire ou null",
+    "category": "travel" ou "invoices" ou "medical" ou "other",
+    "confidence": "high" ou "medium" ou "low"
+}
+
+Règles pour la catégorie:
+- "travel": billets d'avion, train, hôtel, taxi, Uber, péage, carburant
+- "medical": pharmacie, médecin, kiné, hôpital, analyses
+- "invoices": restaurant, équipement sportif, abonnements, services
+- "other": tout le reste
+
+Si l'image n'est pas un reçu ou facture lisible, retourne: {"date": null, "amount": null, "merchant": null, "category": "other", "confidence": "low"}""",
+            image_contents=[image_content]
+        )
+        
+        # Send to GPT-4o Vision
+        response = await chat.send_message(user_message)
+        
+        # Parse JSON response
+        try:
+            # Clean response - remove markdown code blocks if present
+            clean_response = response.strip()
+            if clean_response.startswith("```"):
+                clean_response = re.sub(r'^```(?:json)?\n?', '', clean_response)
+                clean_response = re.sub(r'\n?```$', '', clean_response)
+            
+            data = json.loads(clean_response)
+            
+            return OCRResult(
+                success=True,
+                date=data.get("date"),
+                amount=data.get("amount"),
+                category=data.get("category", "other"),
+                merchant=data.get("merchant"),
+                confidence=data.get("confidence", "medium")
+            )
+        except json.JSONDecodeError as e:
+            print(f"JSON parse error: {e}, response: {response}")
+            return OCRResult(
+                success=False,
+                error=f"Failed to parse AI response: {str(e)}"
+            )
+            
+    except Exception as e:
+        print(f"OCR error: {e}")
+        return OCRResult(
+            success=False,
+            error=str(e)
+        )
+
 # ============ AI QUICK REPLIES ============
 
 class QuickReplyContext(BaseModel):
