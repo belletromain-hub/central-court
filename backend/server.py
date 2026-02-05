@@ -571,17 +571,45 @@ def categorize_receipt(text: str, merchant: Optional[str]) -> str:
 
 @app.post("/api/ocr/analyze-receipt", response_model=OCRResult)
 async def analyze_receipt(request: OCRRequest):
-    """Analyze a receipt image using Tesseract OCR to extract date, amount, and category"""
+    """Analyze a receipt image or PDF using Tesseract OCR to extract date, amount, and category"""
     try:
-        # Decode base64 image
+        # Decode base64 data
         try:
-            image_data = base64.b64decode(request.image_base64)
-            image = Image.open(io.BytesIO(image_data))
+            file_data = base64.b64decode(request.image_base64)
         except Exception as e:
             return OCRResult(
                 success=False,
-                error=f"Failed to decode image: {str(e)}"
+                error=f"Failed to decode base64: {str(e)}"
             )
+        
+        # Check if it's a PDF
+        is_pdf = file_data[:4] == b'%PDF'
+        
+        if is_pdf:
+            # Handle PDF - convert first page to image
+            try:
+                from pdf2image import convert_from_bytes
+                pages = convert_from_bytes(file_data, dpi=150, first_page=1, last_page=1)
+                if not pages:
+                    return OCRResult(
+                        success=False,
+                        error="Could not convert PDF to image"
+                    )
+                image = pages[0]
+            except Exception as e:
+                return OCRResult(
+                    success=False,
+                    error=f"Failed to process PDF: {str(e)}"
+                )
+        else:
+            # Handle image
+            try:
+                image = Image.open(io.BytesIO(file_data))
+            except Exception as e:
+                return OCRResult(
+                    success=False,
+                    error=f"Failed to open image: {str(e)}"
+                )
         
         # Convert to RGB if necessary
         if image.mode != 'RGB':
