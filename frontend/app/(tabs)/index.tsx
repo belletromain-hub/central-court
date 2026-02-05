@@ -289,9 +289,13 @@ export default function CalendarScreenV1() {
   
   // Render tournament week card
   const renderTournamentWeekCard = (week: WeekTournaments) => {
-    const selectedTournament = week.tournaments.find(t => t.id === week.selectedTournamentId);
-    const statusInfo = TOURNAMENT_STATUS_LABELS[week.status];
     const visibleTournaments = getVisibleTournaments(week);
+    const registeredTournaments = week.registrations
+      .map(r => ({
+        tournament: week.tournaments.find(t => t.id === r.tournamentId),
+        status: r.status
+      }))
+      .filter(r => r.tournament);
     
     return (
       <TouchableOpacity
@@ -307,20 +311,27 @@ export default function CalendarScreenV1() {
           <Text style={styles.weekDates}>{week.weekLabel}</Text>
         </View>
         
-        {selectedTournament ? (
-          <View style={styles.selectedTournamentInfo}>
-            <View style={styles.tournamentNameRow}>
-              <Text style={styles.tournamentFlag}>{selectedTournament.countryFlag}</Text>
-              <View style={styles.tournamentDetails}>
-                <Text style={styles.tournamentName}>{selectedTournament.name}</Text>
-                <Text style={styles.tournamentCategory}>{selectedTournament.category} • {selectedTournament.surface}</Text>
-              </View>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '20' }]}>
-              <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                {statusInfo.emoji} {statusInfo.label}
+        {registeredTournaments.length > 0 ? (
+          <View style={styles.registeredTournamentsContainer}>
+            {registeredTournaments.map(({ tournament, status }) => {
+              if (!tournament) return null;
+              const statusInfo = TOURNAMENT_STATUS_LABELS[status];
+              return (
+                <View key={tournament.id} style={styles.registeredTournamentRow}>
+                  <Text style={styles.tournamentFlag}>{tournament.countryFlag}</Text>
+                  <Text style={styles.tournamentNameSmall} numberOfLines={1}>{tournament.name}</Text>
+                  <View style={[styles.statusBadgeSmall, { backgroundColor: statusInfo.color }]}>
+                    <Text style={styles.statusTextSmall}>{statusInfo.emoji}</Text>
+                  </View>
+                </View>
+              );
+            })}
+            {/* Show how many more available */}
+            {visibleTournaments.length > registeredTournaments.length && (
+              <Text style={styles.moreAvailableText}>
+                +{visibleTournaments.length - registeredTournaments.length} disponible{visibleTournaments.length - registeredTournaments.length > 1 ? 's' : ''}
               </Text>
-            </View>
+            )}
           </View>
         ) : visibleTournaments.length > 0 ? (
           <View style={styles.noTournamentSelected}>
