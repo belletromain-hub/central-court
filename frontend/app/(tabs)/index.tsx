@@ -310,6 +310,7 @@ export default function CalendarScreenV1() {
   const renderTournamentWeekCard = (week: WeekTournaments) => {
     const selectedTournament = week.tournaments.find(t => t.id === week.selectedTournamentId);
     const statusInfo = TOURNAMENT_STATUS_LABELS[week.status];
+    const visibleTournaments = getVisibleTournaments(week);
     
     return (
       <TouchableOpacity
@@ -340,12 +341,17 @@ export default function CalendarScreenV1() {
               </Text>
             </View>
           </View>
-        ) : (
+        ) : visibleTournaments.length > 0 ? (
           <View style={styles.noTournamentSelected}>
             <Ionicons name="add-circle-outline" size={24} color={Colors.text.muted} />
             <Text style={styles.noTournamentText}>
-              {week.tournaments.length} tournoi{week.tournaments.length > 1 ? 's' : ''} disponible{week.tournaments.length > 1 ? 's' : ''}
+              {visibleTournaments.length} tournoi{visibleTournaments.length > 1 ? 's' : ''} disponible{visibleTournaments.length > 1 ? 's' : ''}
             </Text>
+          </View>
+        ) : (
+          <View style={styles.noTournamentSelected}>
+            <Ionicons name="close-circle-outline" size={24} color={Colors.text.muted} />
+            <Text style={styles.noTournamentText}>Pas de tournoi cette semaine</Text>
           </View>
         )}
       </TouchableOpacity>
