@@ -244,12 +244,8 @@ export default function DocumentsScreen() {
         const fileType = file.mimeType?.includes('pdf') ? 'pdf' : 'image';
         setShowUploadModal(false);
         
-        // PDFs don't support OCR in V1, add directly
-        if (fileType === 'pdf') {
-          await addDocument(file.uri, 'pdf', 'invoices', file.name);
-        } else {
-          await analyzeWithOCR(file.uri, 'image', file.name);
-        }
+        // Both PDFs and images now support OCR
+        await analyzeWithOCR(file.uri, fileType, file.name);
       }
     } catch (error) {
       console.error('Error selecting file:', error);
