@@ -22,6 +22,7 @@ import {
   WeekTournaments, 
   Tournament,
   TournamentStatus,
+  TournamentRegistration,
   TOURNAMENT_STATUS_LABELS,
   SURFACE_COLORS 
 } from '../../src/data/tournamentsV1';
