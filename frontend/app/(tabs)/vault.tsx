@@ -694,9 +694,16 @@ export default function DocumentsScreen() {
                   <Ionicons name="mail" size={28} color="#1976d2" />
                 </View>
                 <View style={styles.exportOptionInfo}>
-                  <Text style={styles.exportOptionLabel}>Envoyer par email</Text>
-                  <Text style={styles.exportOptionDesc}>Partager avec votre comptable</Text>
+                  <Text style={styles.exportOptionLabel}>
+                    {accountantEmail ? '📨 Envoyer au comptable' : 'Envoyer par email'}
+                  </Text>
+                  <Text style={styles.exportOptionDesc}>
+                    {accountantEmail || 'Partager les documents'}
+                  </Text>
                 </View>
+                {accountantEmail && (
+                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                )}
               </TouchableOpacity>
               
               <TouchableOpacity 
