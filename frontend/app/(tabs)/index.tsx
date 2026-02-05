@@ -70,6 +70,9 @@ export default function CalendarScreenV1() {
     observations: []
   });
   
+  // Observation input
+  const [newObservationText, setNewObservationText] = useState('');
+  
   // Get events for a specific date
   const getEventsForDate = (date: string) => {
     return events.filter(e => e.date === date);
