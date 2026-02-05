@@ -163,7 +163,7 @@ export default function CalendarScreenV1() {
   const handleStatusChange = (weekNumber: number, status: TournamentStatus) => {
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
-        // If status is "not_interested", clear the selection
+        // If status is "none" (pas intéressé), clear the selection
         if (status === 'none' && week.selectedTournamentId) {
           return { ...week, selectedTournamentId: null, status: 'none' };
         }
@@ -175,8 +175,23 @@ export default function CalendarScreenV1() {
     setShowTournamentModal(false);
   };
   
-  // Available status options for UI
-  const STATUS_OPTIONS: TournamentStatus[] = ['interested', 'pending', 'registered', 'accepted', 'participating', 'declined'];
+  // Get status options based on current status
+  // Si inscrit (pending) → L'option "Intéressé" ne doit plus s'afficher
+  const getAvailableStatusOptions = (currentStatus: TournamentStatus): TournamentStatus[] => {
+    if (currentStatus === 'pending' || currentStatus === 'accepted' || currentStatus === 'participating') {
+      // Once registered, can't go back to "interested"
+      return ['pending', 'accepted', 'participating', 'declined'];
+    }
+    // Before registration
+    return ['interested', 'pending', 'accepted', 'participating', 'declined'];
+  };
+  
+  // Check if other tournaments should be visible
+  // Intéressé, En attente (Inscrit), Refusé → Voir les autres tournois
+  // Accepté, Participe → Masquer les autres tournois
+  const shouldShowOtherTournaments = (status: TournamentStatus): boolean => {
+    return status === 'interested' || status === 'pending' || status === 'declined' || status === 'none';
+  };
   
   // Handle add event
   const handleAddEvent = () => {
