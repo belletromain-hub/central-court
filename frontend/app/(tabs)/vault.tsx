@@ -226,7 +226,8 @@ export default function DocumentsScreen() {
     });
     
     if (!result.canceled && result.assets[0]) {
-      await addDocument(result.assets[0].uri, 'image', 'invoices');
+      setShowUploadModal(false);
+      await analyzeWithOCR(result.assets[0].uri, 'image');
     }
   };
   
@@ -241,11 +242,110 @@ export default function DocumentsScreen() {
       if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
         const fileType = file.mimeType?.includes('pdf') ? 'pdf' : 'image';
-        await addDocument(file.uri, fileType, 'invoices', file.name);
+        setShowUploadModal(false);
+        
+        // PDFs don't support OCR in V1, add directly
+        if (fileType === 'pdf') {
+          await addDocument(file.uri, 'pdf', 'invoices', file.name);
+        } else {
+          await analyzeWithOCR(file.uri, 'image', file.name);
+        }
       }
     } catch (error) {
       console.error('Error selecting file:', error);
     }
+  };
+  
+  // Analyze image with OCR
+  const analyzeWithOCR = async (uri: string, type: 'pdf' | 'image', name?: string) => {
+    setIsAnalyzing(true);
+    
+    try {
+      // Convert image to base64
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      // Call OCR endpoint
+      const response = await fetch(`${API_BASE_URL}/api/ocr/analyze-receipt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image_base64: base64,
+        }),
+      });
+      
+      const ocrData = await response.json();
+      
+      if (ocrData.success) {
+        // Show OCR result modal for user to confirm/edit
+        setOcrResult({
+          uri,
+          type,
+          date: ocrData.date || '',
+          amount: ocrData.amount?.toString() || '',
+          category: ocrData.category || 'invoices',
+          merchant: ocrData.merchant || '',
+          confidence: ocrData.confidence || 'low',
+        });
+        setShowOCRResultModal(true);
+      } else {
+        // OCR failed, add document without extracted data
+        console.log('OCR failed:', ocrData.error);
+        await addDocument(uri, type, 'invoices', name);
+      }
+    } catch (error) {
+      console.error('OCR error:', error);
+      // Fallback: add document without OCR
+      await addDocument(uri, type, 'invoices', name);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+  
+  // Confirm OCR result and save document
+  const handleConfirmOCR = async () => {
+    if (!ocrResult) return;
+    
+    setIsUploading(true);
+    setShowOCRResultModal(false);
+    
+    const now = new Date();
+    let month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Parse date from OCR result if available
+    if (ocrResult.date) {
+      const parts = ocrResult.date.split('/');
+      if (parts.length === 3) {
+        month = `${parts[2]}-${parts[1].padStart(2, '0')}`;
+      }
+    }
+    
+    const fileName = ocrResult.merchant 
+      ? `${ocrResult.merchant.replace(/[^a-zA-Z0-9]/g, '_')}_${now.getTime()}.jpg`
+      : `Facture_${now.getTime()}.jpg`;
+    
+    const newDoc: DocumentV1 = {
+      id: `doc-${Date.now()}`,
+      name: fileName,
+      category: ocrResult.category,
+      fileUri: ocrResult.uri,
+      fileType: ocrResult.type,
+      uploadedAt: now.toISOString(),
+      month,
+      amount: ocrResult.amount ? parseFloat(ocrResult.amount) : undefined,
+    };
+    
+    setDocuments(prev => [newDoc, ...prev]);
+    setIsUploading(false);
+    setOcrResult(null);
+    
+    Alert.alert(
+      '✅ Document ajouté', 
+      `${fileName} a été classé dans ${formatMonthLabel(month)}${ocrResult.amount ? `\nMontant: ${ocrResult.amount}€` : ''}`
+    );
   };
   
   // Add document
