@@ -202,12 +202,11 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
 // Statuts tournoi avec labels français
 export const TOURNAMENT_STATUS_LABELS: Record<TournamentStatus, { label: string; emoji: string; color: string }> = {
   interested: { label: 'Intéressé', emoji: '🤔', color: '#ff9800' },
-  pending: { label: 'En attente', emoji: '⏳', color: '#2196f3' },
-  registered: { label: 'Inscrit', emoji: '✓', color: '#4caf50' },
+  pending: { label: 'Inscrit / En attente', emoji: '⏳', color: '#2196f3' },
   accepted: { label: 'Accepté', emoji: '✅', color: '#388e3c' },
   participating: { label: 'Participe', emoji: '🎾', color: '#6a1b9a' },
   declined: { label: 'Refusé', emoji: '❌', color: '#f44336' },
-  none: { label: 'Aucun', emoji: '—', color: '#9e9e9e' }
+  none: { label: 'Pas intéressé', emoji: '—', color: '#9e9e9e' }
 };
 
 // Surface colors
