@@ -601,7 +601,7 @@ Format de réponse JSON:
                     if start >= 0 and end > start:
                         replies = json.loads(content[start:end])
                         return {"replies": replies}
-                except:
+                except json.JSONDecodeError:
                     pass
         
         # Fallback if AI fails
