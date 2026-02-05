@@ -481,6 +481,10 @@ export default function DocumentsScreen() {
       <TouchableOpacity
         key={doc.id}
         style={styles.documentCard}
+        onPress={() => {
+          setSelectedDocument(doc);
+          setShowDocumentPreview(true);
+        }}
         onLongPress={() => handleDeleteDocument(doc.id, doc.name)}
       >
         <View style={[styles.docIcon, { backgroundColor: categoryInfo.color + '15' }]}>
@@ -501,6 +505,7 @@ export default function DocumentsScreen() {
         {doc.amount && (
           <Text style={styles.docAmount}>{doc.amount}€</Text>
         )}
+        <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
       </TouchableOpacity>
     );
   };
