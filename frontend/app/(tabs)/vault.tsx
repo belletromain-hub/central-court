@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,585 +6,596 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  TextInput,
   Alert,
   Platform,
-  KeyboardAvoidingView,
+  Share,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import Colors from '../../src/constants/colors';
-import { useApp } from '../../src/context/AppContext';
-import { Document, teamTypes, TeamType } from '../../src/types';
-import { formatDate, getDaysUntil } from '../../src/utils/dateFormatter';
 
-export default function VaultScreen() {
-  const insets = useSafeAreaInsets();
-  const { documents, addDocument, deleteDocument, updateDocumentSharing } = useApp();
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [showDocModal, setShowDocModal] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('identity');
-  const [newDoc, setNewDoc] = useState({
-    name: '',
-    expiryDate: '',
-    notes: '',
+// Document categories V1
+const DOCUMENT_CATEGORIES = {
+  travel: { name: 'Voyages', icon: 'airplane', emoji: '✈️', color: '#00796b' },
+  invoices: { name: 'Factures', icon: 'receipt', emoji: '🧾', color: '#f57c00' },
+  medical: { name: 'Médical', icon: 'medkit', emoji: '🏥', color: '#c2185b' },
+  other: { name: 'Autres', icon: 'document', emoji: '📄', color: '#757575' },
+};
+
+type DocumentCategory = keyof typeof DOCUMENT_CATEGORIES;
+
+interface DocumentV1 {
+  id: string;
+  name: string;
+  category: DocumentCategory;
+  fileUri: string;
+  fileType: 'pdf' | 'image';
+  uploadedAt: string;
+  month: string; // Format: "2026-02"
+  amount?: number;
+}
+
+// Demo documents
+const INITIAL_DOCUMENTS: DocumentV1[] = [
+  {
+    id: 'doc-001',
+    name: 'Billet_avion_Rotterdam.pdf',
+    category: 'travel',
     fileUri: '',
-  });
-  const [selectedTeams, setSelectedTeams] = useState<TeamType[]>([]);
-  const [isDownloading, setIsDownloading] = useState(false);
+    fileType: 'pdf',
+    uploadedAt: '2026-02-01T10:30:00',
+    month: '2026-02',
+    amount: 285,
+  },
+  {
+    id: 'doc-002',
+    name: 'Hotel_Hilton_Rotterdam.pdf',
+    category: 'travel',
+    fileUri: '',
+    fileType: 'pdf',
+    uploadedAt: '2026-02-01T10:35:00',
+    month: '2026-02',
+    amount: 920,
+  },
+  {
+    id: 'doc-003',
+    name: 'Facture_kine_04fev.jpg',
+    category: 'medical',
+    fileUri: '',
+    fileType: 'image',
+    uploadedAt: '2026-02-04T17:30:00',
+    month: '2026-02',
+    amount: 80,
+  },
+  {
+    id: 'doc-004',
+    name: 'Facture_kine_07fev.jpg',
+    category: 'medical',
+    fileUri: '',
+    fileType: 'image',
+    uploadedAt: '2026-02-07T19:15:00',
+    month: '2026-02',
+    amount: 90,
+  },
+  {
+    id: 'doc-005',
+    name: 'Restaurant_equipe.jpg',
+    category: 'invoices',
+    fileUri: '',
+    fileType: 'image',
+    uploadedAt: '2026-02-05T21:00:00',
+    month: '2026-02',
+    amount: 125,
+  },
+  {
+    id: 'doc-006',
+    name: 'Taxi_aeroport.pdf',
+    category: 'invoices',
+    fileUri: '',
+    fileType: 'pdf',
+    uploadedAt: '2026-02-08T08:00:00',
+    month: '2026-02',
+    amount: 45,
+  },
+];
 
-  const getCategoryIcon = (category: string): string => {
-    switch (category) {
-      case 'identity': return 'id-card';
-      case 'contracts': return 'document-text';
-      case 'invoices': return 'receipt';
-      case 'medical': return 'medkit';
-      default: return 'document';
+export default function DocumentsScreen() {
+  const insets = useSafeAreaInsets();
+  
+  // State
+  const [documents, setDocuments] = useState<DocumentV1[]>(INITIAL_DOCUMENTS);
+  const [selectedMonth, setSelectedMonth] = useState('2026-02');
+  const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | 'all'>('all');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showFinanceModal, setShowFinanceModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // Available months
+  const availableMonths = useMemo(() => {
+    const months = [...new Set(documents.map(d => d.month))];
+    return months.sort().reverse();
+  }, [documents]);
+  
+  // Filter documents
+  const filteredDocuments = useMemo(() => {
+    return documents.filter(doc => {
+      const monthMatch = doc.month === selectedMonth;
+      const categoryMatch = selectedCategory === 'all' || doc.category === selectedCategory;
+      return monthMatch && categoryMatch;
+    });
+  }, [documents, selectedMonth, selectedCategory]);
+  
+  // Group by category
+  const documentsByCategory = useMemo(() => {
+    const grouped: Record<string, DocumentV1[]> = {};
+    filteredDocuments.forEach(doc => {
+      if (!grouped[doc.category]) grouped[doc.category] = [];
+      grouped[doc.category].push(doc);
+    });
+    return grouped;
+  }, [filteredDocuments]);
+  
+  // Calculate totals
+  const monthTotals = useMemo(() => {
+    const monthDocs = documents.filter(d => d.month === selectedMonth);
+    const totals: Record<DocumentCategory, number> = {
+      travel: 0,
+      invoices: 0,
+      medical: 0,
+      other: 0,
+    };
+    monthDocs.forEach(doc => {
+      if (doc.amount) totals[doc.category] += doc.amount;
+    });
+    return {
+      ...totals,
+      total: Object.values(totals).reduce((sum, val) => sum + val, 0)
+    };
+  }, [documents, selectedMonth]);
+  
+  // Format month label
+  const formatMonthLabel = (month: string) => {
+    const [year, m] = month.split('-');
+    const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    return `${months[parseInt(m) - 1]} ${year}`;
+  };
+  
+  // Handle photo capture
+  const handleTakePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour prendre des photos.');
+      return;
+    }
+    
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    
+    if (!result.canceled && result.assets[0]) {
+      await addDocument(result.assets[0].uri, 'image', 'invoices');
     }
   };
-
-  const getCategoryLabel = (category: string): string => {
-    switch (category) {
-      case 'identity': return 'Documents d\'identité';
-      case 'contracts': return 'Contrats';
-      case 'invoices': return 'Factures';
-      case 'medical': return 'Médical';
-      default: return 'Documents';
-    }
-  };
-
-  const getDocumentsByCategory = (category: string) => {
-    return documents.filter(d => d.category === category);
-  };
-
-  const handlePickDocument = async () => {
+  
+  // Handle file selection
+  const handleSelectFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
         copyToCacheDirectory: true,
       });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
+      
+      if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
-        setNewDoc(prev => ({ 
-          ...prev, 
-          name: file.name,
-          fileUri: file.uri 
-        }));
+        const fileType = file.mimeType?.includes('pdf') ? 'pdf' : 'image';
+        await addDocument(file.uri, fileType, 'invoices', file.name);
       }
     } catch (error) {
-      console.error('Error picking document:', error);
+      console.error('Error selecting file:', error);
     }
   };
-
-  // Open document preview modal
-  const handleOpenDoc = (doc: Document) => {
-    setSelectedDoc(doc);
-    setShowDocModal(true);
-  };
-
-  // Download/share document
-  const handleDownloadDoc = async (doc: Document) => {
-    if (!doc.fileUri) {
-      Alert.alert('Erreur', 'Ce document n\'a pas de fichier associé');
-      return;
-    }
-
-    setIsDownloading(true);
-    try {
-      if (Platform.OS === 'web') {
-        // On web, use native download
-        const link = document.createElement('a');
-        link.href = doc.fileUri;
-        link.download = doc.name;
-        link.click();
-      } else {
-        // On mobile, use sharing
-        const isSharingAvailable = await Sharing.isAvailableAsync();
-        if (isSharingAvailable) {
-          // Copy to a shareable location if needed
-          const filename = doc.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const targetUri = `${FileSystem.cacheDirectory}${filename}`;
-          
-          // If the file is already in the cache, share directly
-          // Otherwise, we need to handle the case where file is external
-          try {
-            const fileInfo = await FileSystem.getInfoAsync(doc.fileUri);
-            if (fileInfo.exists) {
-              await Sharing.shareAsync(doc.fileUri, {
-                mimeType: doc.fileType === 'pdf' ? 'application/pdf' : 'image/*',
-                dialogTitle: `Partager ${doc.name}`,
-              });
-            } else {
-              // File doesn't exist, show demo message
-              Alert.alert(
-                'Démo', 
-                'Dans la version complète, ce document serait téléchargé depuis le serveur et partagé.',
-                [{ text: 'OK' }]
-              );
-            }
-          } catch {
-            Alert.alert(
-              'Partager', 
-              `Le document "${doc.name}" serait partagé ici.`,
-              [{ text: 'OK' }]
-            );
-          }
-        } else {
-          Alert.alert('Erreur', 'Le partage n\'est pas disponible sur cet appareil');
-        }
-      }
-    } catch (error) {
-      console.error('Error downloading document:', error);
-      Alert.alert('Erreur', 'Impossible de télécharger le document');
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  const toggleTeam = (teamId: TeamType) => {
-    setSelectedTeams(prev =>
-      prev.includes(teamId)
-        ? prev.filter(t => t !== teamId)
-        : [...prev, teamId]
-    );
-  };
-
-  const handleAddDocument = () => {
-    if (!newDoc.name) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un document');
-      return;
-    }
-
-    const doc: Document = {
+  
+  // Add document
+  const addDocument = async (uri: string, type: 'pdf' | 'image', category: DocumentCategory, name?: string) => {
+    setIsUploading(true);
+    
+    // Simulate upload delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const fileName = name || `${DOCUMENT_CATEGORIES[category].name}_${now.getTime()}.${type === 'pdf' ? 'pdf' : 'jpg'}`;
+    
+    const newDoc: DocumentV1 = {
       id: `doc-${Date.now()}`,
-      category: selectedCategory as 'identity' | 'contracts' | 'invoices' | 'medical',
-      name: newDoc.name,
-      fileType: newDoc.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image',
-      fileUri: newDoc.fileUri || undefined,
-      uploadedAt: new Date().toISOString(),
-      expiryDate: newDoc.expiryDate || undefined,
-      notes: newDoc.notes || undefined,
-      sharedWith: selectedTeams,
+      name: fileName,
+      category,
+      fileUri: uri,
+      fileType: type,
+      uploadedAt: now.toISOString(),
+      month,
     };
-
-    addDocument(doc);
-    setShowAddModal(false);
-    setNewDoc({ name: '', expiryDate: '', notes: '', fileUri: '' });
-    setSelectedTeams([]);
+    
+    setDocuments(prev => [newDoc, ...prev]);
+    setIsUploading(false);
+    setShowUploadModal(false);
+    
+    Alert.alert('✅ Document ajouté', `${fileName} a été classé dans ${formatMonthLabel(month)}`);
   };
-
-  const handleOpenShare = (doc: Document) => {
-    setSelectedDoc(doc);
-    setSelectedTeams(doc.sharedWith || []);
-    setShowShareModal(true);
-  };
-
-  const handleSaveSharing = () => {
-    if (selectedDoc) {
-      updateDocumentSharing(selectedDoc.id, selectedTeams);
+  
+  // Handle export
+  const handleExport = async (method: 'email' | 'download') => {
+    const monthDocs = documents.filter(d => d.month === selectedMonth);
+    
+    if (monthDocs.length === 0) {
+      Alert.alert('Aucun document', 'Pas de documents à exporter pour ce mois.');
+      return;
     }
-    setShowShareModal(false);
-    setSelectedDoc(null);
+    
+    const monthLabel = formatMonthLabel(selectedMonth);
+    const docList = monthDocs.map(d => `- ${d.name}${d.amount ? ` (${d.amount}€)` : ''}`).join('\n');
+    const totalAmount = monthTotals.total;
+    
+    const message = `📋 Documents ${monthLabel}\n\n${docList}\n\n💰 Total: ${totalAmount}€`;
+    
+    if (method === 'email') {
+      try {
+        await Share.share({
+          message,
+          title: `Documents ${monthLabel}`,
+        });
+        setShowExportModal(false);
+      } catch (error) {
+        console.error('Share error:', error);
+      }
+    } else {
+      // In real app, would create a zip file
+      Alert.alert(
+        'Export',
+        `${monthDocs.length} documents seraient téléchargés.\n\nTotal: ${totalAmount}€`,
+        [{ text: 'OK', onPress: () => setShowExportModal(false) }]
+      );
+    }
   };
-
-  const handleDeleteDocument = (id: string, name: string) => {
+  
+  // Delete document
+  const handleDeleteDocument = (docId: string, docName: string) => {
     Alert.alert(
-      'Supprimer le document',
-      `Êtes-vous sûr de vouloir supprimer "${name}" ?`,
+      'Supprimer',
+      `Voulez-vous supprimer "${docName}" ?`,
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Supprimer', style: 'destructive', onPress: () => deleteDocument(id) },
+        { 
+          text: 'Supprimer', 
+          style: 'destructive',
+          onPress: () => setDocuments(prev => prev.filter(d => d.id !== docId))
+        }
       ]
     );
   };
-
-  const isExpiringSoon = (expiryDate?: string): boolean => {
-    if (!expiryDate) return false;
-    const days = getDaysUntil(expiryDate);
-    return days >= 0 && days <= 30;
-  };
-
-  const renderDocumentCard = (doc: Document) => {
-    const expiringSoon = isExpiringSoon(doc.expiryDate);
-    const expired = doc.expiryDate && getDaysUntil(doc.expiryDate) < 0;
-    const sharedCount = doc.sharedWith?.length || 0;
-
+  
+  // Render document card
+  const renderDocumentCard = (doc: DocumentV1) => {
+    const categoryInfo = DOCUMENT_CATEGORIES[doc.category];
     return (
       <TouchableOpacity
         key={doc.id}
         style={styles.documentCard}
-        onPress={() => handleOpenDoc(doc)}
         onLongPress={() => handleDeleteDocument(doc.id, doc.name)}
       >
-        <View style={styles.docIconContainer}>
-          <Ionicons
-            name={doc.fileType === 'pdf' ? 'document-text' : 'image'}
-            size={28}
-            color={Colors.primary}
+        <View style={[styles.docIcon, { backgroundColor: categoryInfo.color + '15' }]}>
+          <Ionicons 
+            name={doc.fileType === 'pdf' ? 'document-text' : 'image'} 
+            size={24} 
+            color={categoryInfo.color} 
           />
         </View>
-        <Text style={styles.docName} numberOfLines={2}>{doc.name}</Text>
-        
-        {/* Sharing indicator */}
-        <View style={styles.sharingRow}>
-          {sharedCount > 0 ? (
-            <View style={styles.sharedBadge}>
-              <Ionicons name="people" size={12} color={Colors.success} />
-              <Text style={styles.sharedText}>{sharedCount} équipe{sharedCount > 1 ? 's' : ''}</Text>
-            </View>
-          ) : (
-            <View style={styles.privateBadge}>
-              <Ionicons name="lock-closed" size={12} color={Colors.text.muted} />
-              <Text style={styles.privateText}>Privé</Text>
-            </View>
-          )}
+        <View style={styles.docInfo}>
+          <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
+          <Text style={styles.docDate}>
+            {new Date(doc.uploadedAt).toLocaleDateString('fr-FR', { 
+              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
+            })}
+          </Text>
         </View>
-        
-        {doc.expiryDate && (
-          <View style={[
-            styles.expiryBadge,
-            expired && styles.expiryExpired,
-            expiringSoon && !expired && styles.expirySoon
-          ]}>
-            <Ionicons
-              name={expired ? 'alert-circle' : 'time'}
-              size={12}
-              color={expired ? '#fff' : expiringSoon ? Colors.warning : Colors.text.secondary}
-            />
-            <Text style={[
-              styles.expiryText,
-              expired && styles.expiryTextExpired,
-              expiringSoon && !expired && styles.expiryTextSoon
-            ]}>
-              {expired ? 'Expiré' : formatDate(doc.expiryDate)}
-            </Text>
-          </View>
+        {doc.amount && (
+          <Text style={styles.docAmount}>{doc.amount}€</Text>
         )}
       </TouchableOpacity>
     );
   };
 
-  const categories = ['identity', 'contracts', 'invoices', 'medical'];
-
   return (
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#1e3c72', '#2a5298']}
-        style={[styles.header, { paddingTop: insets.top + 16 }]}
+        colors={['#f57c00', '#ff9800']}
+        style={[styles.header, { paddingTop: insets.top + 12 }]}
       >
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.headerTitle}>Documents</Text>
-            <Text style={styles.headerSubtitle}>Coffre-fort sécurisé</Text>
-          </View>
-          <View style={styles.lockIcon}>
-            <Ionicons name="lock-closed" size={24} color="rgba(255,255,255,0.9)" />
-          </View>
+          <Text style={styles.headerTitle}>🧾 Documents</Text>
+          <Text style={styles.headerSubtitle}>{filteredDocuments.length} document{filteredDocuments.length > 1 ? 's' : ''}</Text>
         </View>
-      </LinearGradient>
-
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{documents.length}</Text>
-          <Text style={styles.statLabel}>Documents</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>
-            {documents.filter(d => (d.sharedWith?.length || 0) > 0).length}
-          </Text>
-          <Text style={styles.statLabel}>Partagés</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, documents.filter(d => isExpiringSoon(d.expiryDate)).length > 0 && styles.statDanger]}>
-            {documents.filter(d => isExpiringSoon(d.expiryDate)).length}
-          </Text>
-          <Text style={styles.statLabel}>Expirent</Text>
-        </View>
-      </View>
-
-      {/* Categories */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {categories.map(category => {
-          const categoryDocs = getDocumentsByCategory(category);
-
-          return (
-            <View key={category} style={styles.categorySection}>
-              <View style={styles.categoryHeader}>
-                <View style={styles.categoryTitleRow}>
-                  <View style={styles.categoryIconContainer}>
-                    <Ionicons
-                      name={getCategoryIcon(category) as any}
-                      size={20}
-                      color={Colors.primary}
-                    />
-                  </View>
-                  <Text style={styles.categoryTitle}>{getCategoryLabel(category)}</Text>
-                  <View style={styles.categoryBadge}>
-                    <Text style={styles.categoryCount}>{categoryDocs.length}</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.documentsGrid}>
-                {categoryDocs.map(doc => renderDocumentCard(doc))}
-                
-                <TouchableOpacity
-                  style={styles.addDocCard}
-                  onPress={() => {
-                    setSelectedCategory(category);
-                    setShowAddModal(true);
-                  }}
-                >
-                  <Ionicons name="add-circle-outline" size={36} color={Colors.primary} />
-                  <Text style={styles.addDocText}>Ajouter</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* Add Document Modal */}
-      <Modal visible={showAddModal} animationType="slide" transparent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
+        
+        {/* Quick Stats */}
+        <TouchableOpacity 
+          style={styles.financeCard}
+          onPress={() => setShowFinanceModal(true)}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nouveau document</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.selectedCategoryBadge}>
-                <Ionicons
-                  name={getCategoryIcon(selectedCategory) as any}
-                  size={16}
-                  color={Colors.primary}
-                />
-                <Text style={styles.selectedCategoryText}>
-                  {getCategoryLabel(selectedCategory)}
-                </Text>
-              </View>
-
-              <TouchableOpacity style={styles.pickButton} onPress={handlePickDocument}>
-                <Ionicons name="cloud-upload-outline" size={40} color={Colors.primary} />
-                <Text style={styles.pickButtonText}>
-                  {newDoc.name || 'Sélectionner un fichier'}
-                </Text>
-                <Text style={styles.pickButtonHint}>PDF ou Image</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.inputLabel}>Date d'expiration (optionnel)</Text>
-              <TextInput
-                style={styles.input}
-                value={newDoc.expiryDate}
-                onChangeText={expiryDate => setNewDoc({ ...newDoc, expiryDate })}
-                placeholder="YYYY-MM-DD (ex: 2027-06-15)"
-                placeholderTextColor={Colors.text.muted}
-              />
-
-              {/* Team Sharing */}
-              <Text style={styles.inputLabel}>Partager avec</Text>
-              <View style={styles.teamGrid}>
-                {teamTypes.map(team => (
-                  <TouchableOpacity
-                    key={team.id}
-                    style={[
-                      styles.teamOption,
-                      selectedTeams.includes(team.id) && { backgroundColor: team.color + '20', borderColor: team.color }
-                    ]}
-                    onPress={() => toggleTeam(team.id)}
-                  >
-                    <Ionicons
-                      name={team.icon as any}
-                      size={20}
-                      color={selectedTeams.includes(team.id) ? team.color : Colors.text.secondary}
-                    />
-                    <Text style={[
-                      styles.teamOptionText,
-                      selectedTeams.includes(team.id) && { color: team.color }
-                    ]}>
-                      {team.label}
-                    </Text>
-                    {selectedTeams.includes(team.id) && (
-                      <Ionicons name="checkmark-circle" size={16} color={team.color} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                style={[styles.submitBtn, !newDoc.name && styles.submitBtnDisabled]}
-                onPress={handleAddDocument}
-                disabled={!newDoc.name}
-              >
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={styles.submitBtnText}>Enregistrer</Text>
-              </TouchableOpacity>
-            </ScrollView>
+          <View style={styles.financeMain}>
+            <Text style={styles.financeLabel}>Dépenses {formatMonthLabel(selectedMonth)}</Text>
+            <Text style={styles.financeAmount}>{monthTotals.total}€</Text>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Share Document Modal */}
-      <Modal visible={showShareModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Partager le document</Text>
-              <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {selectedDoc && (
-              <View style={styles.docPreview}>
-                <Ionicons name="document-text" size={32} color={Colors.primary} />
-                <Text style={styles.docPreviewName}>{selectedDoc.name}</Text>
-              </View>
-            )}
-
-            <Text style={styles.shareLabel}>Choisir les équipes</Text>
-            <View style={styles.teamList}>
-              {teamTypes.map(team => (
-                <TouchableOpacity
-                  key={team.id}
-                  style={[
-                    styles.teamListItem,
-                    selectedTeams.includes(team.id) && styles.teamListItemSelected
-                  ]}
-                  onPress={() => toggleTeam(team.id)}
-                >
-                  <View style={[styles.teamListIcon, { backgroundColor: team.color + '20' }]}>
-                    <Ionicons name={team.icon as any} size={22} color={team.color} />
-                  </View>
-                  <Text style={styles.teamListName}>{team.label}</Text>
-                  <View style={[
-                    styles.checkbox,
-                    selectedTeams.includes(team.id) && { backgroundColor: team.color, borderColor: team.color }
-                  ]}>
-                    {selectedTeams.includes(team.id) && (
-                      <Ionicons name="checkmark" size={14} color="#fff" />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSaveSharing}>
-              <Ionicons name="share-social" size={20} color="#fff" />
-              <Text style={styles.submitBtnText}>Enregistrer le partage</Text>
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+        </TouchableOpacity>
+      </LinearGradient>
+      
+      {/* Month Selector */}
+      <View style={styles.monthSelector}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthList}>
+          {availableMonths.map(month => (
+            <TouchableOpacity
+              key={month}
+              style={[styles.monthChip, selectedMonth === month && styles.monthChipSelected]}
+              onPress={() => setSelectedMonth(month)}
+            >
+              <Text style={[styles.monthChipText, selectedMonth === month && styles.monthChipTextSelected]}>
+                {formatMonthLabel(month).split(' ')[0]}
+              </Text>
             </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <TouchableOpacity style={styles.exportBtn} onPress={() => setShowExportModal(true)}>
+          <Ionicons name="download-outline" size={20} color={Colors.primary} />
+        </TouchableOpacity>
+      </View>
+      
+      {/* Category Filter */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={styles.categoryFilter}
+        contentContainerStyle={styles.categoryFilterContent}
+      >
+        <TouchableOpacity
+          style={[styles.categoryChip, selectedCategory === 'all' && styles.categoryChipSelected]}
+          onPress={() => setSelectedCategory('all')}
+        >
+          <Text style={[styles.categoryChipText, selectedCategory === 'all' && styles.categoryChipTextSelected]}>
+            Tous
+          </Text>
+        </TouchableOpacity>
+        {(Object.entries(DOCUMENT_CATEGORIES) as [DocumentCategory, typeof DOCUMENT_CATEGORIES.travel][]).map(([key, cat]) => (
+          <TouchableOpacity
+            key={key}
+            style={[
+              styles.categoryChip, 
+              selectedCategory === key && { backgroundColor: cat.color + '15', borderColor: cat.color }
+            ]}
+            onPress={() => setSelectedCategory(key)}
+          >
+            <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+            <Text style={[
+              styles.categoryChipText, 
+              selectedCategory === key && { color: cat.color }
+            ]}>
+              {cat.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      
+      {/* Documents List */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {Object.entries(documentsByCategory).length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="folder-open-outline" size={48} color={Colors.text.muted} />
+            <Text style={styles.emptyTitle}>Aucun document</Text>
+            <Text style={styles.emptySubtitle}>
+              Ajoutez vos factures et reçus
+            </Text>
           </View>
-        </View>
-      </Modal>
-
-      {/* Document Preview Modal */}
-      <Modal visible={showDocModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Document</Text>
-              <TouchableOpacity onPress={() => setShowDocModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {selectedDoc && (
-              <>
-                {/* Document Info */}
-                <View style={styles.docPreviewLarge}>
-                  <View style={styles.docPreviewIcon}>
-                    <Ionicons 
-                      name={selectedDoc.fileType === 'pdf' ? 'document-text' : 'image'} 
-                      size={48} 
-                      color={Colors.primary} 
-                    />
-                  </View>
-                  <View style={styles.docPreviewInfo}>
-                    <Text style={styles.docPreviewTitle}>{selectedDoc.name}</Text>
-                    <Text style={styles.docPreviewMeta}>
-                      Ajouté le {formatDate(selectedDoc.uploadedAt)}
-                    </Text>
-                    {selectedDoc.expiryDate && (
-                      <Text style={[
-                        styles.docPreviewMeta,
-                        getDaysUntil(selectedDoc.expiryDate) < 30 && { color: Colors.warning }
-                      ]}>
-                        Expire le {formatDate(selectedDoc.expiryDate)}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* Sharing Status */}
-                <View style={styles.docSharingSection}>
-                  <Text style={styles.docSharingTitle}>Partagé avec</Text>
-                  {selectedDoc.sharedWith && selectedDoc.sharedWith.length > 0 ? (
-                    <View style={styles.docSharingList}>
-                      {selectedDoc.sharedWith.map(teamId => {
-                        const team = teamTypes.find(t => t.id === teamId);
-                        if (!team) return null;
-                        return (
-                          <View key={teamId} style={[styles.docSharingBadge, { backgroundColor: team.color + '20' }]}>
-                            <Ionicons name={team.icon as any} size={14} color={team.color} />
-                            <Text style={[styles.docSharingBadgeText, { color: team.color }]}>{team.label}</Text>
-                          </View>
-                        );
-                      })}
+        ) : (
+          Object.entries(documentsByCategory).map(([category, docs]) => {
+            const categoryInfo = DOCUMENT_CATEGORIES[category as DocumentCategory];
+            const categoryTotal = docs.reduce((sum, d) => sum + (d.amount || 0), 0);
+            
+            return (
+              <View key={category} style={styles.categorySection}>
+                <View style={styles.categorySectionHeader}>
+                  <View style={styles.categorySectionTitle}>
+                    <Text style={styles.categorySectionEmoji}>{categoryInfo.emoji}</Text>
+                    <Text style={styles.categorySectionName}>{categoryInfo.name}</Text>
+                    <View style={styles.categorySectionCount}>
+                      <Text style={styles.categorySectionCountText}>{docs.length}</Text>
                     </View>
-                  ) : (
-                    <Text style={styles.docSharingNone}>Document privé</Text>
+                  </View>
+                  {categoryTotal > 0 && (
+                    <Text style={[styles.categorySectionTotal, { color: categoryInfo.color }]}>
+                      {categoryTotal}€
+                    </Text>
                   )}
                 </View>
-
-                {/* Action Buttons */}
-                <View style={styles.docActions}>
-                  <TouchableOpacity 
-                    style={styles.docActionBtn}
-                    onPress={() => {
-                      setShowDocModal(false);
-                      handleOpenShare(selectedDoc);
-                    }}
-                  >
-                    <Ionicons name="people-outline" size={22} color={Colors.primary} />
-                    <Text style={styles.docActionBtnText}>Partager</Text>
+                {docs.map(renderDocumentCard)}
+              </View>
+            );
+          })
+        )}
+        
+        {/* Help text */}
+        <View style={styles.helpText}>
+          <Ionicons name="information-circle" size={16} color={Colors.text.muted} />
+          <Text style={styles.helpTextContent}>
+            Appui long sur un document pour le supprimer
+          </Text>
+        </View>
+        
+        <View style={{ height: 120 }} />
+      </ScrollView>
+      
+      {/* FAB - Add Document */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowUploadModal(true)}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
+      
+      {/* Upload Modal */}
+      <Modal visible={showUploadModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ajouter un document</Text>
+              <TouchableOpacity onPress={() => setShowUploadModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            {isUploading ? (
+              <View style={styles.uploadingState}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.uploadingText}>Upload en cours...</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.uploadSubtitle}>
+                  Le document sera classé automatiquement par date d'upload
+                </Text>
+                
+                <View style={styles.uploadOptions}>
+                  <TouchableOpacity style={styles.uploadOption} onPress={handleTakePhoto}>
+                    <View style={[styles.uploadOptionIcon, { backgroundColor: '#4CAF50' + '15' }]}>
+                      <Ionicons name="camera" size={32} color="#4CAF50" />
+                    </View>
+                    <Text style={styles.uploadOptionLabel}>📸 Prendre une photo</Text>
+                    <Text style={styles.uploadOptionDesc}>Photographiez votre reçu</Text>
                   </TouchableOpacity>
                   
-                  <TouchableOpacity 
-                    style={[styles.docActionBtn, styles.docActionBtnPrimary]}
-                    onPress={() => handleDownloadDoc(selectedDoc)}
-                    disabled={isDownloading}
-                  >
-                    {isDownloading ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <Ionicons name="download-outline" size={22} color="#fff" />
-                        <Text style={styles.docActionBtnTextPrimary}>Télécharger</Text>
-                      </>
-                    )}
+                  <TouchableOpacity style={styles.uploadOption} onPress={handleSelectFile}>
+                    <View style={[styles.uploadOptionIcon, { backgroundColor: Colors.primary + '15' }]}>
+                      <Ionicons name="document" size={32} color={Colors.primary} />
+                    </View>
+                    <Text style={styles.uploadOptionLabel}>📁 Sélectionner un fichier</Text>
+                    <Text style={styles.uploadOptionDesc}>PDF ou image (max 10 MB)</Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Export Modal */}
+      <Modal visible={showExportModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Exporter {formatMonthLabel(selectedMonth)}</Text>
+              <TouchableOpacity onPress={() => setShowExportModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.exportSummary}>
+              <Text style={styles.exportSummaryLabel}>Documents à exporter</Text>
+              <Text style={styles.exportSummaryCount}>
+                {documents.filter(d => d.month === selectedMonth).length} fichiers
+              </Text>
+              <Text style={styles.exportSummaryTotal}>Total: {monthTotals.total}€</Text>
+            </View>
+            
+            <View style={styles.exportOptions}>
+              <TouchableOpacity 
+                style={styles.exportOption}
+                onPress={() => handleExport('email')}
+              >
+                <View style={[styles.exportOptionIcon, { backgroundColor: '#1976d2' + '15' }]}>
+                  <Ionicons name="mail" size={28} color="#1976d2" />
+                </View>
+                <View style={styles.exportOptionInfo}>
+                  <Text style={styles.exportOptionLabel}>Envoyer par email</Text>
+                  <Text style={styles.exportOptionDesc}>Partager avec votre comptable</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.exportOption}
+                onPress={() => handleExport('download')}
+              >
+                <View style={[styles.exportOptionIcon, { backgroundColor: '#4CAF50' + '15' }]}>
+                  <Ionicons name="download" size={28} color="#4CAF50" />
+                </View>
+                <View style={styles.exportOptionInfo}>
+                  <Text style={styles.exportOptionLabel}>Télécharger (ZIP)</Text>
+                  <Text style={styles.exportOptionDesc}>Tous les fichiers du mois</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Finance Summary Modal */}
+      <Modal visible={showFinanceModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>💰 Dépenses {formatMonthLabel(selectedMonth)}</Text>
+              <TouchableOpacity onPress={() => setShowFinanceModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.financeTotal}>
+              <Text style={styles.financeTotalLabel}>Total du mois</Text>
+              <Text style={styles.financeTotalAmount}>{monthTotals.total}€</Text>
+            </View>
+            
+            <View style={styles.financeBreakdown}>
+              {(Object.entries(DOCUMENT_CATEGORIES) as [DocumentCategory, typeof DOCUMENT_CATEGORIES.travel][]).map(([key, cat]) => {
+                const amount = monthTotals[key];
+                const percentage = monthTotals.total > 0 ? Math.round((amount / monthTotals.total) * 100) : 0;
+                
+                return (
+                  <View key={key} style={styles.financeRow}>
+                    <View style={styles.financeRowLeft}>
+                      <Text style={styles.financeRowEmoji}>{cat.emoji}</Text>
+                      <Text style={styles.financeRowName}>{cat.name}</Text>
+                    </View>
+                    <View style={styles.financeRowRight}>
+                      <View style={styles.financeBarContainer}>
+                        <View 
+                          style={[
+                            styles.financeBar, 
+                            { width: `${percentage}%`, backgroundColor: cat.color }
+                          ]} 
+                        />
+                      </View>
+                      <Text style={styles.financeRowAmount}>{amount}€</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+            
+            <View style={styles.financeNote}>
+              <Ionicons name="information-circle" size={16} color={Colors.text.secondary} />
+              <Text style={styles.financeNoteText}>
+                Les montants sont calculés à partir des factures uploadées. 
+                Pour une comptabilité complète, utilisez l'export mensuel.
+              </Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -602,212 +613,230 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '700',
     color: '#fff',
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
-  },
-  lockIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: -10,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  statDanger: {
-    color: Colors.danger,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.text.secondary,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
     marginTop: 2,
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: Colors.border.light,
-    marginVertical: 4,
+  financeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 12,
+    padding: 14,
+  },
+  financeMain: {},
+  financeLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  financeAmount: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  monthSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingLeft: 16,
+  },
+  monthList: {
+    paddingRight: 16,
+  },
+  monthChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.background.secondary,
+    marginRight: 8,
+  },
+  monthChipSelected: {
+    backgroundColor: Colors.primary,
+  },
+  monthChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+  },
+  monthChipTextSelected: {
+    color: '#fff',
+  },
+  exportBtn: {
+    padding: 12,
+    marginLeft: 8,
+  },
+  categoryFilter: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
+  },
+  categoryFilterContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.background.secondary,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginRight: 8,
+  },
+  categoryChipSelected: {
+    backgroundColor: Colors.primary + '15',
+    borderColor: Colors.primary,
+  },
+  categoryEmoji: {
+    fontSize: 14,
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+  },
+  categoryChipTextSelected: {
+    color: Colors.primary,
   },
   content: {
     flex: 1,
-    marginTop: 16,
   },
-  categorySection: {
-    marginBottom: 24,
-    paddingHorizontal: 16,
-  },
-  categoryHeader: {
-    marginBottom: 12,
-  },
-  categoryTitleRow: {
-    flexDirection: 'row',
+  emptyState: {
     alignItems: 'center',
+    paddingVertical: 60,
   },
-  categoryIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(29, 161, 242, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  categoryTitle: {
-    fontSize: 18,
+  emptyTitle: {
+    fontSize: 17,
     fontWeight: '600',
     color: Colors.text.primary,
-    flex: 1,
+    marginTop: 16,
   },
-  categoryBadge: {
+  emptySubtitle: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginTop: 4,
+  },
+  categorySection: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+  },
+  categorySectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  categorySectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  categorySectionEmoji: {
+    fontSize: 18,
+  },
+  categorySectionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  categorySectionCount: {
     backgroundColor: Colors.background.tertiary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  categoryCount: {
+  categorySectionCountText: {
     fontSize: 12,
     fontWeight: '600',
     color: Colors.text.secondary,
   },
-  documentsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+  categorySectionTotal: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   documentCard: {
-    width: '47%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
-  docIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(29, 161, 242, 0.1)',
+  docIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+  },
+  docInfo: {
+    flex: 1,
+    marginLeft: 12,
   },
   docName: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
     color: Colors.text.primary,
-    textAlign: 'center',
-    marginBottom: 6,
   },
-  sharingRow: {
-    marginBottom: 6,
-  },
-  sharedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(23, 191, 99, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  sharedText: {
-    fontSize: 10,
-    color: Colors.success,
-    fontWeight: '600',
-  },
-  privateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.background.secondary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  privateText: {
-    fontSize: 10,
-    color: Colors.text.muted,
-  },
-  expiryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: Colors.background.secondary,
-  },
-  expirySoon: {
-    backgroundColor: 'rgba(255, 173, 31, 0.15)',
-  },
-  expiryExpired: {
-    backgroundColor: Colors.danger,
-  },
-  expiryText: {
-    fontSize: 9,
+  docDate: {
+    fontSize: 12,
     color: Colors.text.secondary,
+    marginTop: 2,
   },
-  expiryTextSoon: {
-    color: Colors.warning,
+  docAmount: {
+    fontSize: 15,
     fontWeight: '600',
+    color: Colors.success,
   },
-  expiryTextExpired: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  addDocCard: {
-    width: '47%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
+  helpText: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: Colors.border.light,
-    minHeight: 130,
+    gap: 6,
+    marginTop: 20,
+    paddingHorizontal: 16,
   },
-  addDocText: {
+  helpTextContent: {
     fontSize: 12,
-    color: Colors.primary,
-    fontWeight: '600',
-    marginTop: 6,
+    color: Colors.text.muted,
   },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#f57c00',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -818,261 +847,193 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    maxHeight: '85%',
+    maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: Colors.text.primary,
   },
-  selectedCategoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(29, 161, 242, 0.1)',
-    alignSelf: 'flex-start',
-    marginBottom: 16,
-  },
-  selectedCategoryText: {
+  uploadSubtitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text.secondary,
+    marginBottom: 20,
   },
-  pickButton: {
+  uploadOptions: {
+    gap: 12,
+  },
+  uploadOption: {
     backgroundColor: Colors.background.secondary,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     alignItems: 'center',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: Colors.border.medium,
-    marginBottom: 16,
   },
-  pickButtonText: {
-    fontSize: 14,
+  uploadOptionIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  uploadOptionLabel: {
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.text.primary,
-    marginTop: 8,
   },
-  pickButtonHint: {
-    fontSize: 12,
+  uploadOptionDesc: {
+    fontSize: 13,
     color: Colors.text.secondary,
     marginTop: 4,
   },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginBottom: 8,
-    marginTop: 8,
+  uploadingState: {
+    alignItems: 'center',
+    paddingVertical: 40,
   },
-  input: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 10,
-    padding: 14,
+  uploadingText: {
     fontSize: 15,
-    color: Colors.text.primary,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-  },
-  teamGrid: {
-    gap: 8,
-  },
-  teamOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: Colors.background.secondary,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-  },
-  teamOptionText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
     color: Colors.text.secondary,
+    marginTop: 16,
   },
-  docPreview: {
-    flexDirection: 'row',
+  // Export modal
+  exportSummary: {
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: Colors.background.secondary,
-    padding: 16,
-    borderRadius: 12,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
     marginBottom: 20,
   },
-  docPreviewName: {
-    flex: 1,
+  exportSummaryLabel: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+  },
+  exportSummaryCount: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginTop: 4,
+  },
+  exportSummaryTotal: {
     fontSize: 15,
+    color: Colors.success,
     fontWeight: '600',
-    color: Colors.text.primary,
+    marginTop: 4,
   },
-  shareLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    marginBottom: 12,
-  },
-  teamList: {
-    gap: 8,
-  },
-  teamListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.background.secondary,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-  },
-  teamListItemSelected: {
-    backgroundColor: '#fff',
-  },
-  teamListIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  teamListName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.text.primary,
-    marginLeft: 12,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.border.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 20,
+  exportOptions: {
+    gap: 12,
     marginBottom: Platform.OS === 'ios' ? 20 : 0,
   },
-  submitBtnDisabled: {
-    opacity: 0.5,
-  },
-  submitBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // Document Preview Modal Styles
-  docPreviewLarge: {
+  exportOption: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.background.secondary,
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 20,
+    borderRadius: 12,
+    padding: 16,
   },
-  docPreviewIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-    backgroundColor: Colors.primary + '15',
+  exportOptionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  docPreviewInfo: {
+  exportOptionInfo: {
+    marginLeft: 14,
     flex: 1,
-    marginLeft: 16,
   },
-  docPreviewTitle: {
-    fontSize: 17,
+  exportOptionLabel: {
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.text.primary,
-    marginBottom: 4,
   },
-  docPreviewMeta: {
-    fontSize: 13,
+  exportOptionDesc: {
+    fontSize: 12,
     color: Colors.text.secondary,
     marginTop: 2,
   },
-  docSharingSection: {
-    marginBottom: 20,
+  // Finance modal
+  financeTotal: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
   },
-  docSharingTitle: {
+  financeTotalLabel: {
     fontSize: 14,
-    fontWeight: '600',
     color: Colors.text.secondary,
-    marginBottom: 10,
   },
-  docSharingList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  financeTotalAmount: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginTop: 4,
   },
-  docSharingBadge: {
+  financeBreakdown: {
+    marginTop: 20,
+    gap: 16,
+  },
+  financeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    justifyContent: 'space-between',
   },
-  docSharingBadgeText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  docSharingNone: {
-    fontSize: 14,
-    color: Colors.text.muted,
-    fontStyle: 'italic',
-  },
-  docActions: {
+  financeRowLeft: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 10,
-    marginBottom: Platform.OS === 'ios' ? 20 : 0,
+    alignItems: 'center',
+    gap: 10,
+    width: 110,
   },
-  docActionBtn: {
+  financeRowEmoji: {
+    fontSize: 20,
+  },
+  financeRowName: {
+    fontSize: 14,
+    color: Colors.text.primary,
+  },
+  financeRowRight: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 12,
+  },
+  financeBarContainer: {
+    flex: 1,
+    height: 8,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  financeBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  financeRowAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    width: 60,
+    textAlign: 'right',
+  },
+  financeNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.primary,
+    marginTop: 24,
+    padding: 12,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 10,
+    marginBottom: Platform.OS === 'ios' ? 20 : 0,
   },
-  docActionBtnPrimary: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  docActionBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  docActionBtnTextPrimary: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
+  financeNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.text.secondary,
+    lineHeight: 16,
   },
 });
