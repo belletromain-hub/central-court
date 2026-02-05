@@ -495,7 +495,7 @@ Règles pour la catégorie:
 - "other": tout le reste
 
 Si l'image n'est pas un reçu ou facture lisible, retourne: {"date": null, "amount": null, "merchant": null, "category": "other", "confidence": "low"}""",
-            image_contents=[image_content]
+            file_contents=[image_content]
         )
         
         # Send to GPT-4o Vision
