@@ -12,7 +12,9 @@ import secrets
 import base64
 import json
 import re
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+import io
+import pytesseract
+from PIL import Image
 
 load_dotenv()
 
