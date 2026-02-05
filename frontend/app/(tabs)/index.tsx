@@ -1367,4 +1367,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  // Status section styles
+  statusSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.light,
+  },
+  statusSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 12,
+  },
+  statusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.background.secondary,
+    borderWidth: 2,
+    borderColor: Colors.border.light,
+    minWidth: 90,
+  },
+  statusOptionEmoji: {
+    fontSize: 16,
+  },
+  statusOptionText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+  },
 });
