@@ -138,18 +138,34 @@ export default function CalendarScreenV1() {
   const handleRegisterTournament = (weekNumber: number, tournamentId: string, status: TournamentStatus) => {
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
-        const existingRegIndex = week.registrations.findIndex(r => r.tournamentId === tournamentId);
         let newRegistrations = [...week.registrations];
+        let newHiddenIds = [...(week.hiddenTournamentIds || [])];
         
-        if (existingRegIndex >= 0) {
-          // Update existing registration
-          newRegistrations[existingRegIndex] = { tournamentId, status };
+        // Si "Participe" est sélectionné, masquer tous les autres tournois
+        if (status === 'participating') {
+          // Garder seulement l'inscription pour ce tournoi
+          newRegistrations = [{ tournamentId, status }];
+          
+          // Masquer tous les autres tournois de la semaine
+          week.tournaments.forEach(t => {
+            if (t.id !== tournamentId && !newHiddenIds.includes(t.id)) {
+              newHiddenIds.push(t.id);
+            }
+          });
         } else {
-          // Add new registration
-          newRegistrations.push({ tournamentId, status });
+          // Comportement normal pour les autres statuts
+          const existingRegIndex = newRegistrations.findIndex(r => r.tournamentId === tournamentId);
+          
+          if (existingRegIndex >= 0) {
+            // Update existing registration
+            newRegistrations[existingRegIndex] = { tournamentId, status };
+          } else {
+            // Add new registration
+            newRegistrations.push({ tournamentId, status });
+          }
         }
         
-        const updatedWeek = { ...week, registrations: newRegistrations };
+        const updatedWeek = { ...week, registrations: newRegistrations, hiddenTournamentIds: newHiddenIds };
         // Update selectedWeek immediately
         setSelectedWeek(updatedWeek);
         return updatedWeek;
