@@ -27,6 +27,7 @@ export interface WeekTournaments {
   tournaments: Tournament[];
   selectedTournamentId: string | null;
   status: TournamentStatus;
+  hiddenTournamentIds: string[]; // Tournois marqués "pas intéressé" - disparaissent
 }
 
 // Tournois ATP Février 2026
