@@ -10,217 +10,203 @@ import {
   Share,
   Platform,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../src/constants/colors';
-import { useAuth } from '../../src/context/AuthContext';
-import { useApp } from '../../src/context/AppContext';
-import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
-                process.env.EXPO_PUBLIC_BACKEND_URL ||
-                '';
-
-interface Invitation {
-  invitation_id: string;
-  code: string;
-  role: string;
-  expires_at: string;
-  used_count: number;
-}
+// Staff roles selon specs V1
+const STAFF_ROLES = [
+  { 
+    id: 'tennis_coach', 
+    label: 'Entraîneur Tennis', 
+    icon: 'tennisball',
+    emoji: '🎾',
+    color: '#388e3c',
+    permissions: ['training_tennis', 'tournament']
+  },
+  { 
+    id: 'physical_coach', 
+    label: 'Préparateur Physique', 
+    icon: 'barbell',
+    emoji: '💪',
+    color: '#2e7d32',
+    permissions: ['training_physical', 'medical_kine']
+  },
+  { 
+    id: 'physio', 
+    label: 'Kiné', 
+    icon: 'medkit',
+    emoji: '🏥',
+    color: '#c2185b',
+    permissions: ['medical_kine', 'training_tennis', 'training_physical']
+  },
+  { 
+    id: 'agent', 
+    label: 'Agent', 
+    icon: 'briefcase',
+    emoji: '💼',
+    color: '#1976d2',
+    permissions: ['sponsor', 'media', 'tournament', 'travel']
+  },
+  { 
+    id: 'family', 
+    label: 'Famille', 
+    icon: 'people',
+    emoji: '👨‍👩‍👧',
+    color: '#ff9800',
+    permissions: ['all_except_personal']
+  },
+  { 
+    id: 'other', 
+    label: 'Autre', 
+    icon: 'person',
+    emoji: '👤',
+    color: '#757575',
+    permissions: []
+  },
+];
 
 interface TeamMember {
-  user_id: string;
-  email: string;
+  id: string;
   name: string;
-  picture?: string;
+  email: string;
   role: string;
+  addedAt: string;
 }
+
+interface TravelDay {
+  country: string;
+  flag: string;
+  days: number;
+}
+
+const PROFILE_STORAGE_KEY = '@central_court_player_profile';
+const TEAM_STORAGE_KEY = '@central_court_team';
+const TRAVEL_STORAGE_KEY = '@central_court_travel_days';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout, isAuthenticated } = useAuth();
-  const { tournaments, events, documents, taxHistory } = useApp();
   
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  // State
+  const [playerProfile, setPlayerProfile] = useState<any>(null);
   const [team, setTeam] = useState<TeamMember[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [travelDays, setTravelDays] = useState<TravelDay[]>([
+    { country: 'France', flag: '🇫🇷', days: 20 },
+    { country: 'Monaco', flag: '🇲🇨', days: 5 },
+    { country: 'Australie', flag: '🇦🇺', days: 3 },
+  ]);
+  
+  // Modals
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showTravelModal, setShowTravelModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
-
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'player') {
-      fetchInvitations();
-      fetchTeam();
-    }
-  }, [isAuthenticated, user]);
-
-  const getAuthToken = async () => {
-    if (Platform.OS === 'web') {
-      return localStorage.getItem('session_token');
-    }
-    const SecureStore = require('expo-secure-store');
-    return await SecureStore.getItemAsync('session_token');
-  };
-
-  const fetchInvitations = async () => {
+    loadData();
+  }, []);
+  
+  const loadData = async () => {
     try {
-      const token = await getAuthToken();
-      const response = await fetch(`${API_URL}/api/invitations`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setInvitations(data);
-      }
-    } catch (error) {
-      console.error('Error fetching invitations:', error);
-    }
-  };
-
-  const fetchTeam = async () => {
-    try {
-      const token = await getAuthToken();
-      const response = await fetch(`${API_URL}/api/team`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setTeam(data);
-      }
-    } catch (error) {
-      console.error('Error fetching team:', error);
-    }
-  };
-
-  const createInvitation = async (role: string) => {
-    setIsLoading(true);
-    try {
-      const token = await getAuthToken();
-      const response = await fetch(`${API_URL}/api/invitations`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ role })
-      });
+      const [profileData, teamData, travelData] = await Promise.all([
+        AsyncStorage.getItem(PROFILE_STORAGE_KEY),
+        AsyncStorage.getItem(TEAM_STORAGE_KEY),
+        AsyncStorage.getItem(TRAVEL_STORAGE_KEY),
+      ]);
       
-      if (response.ok) {
-        const data = await response.json();
-        await fetchInvitations();
-        
-        // Share the invitation link
-        const inviteUrl = `${Platform.OS === 'web' ? window.location.origin : 'centralcourt://'}/invite?code=${data.code}`;
-        
-        if (Platform.OS === 'web') {
-          await navigator.clipboard.writeText(inviteUrl);
-          Alert.alert('Lien copié', 'Le lien d\'invitation a été copié dans le presse-papiers');
-        } else {
-          await Share.share({
-            message: `Rejoignez mon équipe sur Le Central Court en tant que ${getRoleLabel(role)}!\n\n${inviteUrl}`,
-            title: 'Invitation Le Central Court'
-          });
-        }
-        
-        setShowInviteModal(false);
-        setSelectedRole(null);
+      if (profileData) setPlayerProfile(JSON.parse(profileData));
+      if (teamData) setTeam(JSON.parse(teamData));
+      if (travelData) setTravelDays(JSON.parse(travelData));
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
+  
+  const saveTeam = async (newTeam: TeamMember[]) => {
+    setTeam(newTeam);
+    await AsyncStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(newTeam));
+  };
+  
+  const handleInvite = async () => {
+    if (!selectedRole || !inviteEmail || !inviteName) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    // Simulate invitation creation
+    const newMember: TeamMember = {
+      id: `member-${Date.now()}`,
+      name: inviteName,
+      email: inviteEmail,
+      role: selectedRole,
+      addedAt: new Date().toISOString(),
+    };
+    
+    await saveTeam([...team, newMember]);
+    
+    // Share invitation link
+    const inviteUrl = `centralcourt://invite?role=${selectedRole}`;
+    const roleInfo = STAFF_ROLES.find(r => r.id === selectedRole);
+    
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(inviteUrl);
+        Alert.alert('Invitation créée', `${inviteName} a été ajouté(e) comme ${roleInfo?.label}`);
+      } else {
+        await Share.share({
+          message: `${playerProfile?.firstName || 'Un joueur'} vous invite à rejoindre son équipe sur Tennis Assistant en tant que ${roleInfo?.label}!\n\nTéléchargez l'app et utilisez ce lien: ${inviteUrl}`,
+          title: 'Invitation Tennis Assistant'
+        });
       }
     } catch (error) {
-      console.error('Error creating invitation:', error);
-      Alert.alert('Erreur', 'Impossible de créer l\'invitation');
-    } finally {
-      setIsLoading(false);
+      console.error('Share error:', error);
     }
+    
+    setShowInviteModal(false);
+    setSelectedRole(null);
+    setInviteEmail('');
+    setInviteName('');
+    setIsLoading(false);
   };
-
-  const deleteInvitation = async (invitationId: string) => {
-    try {
-      const token = await getAuthToken();
-      await fetch(`${API_URL}/api/invitations/${invitationId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      await fetchInvitations();
-    } catch (error) {
-      console.error('Error deleting invitation:', error);
-    }
-  };
-
-  const handleLogout = async () => {
+  
+  const handleRemoveMember = (memberId: string, memberName: string) => {
     Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      'Retirer du staff',
+      `Voulez-vous retirer ${memberName} de votre équipe ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         { 
-          text: 'Déconnexion', 
+          text: 'Retirer', 
           style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/login');
-          }
+          onPress: () => saveTeam(team.filter(m => m.id !== memberId))
         }
       ]
     );
   };
-
-  const getRoleLabel = (role: string): string => {
-    switch (role) {
-      case 'agent': return 'Agent';
-      case 'medical': return 'Staff Médical';
-      case 'technical': return 'Staff Technique';
-      case 'logistics': return 'Logistique';
-      default: return role;
-    }
+  
+  const getRoleInfo = (roleId: string) => {
+    return STAFF_ROLES.find(r => r.id === roleId) || STAFF_ROLES[5];
   };
-
-  const getRoleIcon = (role: string): string => {
-    switch (role) {
-      case 'agent': return 'briefcase';
-      case 'medical': return 'medkit';
-      case 'technical': return 'fitness';
-      case 'logistics': return 'airplane';
-      default: return 'person';
-    }
-  };
-
-  const getRoleColor = (role: string): string => {
-    switch (role) {
-      case 'agent': return '#1da1f2';
-      case 'medical': return '#e0245e';
-      case 'technical': return '#4CAF50';
-      case 'logistics': return '#ff9800';
-      default: return Colors.primary;
-    }
-  };
-
-  const stats = {
-    tournamentsConfirmed: tournaments.filter(t => t.status === 'confirmed').length,
-    eventsThisMonth: events.length,
-    documentsStored: documents.length,
-    countriesVisited: taxHistory.length,
-  };
-
-  const roles = [
-    { id: 'agent', label: 'Agent', icon: 'briefcase', color: '#1da1f2' },
-    { id: 'medical', label: 'Staff Médical', icon: 'medkit', color: '#e0245e' },
-    { id: 'technical', label: 'Staff Technique', icon: 'fitness', color: '#4CAF50' },
-    { id: 'logistics', label: 'Logistique', icon: 'airplane', color: '#ff9800' },
-  ];
-
-  // Demo user when not authenticated
-  const displayUser = user || {
-    user_id: 'demo',
-    email: 'lucas.martin@tennis.fr',
-    name: 'Lucas Martin',
-    role: 'player' as const,
-    picture: null,
-  };
+  
+  const totalTravelDays = travelDays.reduce((sum, t) => sum + t.days, 0);
+  
+  // Display name
+  const displayName = playerProfile?.firstName && playerProfile?.lastName
+    ? `${playerProfile.firstName} ${playerProfile.lastName}`
+    : 'Joueur Tennis';
+  
+  const displayEmail = playerProfile?.email || 'Configurer le profil';
+  const displayCircuit = playerProfile?.circuit || 'ATP';
 
   return (
     <View style={styles.container}>
@@ -232,155 +218,143 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              {displayUser.picture ? (
-                <Text style={styles.avatarInitial}>{displayUser.name.charAt(0)}</Text>
-              ) : (
-                <Ionicons name="person" size={48} color="#fff" />
-              )}
+              <Ionicons name="person" size={40} color="#fff" />
             </View>
-            {displayUser.role === 'player' && (
-              <View style={styles.rankBadge}>
-                <Ionicons name="tennisball" size={14} color="#fff" />
+            <View style={styles.circuitBadge}>
+              <Text style={styles.circuitBadgeText}>{displayCircuit}</Text>
+            </View>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.playerName}>{displayName}</Text>
+            <Text style={styles.playerEmail}>{displayEmail}</Text>
+            {playerProfile?.currentRanking && (
+              <View style={styles.rankingTag}>
+                <Ionicons name="trophy" size={14} color="#FFD700" />
+                <Text style={styles.rankingText}>Classement: #{playerProfile.currentRanking}</Text>
               </View>
             )}
           </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.playerName}>{displayUser.name}</Text>
-            <Text style={styles.playerEmail}>{displayUser.email}</Text>
-            <View style={[styles.roleTag, { backgroundColor: getRoleColor(displayUser.role) }]}>
-              <Ionicons name={getRoleIcon(displayUser.role) as any} size={14} color="#fff" />
-              <Text style={styles.roleText}>{getRoleLabel(displayUser.role)}</Text>
-            </View>
-          </View>
+          <TouchableOpacity 
+            style={styles.editBtn}
+            onPress={() => router.push('/onboarding')}
+          >
+            <Ionicons name="create-outline" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Quick Stats */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statBox}>
-            <Text style={styles.statBoxNumber}>{stats.tournamentsConfirmed}</Text>
-            <Text style={styles.statBoxLabel}>Tournois</Text>
+        {/* Team Management */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>👥 Mon équipe</Text>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setShowInviteModal(true)}
+            >
+              <Ionicons name="person-add" size={18} color="#fff" />
+              <Text style={styles.addBtnText}>Inviter</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statBoxNumber}>{stats.eventsThisMonth}</Text>
-            <Text style={styles.statBoxLabel}>Événements</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statBoxNumber}>{stats.documentsStored}</Text>
-            <Text style={styles.statBoxLabel}>Documents</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statBoxNumber}>{stats.countriesVisited}</Text>
-            <Text style={styles.statBoxLabel}>Pays</Text>
-          </View>
-        </View>
 
-        {/* Team Management (Player only) */}
-        {displayUser.role === 'player' && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Mon équipe</Text>
-              <TouchableOpacity
-                style={styles.addTeamBtn}
-                onPress={() => setShowInviteModal(true)}
-              >
-                <Ionicons name="person-add" size={18} color="#fff" />
-                <Text style={styles.addTeamBtnText}>Inviter</Text>
-              </TouchableOpacity>
+          {team.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="people-outline" size={40} color={Colors.text.muted} />
+              <Text style={styles.emptyTitle}>Aucun membre</Text>
+              <Text style={styles.emptySubtitle}>
+                Invitez votre coach, kiné, agent...
+              </Text>
             </View>
-
-            {team.length === 0 ? (
-              <View style={styles.emptyTeam}>
-                <Ionicons name="people-outline" size={40} color={Colors.text.muted} />
-                <Text style={styles.emptyTeamText}>Aucun membre dans l'équipe</Text>
-                <Text style={styles.emptyTeamSubtext}>
-                  Invitez votre agent, coach, kiné...
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.teamCard}>
-                {team.map((member, index) => (
-                  <View
-                    key={member.user_id}
+          ) : (
+            <View style={styles.teamCard}>
+              {team.map((member, index) => {
+                const roleInfo = getRoleInfo(member.role);
+                return (
+                  <TouchableOpacity
+                    key={member.id}
                     style={[
                       styles.teamMember,
                       index < team.length - 1 && styles.teamMemberBorder
                     ]}
+                    onLongPress={() => handleRemoveMember(member.id, member.name)}
                   >
-                    <View style={[styles.teamAvatar, { backgroundColor: getRoleColor(member.role) + '20' }]}>
-                      <Ionicons name={getRoleIcon(member.role) as any} size={20} color={getRoleColor(member.role)} />
+                    <View style={[styles.memberAvatar, { backgroundColor: roleInfo.color + '20' }]}>
+                      <Text style={styles.memberEmoji}>{roleInfo.emoji}</Text>
                     </View>
-                    <View style={styles.teamInfo}>
-                      <Text style={styles.teamName}>{member.name}</Text>
-                      <Text style={styles.teamRole}>{getRoleLabel(member.role)}</Text>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>{member.name}</Text>
+                      <Text style={[styles.memberRole, { color: roleInfo.color }]}>
+                        {roleInfo.label}
+                      </Text>
                     </View>
-                    <TouchableOpacity style={styles.contactBtn}>
-                      <Ionicons name="chatbubble-outline" size={18} color={Colors.primary} />
+                    <TouchableOpacity style={styles.memberAction}>
+                      <Ionicons name="mail-outline" size={20} color={Colors.text.muted} />
                     </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+          
+          <Text style={styles.teamNote}>
+            Appuyez longuement sur un membre pour le retirer
+          </Text>
+        </View>
 
-            {/* Active Invitations */}
-            {invitations.length > 0 && (
-              <View style={styles.invitationsSection}>
-                <Text style={styles.invitationsTitle}>Invitations actives</Text>
-                {invitations.map(inv => (
-                  <View key={inv.invitation_id} style={styles.invitationItem}>
-                    <View style={[styles.invIconContainer, { backgroundColor: getRoleColor(inv.role) + '20' }]}>
-                      <Ionicons name={getRoleIcon(inv.role) as any} size={16} color={getRoleColor(inv.role)} />
-                    </View>
-                    <View style={styles.invInfo}>
-                      <Text style={styles.invRole}>{getRoleLabel(inv.role)}</Text>
-                      <Text style={styles.invUsed}>{inv.used_count} utilisations</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.deleteInvBtn}
-                      onPress={() => deleteInvitation(inv.invitation_id)}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
+        {/* Travel Days (Jours de voyage) */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>✈️ Jours de voyage</Text>
+            <TouchableOpacity
+              style={styles.viewAllBtn}
+              onPress={() => setShowTravelModal(true)}
+            >
+              <Text style={styles.viewAllText}>Voir tout</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+            </TouchableOpacity>
           </View>
-        )}
+          
+          <View style={styles.travelCard}>
+            <View style={styles.travelSummary}>
+              <Text style={styles.travelTotal}>{totalTravelDays}</Text>
+              <Text style={styles.travelLabel}>jours en 2026</Text>
+            </View>
+            <View style={styles.travelCountries}>
+              {travelDays.slice(0, 3).map(travel => (
+                <View key={travel.country} style={styles.travelItem}>
+                  <Text style={styles.travelFlag}>{travel.flag}</Text>
+                  <Text style={styles.travelDays}>{travel.days}j</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
 
         {/* Settings Menu */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Paramètres</Text>
+          <Text style={styles.sectionTitle}>⚙️ Paramètres</Text>
           <View style={styles.menuCard}>
             <TouchableOpacity 
               style={[styles.menuItem, styles.menuItemBorder]}
-              onPress={() => router.push('/(tabs)/settings')}
+              onPress={() => router.push('/onboarding')}
             >
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="person-outline" size={22} color={Colors.text.secondary} />
+                <Text style={styles.menuItemLabel}>Modifier mon profil</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name="notifications-outline" size={22} color={Colors.text.secondary} />
                 <Text style={styles.menuItemLabel}>Notifications</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="shield-checkmark-outline" size={22} color={Colors.text.secondary} />
-                <Text style={styles.menuItemLabel}>Confidentialité</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
+            <TouchableOpacity style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name="help-circle-outline" size={22} color={Colors.text.secondary} />
                 <Text style={styles.menuItemLabel}>Aide & Support</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="log-out-outline" size={22} color={Colors.danger} />
-                <Text style={[styles.menuItemLabel, { color: Colors.danger }]}>Déconnexion</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
             </TouchableOpacity>
@@ -389,8 +363,8 @@ export default function ProfileScreen() {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appName}>Le Central Court</Text>
-          <Text style={styles.appVersion}>Version 1.0.0</Text>
+          <Text style={styles.appName}>🎾 Tennis Assistant</Text>
+          <Text style={styles.appVersion}>Version 1.0.0 - MVP</Text>
         </View>
 
         <View style={{ height: 100 }} />
@@ -407,49 +381,108 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
-              Choisissez le rôle du nouveau membre
-            </Text>
+            <Text style={styles.modalSubtitle}>Choisissez le rôle</Text>
 
-            <View style={styles.rolesGrid}>
-              {roles.map(role => (
+            <ScrollView style={styles.rolesScroll} showsVerticalScrollIndicator={false}>
+              {STAFF_ROLES.map(role => (
                 <TouchableOpacity
                   key={role.id}
                   style={[
-                    styles.roleCard,
+                    styles.roleOption,
                     selectedRole === role.id && { borderColor: role.color, backgroundColor: role.color + '10' }
                   ]}
                   onPress={() => setSelectedRole(role.id)}
                 >
-                  <View style={[styles.roleIconContainer, { backgroundColor: role.color + '20' }]}>
-                    <Ionicons name={role.icon as any} size={28} color={role.color} />
+                  <View style={[styles.roleIcon, { backgroundColor: role.color + '20' }]}>
+                    <Text style={styles.roleEmoji}>{role.emoji}</Text>
                   </View>
-                  <Text style={styles.roleCardLabel}>{role.label}</Text>
+                  <View style={styles.roleInfo}>
+                    <Text style={styles.roleLabel}>{role.label}</Text>
+                  </View>
                   {selectedRole === role.id && (
-                    <Ionicons name="checkmark-circle" size={20} color={role.color} style={styles.roleCheck} />
+                    <Ionicons name="checkmark-circle" size={22} color={role.color} />
                   )}
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
+
+            {selectedRole && (
+              <View style={styles.inviteForm}>
+                <Text style={styles.inputLabel}>Nom *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={inviteName}
+                  onChangeText={setInviteName}
+                  placeholder="Patrick Mouratoglou"
+                  placeholderTextColor={Colors.text.muted}
+                />
+                
+                <Text style={styles.inputLabel}>Email *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={inviteEmail}
+                  onChangeText={setInviteEmail}
+                  placeholder="coach@email.com"
+                  placeholderTextColor={Colors.text.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+            )}
 
             <TouchableOpacity
-              style={[styles.createInviteBtn, !selectedRole && styles.createInviteBtnDisabled]}
-              onPress={() => selectedRole && createInvitation(selectedRole)}
-              disabled={!selectedRole || isLoading}
+              style={[
+                styles.inviteBtn,
+                (!selectedRole || !inviteEmail || !inviteName) && styles.inviteBtnDisabled
+              ]}
+              onPress={handleInvite}
+              disabled={!selectedRole || !inviteEmail || !inviteName || isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  <Ionicons name="link" size={20} color="#fff" />
-                  <Text style={styles.createInviteBtnText}>Créer le lien d'invitation</Text>
+                  <Ionicons name="paper-plane" size={20} color="#fff" />
+                  <Text style={styles.inviteBtnText}>Envoyer l'invitation</Text>
                 </>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
-            <Text style={styles.inviteNote}>
-              Le lien sera valide 7 jours et pourra être utilisé plusieurs fois
-            </Text>
+      {/* Travel Days Modal */}
+      <Modal visible={showTravelModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Jours de voyage 2026</Text>
+              <TouchableOpacity onPress={() => setShowTravelModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.travelModalSummary}>
+              <Text style={styles.travelModalTotal}>{totalTravelDays}</Text>
+              <Text style={styles.travelModalLabel}>jours au total</Text>
+            </View>
+
+            <ScrollView style={styles.travelList}>
+              {travelDays.map(travel => (
+                <View key={travel.country} style={styles.travelListItem}>
+                  <Text style={styles.travelListFlag}>{travel.flag}</Text>
+                  <Text style={styles.travelListCountry}>{travel.country}</Text>
+                  <Text style={styles.travelListDays}>{travel.days} jours</Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.travelNote}>
+              <Ionicons name="information-circle" size={18} color={Colors.text.secondary} />
+              <Text style={styles.travelNoteText}>
+                Comptage manuel pour V1. La géolocalisation automatique sera disponible prochainement.
+              </Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -464,7 +497,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 24,
   },
   profileSection: {
     flexDirection: 'row',
@@ -474,92 +507,65 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.3)',
   },
-  avatarInitial: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  rankBadge: {
+  circuitBadge: {
     position: 'absolute',
     bottom: -4,
     right: -4,
     backgroundColor: Colors.primary,
-    padding: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#fff',
   },
+  circuitBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   profileInfo: {
-    marginLeft: 16,
+    marginLeft: 14,
     flex: 1,
   },
   playerName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
   },
   playerEmail: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
   },
-  roleTag: {
+  rankingTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginTop: 8,
+    gap: 4,
+    marginTop: 6,
   },
-  roleText: {
+  rankingText: {
     fontSize: 12,
+    color: '#FFD700',
     fontWeight: '600',
-    color: '#fff',
+  },
+  editBtn: {
+    padding: 8,
   },
   content: {
     flex: 1,
-    marginTop: -15,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 12,
-    padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  statBoxNumber: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  statBoxLabel: {
-    fontSize: 11,
-    color: Colors.text.secondary,
-    marginTop: 2,
+    marginTop: -8,
   },
   section: {
-    marginTop: 24,
+    marginTop: 20,
     paddingHorizontal: 16,
   },
   sectionHeader: {
@@ -569,11 +575,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: Colors.text.primary,
   },
-  addTeamBtn: {
+  addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -582,24 +588,33 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
-  addTeamBtnText: {
+  addBtnText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
   },
-  emptyTeam: {
+  viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewAllText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  emptyCard: {
     alignItems: 'center',
     padding: 32,
     backgroundColor: '#fff',
     borderRadius: 12,
   },
-  emptyTeamText: {
+  emptyTitle: {
     fontSize: 15,
     fontWeight: '600',
     color: Colors.text.primary,
     marginTop: 12,
   },
-  emptyTeamSubtext: {
+  emptySubtitle: {
     fontSize: 13,
     color: Colors.text.secondary,
     marginTop: 4,
@@ -607,79 +622,87 @@ const styles = StyleSheet.create({
   teamCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 4,
   },
   teamMember: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
   },
   teamMemberBorder: {
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.light,
   },
-  teamAvatar: {
+  memberAvatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  teamInfo: {
+  memberEmoji: {
+    fontSize: 20,
+  },
+  memberInfo: {
     flex: 1,
     marginLeft: 12,
   },
-  teamName: {
+  memberName: {
     fontSize: 15,
     fontWeight: '600',
     color: Colors.text.primary,
   },
-  teamRole: {
+  memberRole: {
     fontSize: 12,
-    color: Colors.text.secondary,
+    fontWeight: '500',
   },
-  contactBtn: {
+  memberAction: {
     padding: 8,
   },
-  invitationsSection: {
-    marginTop: 16,
+  teamNote: {
+    fontSize: 11,
+    color: Colors.text.muted,
+    textAlign: 'center',
+    marginTop: 8,
   },
-  invitationsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginBottom: 8,
-  },
-  invitationItem: {
+  travelCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
   },
-  invIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  travelSummary: {
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingRight: 20,
+    borderRightWidth: 1,
+    borderRightColor: Colors.border.light,
   },
-  invInfo: {
-    flex: 1,
-    marginLeft: 10,
+  travelTotal: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: Colors.primary,
   },
-  invRole: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  invUsed: {
+  travelLabel: {
     fontSize: 12,
     color: Colors.text.secondary,
   },
-  deleteInvBtn: {
-    padding: 8,
+  travelCountries: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingLeft: 16,
+  },
+  travelItem: {
+    alignItems: 'center',
+  },
+  travelFlag: {
+    fontSize: 24,
+  },
+  travelDays: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginTop: 2,
   },
   menuCard: {
     backgroundColor: '#fff',
@@ -720,6 +743,7 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: 2,
   },
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -730,6 +754,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -745,41 +770,63 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: 14,
     color: Colors.text.secondary,
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  rolesGrid: {
+  rolesScroll: {
+    maxHeight: 250,
+  },
+  roleOption: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  roleCard: {
-    width: '47%',
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 12,
-    padding: 16,
     alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: Colors.background.secondary,
+    marginBottom: 8,
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  roleIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  roleIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
   },
-  roleCardLabel: {
-    fontSize: 14,
+  roleEmoji: {
+    fontSize: 20,
+  },
+  roleInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  roleLabel: {
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.text.primary,
   },
-  roleCheck: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
+  inviteForm: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.light,
   },
-  createInviteBtn: {
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  input: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 15,
+    color: Colors.text.primary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  inviteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -788,20 +835,72 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     marginTop: 20,
+    marginBottom: Platform.OS === 'ios' ? 20 : 0,
   },
-  createInviteBtnDisabled: {
+  inviteBtnDisabled: {
     opacity: 0.5,
   },
-  createInviteBtnText: {
+  inviteBtnText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
-  inviteNote: {
+  // Travel modal
+  travelModalSummary: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
+  },
+  travelModalTotal: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  travelModalLabel: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+  },
+  travelList: {
+    maxHeight: 300,
+    marginTop: 16,
+  },
+  travelListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
+  },
+  travelListFlag: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  travelListCountry: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: Colors.text.primary,
+  },
+  travelListDays: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  travelNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: Colors.background.secondary,
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 16,
+    marginBottom: Platform.OS === 'ios' ? 20 : 0,
+  },
+  travelNoteText: {
+    flex: 1,
     fontSize: 12,
-    color: Colors.text.muted,
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 20,
+    color: Colors.text.secondary,
+    lineHeight: 16,
   },
 });
