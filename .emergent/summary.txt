@@ -1,161 +1,157 @@
 <analysis>
 
-**original_problem_statement**: The user wants to build a mobile application in French called Le Central Court for professional tennis players. The goal is to centralize all player-related activities into one app.
+**original_problem_statement**: The user initially requested a series of enhancements to a feature-rich tennis player management app. However, the project underwent a major pivot to a simplified V1 MVP, as detailed in a new product requirements document.
 
-**PRODUCT REQUIREMENTS**:
-1.  **Smart Calendar**: A unified calendar to manage tournaments, media appearances, medical appointments, training sessions, travel, and sponsor obligations. It should have week and month views, similar to Apple's native calendar.
-2.  **Document Vault**: Securely store and share documents with specific team members (Agent, Medical Staff, Technical Staff, Logistics). Users should be able to open and download these documents to their phone.
-3.  **Fiscal Tracking**: A tool to monitor the 183-day rule for tax residency in different countries. Initially manual, with plans for automation.
-4.  **Housing Management**: Add information about accommodations and calculate the distance to training or competition venues.
-5.  **Team Communication**: Dedicated chat channels to communicate with different staff members (Agent, Medical, etc.). It should include AI-generated reply suggestions to save time.
-6.  **Authentication & Invitations**: A full authentication system (Google/Email). The player, upon creating an account, can generate role-specific invitation links for their staff.
-7.  **Notifications & Suggestions**:
-    *   Critical alerts for deadlines and expirations.
-    *   Smart recommendations (e.g., suggesting a trip to optimize fiscal residency).
-    *   Allow users to suggest time changes for events, which notifies the relevant staff.
-    *   Users should be able to manage their notification preferences.
-8.  **UX/UI Enhancements**:
-    *   A user-friendly, hierarchical home screen that prioritizes important information.
-    *   Clickable locations in the calendar that open in an external maps app (Google/Apple Maps).
-    *   An intuitive event creation form with proper date/time pickers and location suggestions (via Google Maps API).
+**PRODUCT REQUIREMENTS (V1 MVP)**:
+The goal is to create an ultra-simplified, calendar-centric mobile app.
+
+1.  **Simplified Navigation**: A three-tab layout: **Calendrier** (Calendar), **Documents**, and **Profil** (Profile).
+2.  **Calendar (Core Feature)**:
+    *   **Month View Only**: With color-coded dots for events.
+    *   **Tournament Management**: A weekly list of available tournaments (ATP/WTA/ITF based on player profile). The player can select a tournament for the week, which then updates its status (e.g., Interested).
+    *   **Event Types**: Specific, color-coded event categories (Tournament, Training, Medical, Media, Sponsor, Personal).
+    *   **Observations**: A simple text field on each event to replace the chat system, allowing staff to add notes.
+3.  **Documents (Simplified for Expense Tracking)**:
+    *   **Receipt Upload**: Upload receipts via photo or file selection.
+    *   **Automatic Classification**: Documents are automatically categorized by the month of upload.
+    *   **Expense Categories**: Travel, Invoices, Medical, etc.
+    *   **Monthly Export**: Functionality to export all documents for a given month as a ZIP file or send them via email.
+4.  **Geolocation (Simplified as Travel Days)**:
+    *   Manual tracking of days spent in different countries. No automatic GPS tracking in V1.
+5.  **Profiles & Permissions**:
+    *   **Player Onboarding**: A multi-step flow to capture personal info and tennis circuit (ATP/WTA/ITF), which determines the tournament data shown.
+    *   **Staff Roles**: Predefined roles (Coach, Physio, Agent, etc.) with specific, granular permissions.
+    *   **Invitations**: The player can invite staff members by email, assigning them a role.
+6.  **Financial Dashboard (Simplified)**:
+    *   A read-only monthly summary of expenses, calculated automatically from uploaded receipts.
 
 **User's preferred language**: French
 
 **what currently exists?**
-A full-stack Expo (React Native) and FastAPI application. The app has a tab-based navigation system with five main screens:
-1.  **Accueil (Home/Calendar)**: A completely redesigned home screen acting as a dashboard, showing today's schedule, required actions, and upcoming events. It also includes List, Week, and Month views powered by .
-2.  **Vault**: A document management screen with a UI for sharing files with specific teams.
-3.  **Messages**: A screen listing chat channels, leading to individual chat UIs.
-4.  **Fiscalité (Fiscality)**: A placeholder screen for fiscal tracking.
-5.  **Profil (Profile)**: A screen for user info, team management (with a functional Invite modal), and settings.
+The application has been successfully refactored to meet the V1 MVP specifications. It is a frontend-heavy application using static data stored in  files.
 
-Most data (events, documents, messages) is currently static and hardcoded on the frontend. A foundational authentication structure (context, screens, backend routes) has been created but is not fully integrated or functional; the app runs in a demo mode.
+-   **Navigation**: A 3-tab navigator is in place for Calendar, Documents, and Profile.
+-   **Calendar ()**: Fully functional month view using . It displays weekly tournament selection modals, allows users to select a tournament, and shows a list of events with observations for any selected day.
+-   **Documents ()**: A complete expense tracking module. It displays documents grouped by category, calculates the total monthly expense, and provides modals for uploading new documents (via camera or file picker), viewing a financial breakdown, and exporting monthly receipts.
+-   **Profile ()**: A V1 profile screen showing user info, a Travel Days counter, and a staff management section with a functional Invite modal that includes the new V1 roles.
+-   **Onboarding ()**: A multi-step onboarding screen for new players exists.
+-   **Data**: All data (tournaments, events, documents, staff) is static and hardcoded in . The backend () exists but is not currently used for the V1 features.
 
 **Last working item**:
--   Last item agent was working: The agent began implementing a new set of user-requested features. The very last action was adding  and  as empty placeholders to the  file. This was the first step towards enabling Google Maps location suggestions and AI-powered chat replies.
+-   Last item agent was working: The agent started implementing a new set of user requests to enhance the V1 MVP. The very last action was overwriting the  file with the intention of creating a **profile editing screen**.
 -   Status: IN PROGRESS
 -   Agent Testing Done: N
 -   Which testing method agent to use?: both
 -   User Testing Done: N
 
 **All Pending/In progress Issue list**:
--   Issue 1: Authentication and Invitation Flow is Incomplete (P1)
--   Issue 2: Time Change Request Functionality is Not Verified (P2)
+-   Issue 1: Implement Post-V1 Enhancements (P0)
 
 Issues Detail:
 -   Issue 1:
-    -   Attempted fixes: The agent created login/invite screens, an , and backend endpoints (, , ). However, the flow was never fully tested end-to-end. A demo mode was implemented on the profile screen as a workaround for errors caused by the unauthenticated state.
+    -   Attempted fixes: The agent started by overwriting  to begin creating a profile editing screen. This was an incorrect file choice.
     -   Next debug checklist:
-        1.  Complete the frontend integration of  to protect routes correctly.
-        2.  Thoroughly test the Google Sign-In flow.
-        3.  Test the entire email/password registration and login flow.
-        4.  Test the invitation link generation and the registration process for a new staff member using an invite link.
-        5.  Remove the demo mode patch from  once the auth state is reliable.
-    -   Why fix this issue and what will be achieved with the fix?: This is a core requirement for a multi-user application. It will enable secure access, differentiate between a player and staff members, and allow for personalized data and permissions.
-    -   Status: NOT STARTED
-    -   Is recurring issue? N
-    -   Should Test frontend/backend/both after fix? both
-    -   Blocked on other issue: None
-
--   Issue 2:
-    -   Attempted fixes: The agent added a clock icon button to training and medical events in the list view to trigger a time change request. However, the agent's attempt to test the modal's appearance via screenshot timed out.
-    -   Next debug checklist:
-        1.  Verify that pressing the clock icon on an event in  correctly opens the time-change request modal.
-        2.  Implement the backend logic to handle the submission of this request.
-        3.  Implement a push notification system (e.g., using ) to alert the relevant staff member when a request is made.
-    -   Why fix this issue and what will be achieved with the fix?: This fulfills the user's request for a more interactive and collaborative calendar, allowing players to communicate schedule adjustments efficiently.
+        1.  **Correct File Structure**: Create a new file  for the profile editing UI. Restore the original  from git history or recreate it if necessary.
+        2.  **Link Edit Screen**: Add a button on the main profile tab () to navigate to the new  screen.
+        3.  **Implement Profile Editing**: Build the UI for editing the profile, including a native date picker for the date of birth, an image picker for the profile photo, and a selector for fiscal residence.
+        4.  **Implement OCR for Receipts**: This is a significant task requiring backend changes.
+            -   Research and choose an OCR library/service compatible with Python.
+            -   Create a new FastAPI endpoint in  that accepts an image file.
+            -   The endpoint should process the image with OCR to extract the date and total amount. It could also attempt to suggest a category based on keywords.
+            -   Modify the upload flow in  to call this new endpoint and pre-fill the document details form with the OCR results.
+        5.  **Implement Accountant Email**:
+            -   Add a field in the new  screen to save an accountant's email address.
+            -   Store this email in the app's context or .
+            -   Update the export modal in  so the Send by email button uses the saved accountant's email address.
+    -   Why fix this issue and what will be achieved with the fix?: Fulfills the user's latest feature requests, making the profile editable and streamlining the expense tracking workflow with automation.
     -   Status: IN PROGRESS
     -   Is recurring issue? N
     -   Should Test frontend/backend/both after fix? both
     -   Blocked on other issue: None
 
 **In progress Task List**:
--   Task 1: Implement the Latest Batch of Feature Requests (P0)
-
-Task Detail:
--   Task 1:
-    -   Where to resume: The agent just modified . The immediate next step is to **ask the user for their Google Maps API key**. The OpenAI key can be sourced from the . After getting the key, proceed with backend and frontend implementation.
-    -   What will be achieved with this?: This will complete the 5 features requested by the user in their last message:
-        1.  **Document Management**: Opening/downloading from the vault.
-        2.  **Notification Preferences**: A new settings screen.
-        3.  **Housing Info**: Storing accommodation data and calculating distances.
-        4.  **AI Quick Replies**: In the chat interface.
-        5.  **Improved Event Creation**: With date/time pickers and map-based location suggestions.
-    -   Status: IN PROGRESS
-    -   Should Test frontend/backend/both after fix? both
-    -   Blocked on something: Awaiting the user's .
+(None, all current work is captured in the issue above)
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
-    -   **Backend Data Migration (P1)**: Migrate all static data (events, documents, messages, team members) from frontend  files to MongoDB collections. This is crucial for a dynamic, multi-user application.
-    -   **Push Notification System (P1)**: Implement a full push notification system for event reminders, chat messages, and time change requests.
+    -   **Backend Data Migration (P0)**: The most critical next step for the app's viability. All static data from  (users, events, documents, staff, tournaments) must be migrated to MongoDB. This involves creating DB schemas and corresponding FastAPI CRUD endpoints for each data model.
+    -   **Full Authentication & Permissions (P1)**: The staff invitation flow is currently frontend-only. This task involves implementing the full end-to-end flow:
+        -   Backend generates a secure, unique invitation token.
+        -   (Future) Send an email with the invitation link.
+        -   A new user registers using the token, linking them to the player's team.
+        -   Enforce the V1 staff permissions on all backend endpoints to ensure users can only view/edit data they are authorized for.
 -   **Future Tasks**:
-    -   **Automatic GPS Fiscal Tracking (P2)**: Implement automatic location tracking using  to automate the 183-day rule calculation. This will require handling background location permissions.
+    -   **Push Notifications & Reminders (P2)**: Implement the notification system (e.g., using ) for event reminders as specified in the V1 requirements.
+    -   **Automatic GPS Fiscal Tracking (P3)**: Implement the V2 vision for automatic location tracking to automate the Travel Days feature.
+    -   **Live Tournament Data (P3)**: Replace static tournament data with live data from an official API or a web scraper.
 
 **Completed work in this session**
--   List of all completed tasks with file and method name:
-    -   Initial MVP with tab navigation ().
-    -   Chat feature with dedicated channels (, ).
-    -   Document vault with team-based sharing UI ().
-    -   Smart recommendations on the calendar screen ().
-    -   Calendar refactor to include List, Week, and Month views using  ().
-    -   UX redesign of the home screen into a dashboard ().
-    -   Implementation of clickable locations opening external maps ().
-    -   Created UI/backend foundation for Authentication and Staff Invitations (, ).
+-   **Major App Refactor to V1 MVP**:
+    -   **Sprint 1**: Implemented a simplified 3-tab navigation. Created the V1 Calendar screen with a month view, weekly tournament selection workflow, and a list view for daily events.
+    -   **Sprint 2**: Implemented the V1 Profile screen with staff roles, an invitation modal, and a Travel Days counter. Added the Observations feature to calendar events, allowing users to add notes.
+    -   **Sprint 3**: Implemented the V1 Documents screen as a full expense tracking module, including receipt upload (photo/file), automatic monthly classification, a financial summary dashboard, and an export function.
+-   (Pre-Refactor) Implemented a notification settings screen, document viewer, AI-powered chat replies, a fiscality onboarding flow, and native date/time pickers for event creation. These features have since been removed or replaced during the V1 refactor.
+
+**Earlier issues found/mentioned but not fixed**
+(None, the V1 refactor superseded all previous issues.)
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Frontend**: Expo (React Native), Expo Router (file-based routing), , React Context API for state management.
--   **Backend**: FastAPI, MongoDB.
--   **Authentication**: Planned for JWT (email/password) and Google OAuth. Backend routes are defined, frontend context is created, but the integration is incomplete.
--   **Styling**: React Native  with a consistent color scheme.
+-   **Frontend**: Expo (React Native), Expo Router, , , , React Context API for state.
+-   **Backend**: FastAPI (currently underutilized for V1).
+-   **Data Management**: The application currently runs entirely on static data loaded into the React Context from  files in the frontend. There is no active database interaction for the core features.
 
 **key DB schema**
--   : { , , , : ('player'|'staff'),  }
--   : { , : [{'user_id', 'role'}] }
--   : { , , ,  }
--   Note: Schemas for events, documents, and messages are not yet in the database; they are handled with static data on the frontend.
+(Note: The following schemas are the *target* for the backend migration task, they are **not currently implemented**.)
+-   : { , , , , , , ,  }
+-   : { , , , , Thu Feb  5 01:24:17 UTC 2026, , , , : [{ , ,  }] }
+-   : { , , , , , , Thu Feb  5 01:24:17 UTC 2026 }
+-   : { , , : [{ ,  }] }
 
 **All files of reference**
--   **/app/frontend/app/(tabs)/index.tsx**: The most complex file, containing logic for the Home dashboard, List, Week, and Month calendar views, and modals.
--   **/app/backend/server.py**: Contains all current backend API endpoints, including the incomplete authentication and invitation logic.
--   **/app/frontend/src/context/AuthContext.tsx**: The React context for managing user authentication state.
--   **/app/frontend/app/_layout.tsx**: The root layout file that manages the navigation stack and redirects unauthenticated users.
--   **/app/backend/.env**: Contains the MongoDB connection string and now has placeholders for Google Maps and OpenAI API keys.
+-   **/app/frontend/app/(tabs)/index.tsx**: The new V1 calendar screen.
+-   **/app/frontend/app/(tabs)/vault.tsx**: The new V1 expense tracking screen (was ).
+-   **/app/frontend/app/(tabs)/profile.tsx**: The new V1 profile and staff management screen.
+-   **/app/frontend/app/(tabs)/_layout.tsx**: The simplified 3-tab navigator layout.
+-   **/app/frontend/src/context/AppContext.tsx**: The heart of the current application, holding all state and static data.
+-   **/app/frontend/app/onboarding.tsx**: The player onboarding screen, which was **incorrectly overwritten** at the end of the session.
 
 **Critical Info for New Agent**
--   **API Keys Required**: The immediate next step is to obtain the  from the user. You must use the  tool for this. The OpenAI functionality should use the , which is already available in the environment. Do not ask the user for an OpenAI key.
--   **Incomplete Authentication**: Be aware that the authentication system is a major piece of technical debt. While the UI and some backend routes exist, the app is currently running in a demo mode and the end-to-end flow is untested. This will need to be properly addressed soon.
--   **Static Data**: The application heavily relies on static data stored in . A full implementation of the requested features will require migrating this data to the MongoDB database and building out the corresponding backend services.
+-   **V1 MVP Pivot**: The project's direction has completely changed. Refer to the V1 MVP requirements, not the initial problem statement. The app is now much simpler.
+-   **Static Data**: The entire app is a facade running on static data in the frontend. The highest priority technical debt is to migrate this data to the MongoDB backend and build out the corresponding APIs.
+-   **Incorrect File Edit**: The previous agent overwrote  while trying to create a profile *editing* screen. Your first action should be to create a new  file and restore the original onboarding screen.
+-   **OCR is a Major Task**: The user's request for OCR on receipts is not trivial. It will require backend development and integration of a third-party OCR service or library. Plan this task carefully.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **Request**: Add document download, notification settings, housing info with distance calculation, AI chat replies, and improved date/location pickers for event creation. (IN PROGRESS)
-2.  **Request**: Make calendar locations open in Maps, allow suggesting time changes for events, and redesign the home screen for better UX. (Completed)
-3.  **Request**: Implement authentication (Google/email), a staff invitation system, and add week/month calendar views. (Completed, but auth is partial)
-4.  **Request**: Add more specific medical/training events, team-based document sharing, and staff chat channels. (Completed)
-5.  **Clarification**: Confirmed initial MVP scope: French language, no auth, player-only view, manual/static data. (Done)
-6.  *Pending Human Message*: The agent has not yet asked for the user's preference on authentication from message #87. The user did not reply to the options presented. The agent proceeded with a combined approach.
+1.  **Request**: Add profile editing (DOB, photo, fiscal residence), OCR for receipts, and an accountant email setting for 1-click export. (IN PROGRESS)
+2.  **Confirmation**: sprint 3. (Completed)
+3.  **Confirmation**: sprint 2. (Completed)
+4.  **Confirmation**: oui allons y avec le sprint 1. (Completed)
+5.  **New Requirement**: A full V1 MVP product requirements document was provided, pivoting the entire project. (Completed - All 3 sprints)
+6.  **Clarification**: Asked for an onboarding flow for the fiscality tab: first ask for residency, then offer geolocation. (Completed, but feature now simplified in V1)
+7.  **Request**: Make fiscality data more realistic, implement real geolocation, and use native date/time pickers. (Completed, but features now simplified/removed in V1)
+8.  **Confirmation**: Chose to proceed with mocked data instead of providing API keys. (Acknowledged)
+
+**Project Health Check:**
+-   **Mocked**: The entire data layer (users, events, documents, etc.) is mocked using static data on the frontend.
+-   **Broken**: The  file was incorrectly overwritten.
 
 **3rd Party Integrations**
--   **OpenAI GPT-4o**: For AI-powered message replies. — uses Emergent LLM Key.
--   **Google Maps API**: For location suggestions and distance calculation. — requires User API Key.
--   **React Native Calendars**: Used for the advanced calendar views.
--   **@react-native-google-signin/google-signin**: Installed for Google authentication.
+-   **OpenAI GPT-4o**: Previously used for AI chat replies, but the chat feature has been removed in V1. — uses Emergent LLM Key.
+-   **React Native Calendars**: Core component for the calendar view.
+-   **@react-native-community/datetimepicker**: Used for native date/time selection.
+-   **expo-image-picker**: Used for uploading receipts from the camera or gallery.
+-   **expo-location**: Installed, but the V1 spec requires manual location tracking, so it's not actively used.
 
 **Testing status**
--   Testing agent used after significant changes: NO (Agent used screenshot tool extensively but not a formal testing agent).
+-   Testing agent used after significant changes: NO (Agent relied on the ).
 -   Troubleshoot agent used after agent stuck in loop: NO
 -   Test files created: []
--   Known regressions: None.
+-   Known regressions: The  file is non-functional as it was overwritten.
 
 **What agent forgot to execute**
--   The agent added  to the  file but **forgot to ask the user to provide the actual key**. This is a blocker for the location-based features.
--   The agent hardcoded a placeholder for  instead of using the  it had already fetched. The implementation should use the Emergent key.
+-   The agent did not create a separate file for the edit profile functionality, instead overwriting the existing onboarding file. This needs to be corrected.
 
 </analysis>
-<SYS_PROMPT_SEPARATOR>
-<workspace_dir>
-/app
-</workspace_dir>
