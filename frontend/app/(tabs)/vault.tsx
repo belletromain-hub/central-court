@@ -392,14 +392,41 @@ export default function DocumentsScreen() {
     const message = `📋 Documents ${monthLabel}\n\n${docList}\n\n💰 Total: ${totalAmount}€`;
     
     if (method === 'email') {
-      try {
-        await Share.share({
-          message,
-          title: `Documents ${monthLabel}`,
-        });
-        setShowExportModal(false);
-      } catch (error) {
-        console.error('Share error:', error);
+      // Use accountant email if available
+      if (accountantEmail) {
+        const subject = encodeURIComponent(`Documents ${monthLabel} - Tennis Assistant`);
+        const body = encodeURIComponent(message);
+        const mailtoUrl = `mailto:${accountantEmail}?subject=${subject}&body=${body}`;
+        
+        try {
+          const canOpen = await Linking.canOpenURL(mailtoUrl);
+          if (canOpen) {
+            await Linking.openURL(mailtoUrl);
+            setShowExportModal(false);
+          } else {
+            // Fallback to Share
+            await Share.share({
+              message,
+              title: `Documents ${monthLabel}`,
+            });
+            setShowExportModal(false);
+          }
+        } catch (error) {
+          console.error('Mail error:', error);
+          await Share.share({ message, title: `Documents ${monthLabel}` });
+          setShowExportModal(false);
+        }
+      } else {
+        // No accountant email, use generic share
+        try {
+          await Share.share({
+            message,
+            title: `Documents ${monthLabel}`,
+          });
+          setShowExportModal(false);
+        } catch (error) {
+          console.error('Share error:', error);
+        }
       }
     } else {
       // In real app, would create a zip file
