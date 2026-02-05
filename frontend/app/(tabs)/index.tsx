@@ -151,11 +151,18 @@ export default function CalendarScreenV1() {
   const handleStatusChange = (weekNumber: number, status: TournamentStatus) => {
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
+        // If status is "not_interested", clear the selection
+        if (status === 'none' && week.selectedTournamentId) {
+          return { ...week, selectedTournamentId: null, status: 'none' };
+        }
         return { ...week, status };
       }
       return week;
     }));
   };
+  
+  // Available status options for UI
+  const STATUS_OPTIONS: TournamentStatus[] = ['interested', 'pending', 'registered', 'accepted', 'declined'];
   
   // Handle add event
   const handleAddEvent = () => {
