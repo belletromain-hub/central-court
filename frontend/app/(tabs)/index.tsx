@@ -163,9 +163,15 @@ export default function CalendarScreenV1() {
   const handleStatusChange = (weekNumber: number, status: TournamentStatus) => {
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
-        // If status is "none" (pas intéressé), clear the selection
+        // If status is "none" (pas intéressé), hide the tournament completely
         if (status === 'none' && week.selectedTournamentId) {
-          return { ...week, selectedTournamentId: null, status: 'none' };
+          const newHiddenIds = [...(week.hiddenTournamentIds || []), week.selectedTournamentId];
+          return { 
+            ...week, 
+            selectedTournamentId: null, 
+            status: 'none',
+            hiddenTournamentIds: newHiddenIds
+          };
         }
         return { ...week, status };
       }
@@ -173,6 +179,34 @@ export default function CalendarScreenV1() {
     }));
     // Close modal after status selection
     setShowTournamentModal(false);
+  };
+  
+  // Handle hiding a tournament without selecting it first (from the list)
+  const handleHideTournament = (weekNumber: number, tournamentId: string) => {
+    setWeekTournaments(prev => prev.map(week => {
+      if (week.weekNumber === weekNumber) {
+        const newHiddenIds = [...(week.hiddenTournamentIds || []), tournamentId];
+        // If this was the selected tournament, clear it
+        const newSelectedId = week.selectedTournamentId === tournamentId ? null : week.selectedTournamentId;
+        const newStatus = newSelectedId ? week.status : 'none';
+        return { 
+          ...week, 
+          selectedTournamentId: newSelectedId,
+          status: newStatus,
+          hiddenTournamentIds: newHiddenIds
+        };
+      }
+      return week;
+    }));
+    // Update selectedWeek state as well
+    if (selectedWeek?.weekNumber === weekNumber) {
+      setSelectedWeek(prev => {
+        if (!prev) return prev;
+        const newHiddenIds = [...(prev.hiddenTournamentIds || []), tournamentId];
+        const newSelectedId = prev.selectedTournamentId === tournamentId ? null : prev.selectedTournamentId;
+        return { ...prev, hiddenTournamentIds: newHiddenIds, selectedTournamentId: newSelectedId };
+      });
+    }
   };
   
   // Get status options based on current status
@@ -191,6 +225,12 @@ export default function CalendarScreenV1() {
   // Accepté, Participe → Masquer les autres tournois
   const shouldShowOtherTournaments = (status: TournamentStatus): boolean => {
     return status === 'interested' || status === 'pending' || status === 'declined' || status === 'none';
+  };
+  
+  // Get visible tournaments for a week (filter out hidden ones)
+  const getVisibleTournaments = (week: WeekTournaments) => {
+    const hiddenIds = week.hiddenTournamentIds || [];
+    return week.tournaments.filter(t => !hiddenIds.includes(t.id));
   };
   
   // Handle add event
