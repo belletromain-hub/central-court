@@ -149,8 +149,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
         endDate: '2026-02-22'
       }
     ],
-    selectedTournamentId: null,
-    status: 'none',
+    registrations: [],
     hiddenTournamentIds: []
   },
   {
