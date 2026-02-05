@@ -1,6 +1,6 @@
 // Tournois ATP/WTA/ITF pour V1 MVP - Février 2026
 
-export type TournamentStatus = 'interested' | 'pending' | 'registered' | 'accepted' | 'declined' | 'none';
+export type TournamentStatus = 'interested' | 'pending' | 'registered' | 'accepted' | 'declined' | 'participating' | 'none';
 
 export interface Tournament {
   id: string;
