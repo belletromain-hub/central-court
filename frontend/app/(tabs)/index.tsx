@@ -542,176 +542,98 @@ export default function CalendarScreenV1() {
                   Semaine {selectedWeek.weekNumber} • {selectedWeek.weekLabel}
                 </Text>
                 
-                {/* SECTION 1: Tournoi sélectionné avec statut */}
-                {selectedWeek.selectedTournamentId && (() => {
-                  const selectedTournament = selectedWeek.tournaments.find(t => t.id === selectedWeek.selectedTournamentId);
-                  if (!selectedTournament) return null;
+                {/* Afficher TOUS les tournois visibles avec leur statut */}
+                {getVisibleTournaments(selectedWeek).map(tournament => {
+                  const registration = getRegistration(selectedWeek, tournament.id);
+                  const isRegistered = !!registration;
+                  const currentStatus = registration?.status || 'none';
+                  const statusInfo = isRegistered ? TOURNAMENT_STATUS_LABELS[currentStatus] : null;
+                  
                   return (
-                    <View style={styles.selectedTournamentSection}>
-                      <Text style={styles.sectionTitle}>Votre inscription</Text>
-                      <View style={[styles.tournamentOption, styles.tournamentOptionSelected]}>
+                    <View key={tournament.id} style={styles.tournamentOptionContainer}>
+                      <View style={[
+                        styles.tournamentOption,
+                        isRegistered && styles.tournamentOptionSelected
+                      ]}>
                         <View style={styles.tournamentOptionHeader}>
-                          <Text style={styles.tournamentOptionFlag}>{selectedTournament.countryFlag}</Text>
+                          <Text style={styles.tournamentOptionFlag}>{tournament.countryFlag}</Text>
                           <View style={styles.tournamentOptionInfo}>
-                            <Text style={styles.tournamentOptionName}>{selectedTournament.name}</Text>
-                            <Text style={styles.tournamentOptionCity}>{selectedTournament.city}, {selectedTournament.country}</Text>
+                            <Text style={styles.tournamentOptionName}>{tournament.name}</Text>
+                            <Text style={styles.tournamentOptionCity}>{tournament.city}, {tournament.country}</Text>
                           </View>
-                          <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
+                          {isRegistered && statusInfo && (
+                            <View style={[styles.currentStatusBadge, { backgroundColor: statusInfo.color }]}>
+                              <Text style={styles.currentStatusEmoji}>{statusInfo.emoji}</Text>
+                            </View>
+                          )}
                         </View>
                         
                         <View style={styles.tournamentOptionDetails}>
-                          <View style={[styles.categoryBadge, { backgroundColor: SURFACE_COLORS[selectedTournament.surface] + '20' }]}>
-                            <Text style={[styles.categoryBadgeText, { color: SURFACE_COLORS[selectedTournament.surface] }]}>
-                              {selectedTournament.category}
+                          <View style={[styles.categoryBadge, { backgroundColor: SURFACE_COLORS[tournament.surface] + '20' }]}>
+                            <Text style={[styles.categoryBadgeText, { color: SURFACE_COLORS[tournament.surface] }]}>
+                              {tournament.category}
                             </Text>
                           </View>
-                          <View style={[styles.surfaceBadge, { backgroundColor: SURFACE_COLORS[selectedTournament.surface] + '20' }]}>
-                            <Text style={[styles.surfaceBadgeText, { color: SURFACE_COLORS[selectedTournament.surface] }]}>
-                              {selectedTournament.surface}
+                          <View style={[styles.surfaceBadge, { backgroundColor: SURFACE_COLORS[tournament.surface] + '20' }]}>
+                            <Text style={[styles.surfaceBadgeText, { color: SURFACE_COLORS[tournament.surface] }]}>
+                              {tournament.surface}
                             </Text>
                           </View>
-                          <Text style={styles.tournamentPrize}>{selectedTournament.prize}</Text>
-                        </View>
-                      </View>
-                      
-                      {/* Status Selection */}
-                      <View style={styles.statusSection}>
-                        <Text style={styles.statusSectionTitle}>Statut</Text>
-                        <View style={styles.statusGrid}>
-                          {getAvailableStatusOptions(selectedWeek.status).map(status => {
-                            const statusInfo = TOURNAMENT_STATUS_LABELS[status];
-                            const isSelected = selectedWeek.status === status;
-                            return (
-                              <TouchableOpacity
-                                key={status}
-                                style={[
-                                  styles.statusOption,
-                                  isSelected && { backgroundColor: statusInfo.color, borderColor: statusInfo.color }
-                                ]}
-                                onPress={() => handleStatusChange(selectedWeek.weekNumber, status)}
-                              >
-                                <Text style={[styles.statusOptionEmoji, isSelected && { color: '#fff' }]}>
-                                  {statusInfo.emoji}
-                                </Text>
-                                <Text style={[styles.statusOptionText, isSelected && { color: '#fff' }]}>
-                                  {statusInfo.label}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                          <Text style={styles.tournamentPrize}>{tournament.prize}</Text>
                         </View>
                         
-                        {/* Ne pas s'inscrire button */}
-                        {(selectedWeek.status === 'pending' || selectedWeek.status === 'interested') && (
+                        {/* Status Selection for this tournament */}
+                        <View style={styles.statusSectionInline}>
+                          <View style={styles.statusGridInline}>
+                            {getAvailableStatusOptions(currentStatus).map(status => {
+                              const sInfo = TOURNAMENT_STATUS_LABELS[status];
+                              const isSelected = currentStatus === status;
+                              return (
+                                <TouchableOpacity
+                                  key={status}
+                                  style={[
+                                    styles.statusOptionSmall,
+                                    isSelected && { backgroundColor: sInfo.color, borderColor: sInfo.color }
+                                  ]}
+                                  onPress={() => handleRegisterTournament(selectedWeek.weekNumber, tournament.id, status)}
+                                >
+                                  <Text style={[styles.statusOptionEmojiSmall, isSelected && { color: '#fff' }]}>
+                                    {sInfo.emoji}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                          
+                          {/* Bouton Pas intéressé - masque le tournoi */}
                           <TouchableOpacity
-                            style={styles.cancelRegistrationBtn}
-                            onPress={() => handleStatusChange(selectedWeek.weekNumber, 'none')}
+                            style={styles.hideInlineBtnContainer}
+                            onPress={() => handleHideTournament(selectedWeek.weekNumber, tournament.id)}
                           >
-                            <Ionicons name="close-circle" size={18} color="#f44336" />
-                            <Text style={styles.cancelRegistrationText}>Ne pas s'inscrire</Text>
+                            <Ionicons name="eye-off-outline" size={16} color="#9e9e9e" />
                           </TouchableOpacity>
-                        )}
+                        </View>
+                        
+                        {/* Lien Player Zone */}
+                        <TouchableOpacity
+                          style={styles.playerZoneBtn}
+                          onPress={() => Linking.openURL(tournament.playerZoneLink)}
+                        >
+                          <Ionicons name="open-outline" size={16} color={Colors.primary} />
+                          <Text style={styles.playerZoneBtnText}>S'inscrire (Player Zone)</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   );
-                })()}
+                })}
                 
-                {/* SECTION 2: Autres tournois disponibles */}
-                {shouldShowOtherTournaments(selectedWeek.status) && (
-                  <>
-                    {/* Separator if there's a selected tournament */}
-                    {selectedWeek.selectedTournamentId && getVisibleTournaments(selectedWeek).filter(t => t.id !== selectedWeek.selectedTournamentId).length > 0 && (
-                      <View style={styles.otherTournamentsHeader}>
-                        <View style={styles.separatorLine} />
-                        <Text style={styles.sectionTitle}>Autres tournois disponibles</Text>
-                      </View>
-                    )}
-                    
-                    {getVisibleTournaments(selectedWeek)
-                      .filter(t => t.id !== selectedWeek.selectedTournamentId) // Exclude already selected
-                      .map(tournament => (
-                      <View key={tournament.id} style={styles.tournamentOptionContainer}>
-                        <TouchableOpacity
-                          style={styles.tournamentOption}
-                          onPress={() => handleSelectTournament(selectedWeek.weekNumber, tournament.id)}
-                        >
-                          <View style={styles.tournamentOptionHeader}>
-                            <Text style={styles.tournamentOptionFlag}>{tournament.countryFlag}</Text>
-                            <View style={styles.tournamentOptionInfo}>
-                              <Text style={styles.tournamentOptionName}>{tournament.name}</Text>
-                              <Text style={styles.tournamentOptionCity}>{tournament.city}, {tournament.country}</Text>
-                            </View>
-                          </View>
-                          
-                          <View style={styles.tournamentOptionDetails}>
-                            <View style={[styles.categoryBadge, { backgroundColor: SURFACE_COLORS[tournament.surface] + '20' }]}>
-                              <Text style={[styles.categoryBadgeText, { color: SURFACE_COLORS[tournament.surface] }]}>
-                                {tournament.category}
-                              </Text>
-                            </View>
-                            <View style={[styles.surfaceBadge, { backgroundColor: SURFACE_COLORS[tournament.surface] + '20' }]}>
-                              <Text style={[styles.surfaceBadgeText, { color: SURFACE_COLORS[tournament.surface] }]}>
-                                {tournament.surface}
-                              </Text>
-                            </View>
-                            <Text style={styles.tournamentPrize}>{tournament.prize}</Text>
-                          </View>
-                          
-                          <View style={styles.tournamentActions}>
-                            <TouchableOpacity
-                              style={styles.playerZoneBtn}
-                              onPress={() => Linking.openURL(tournament.playerZoneLink)}
-                            >
-                              <Ionicons name="open-outline" size={16} color={Colors.primary} />
-                              <Text style={styles.playerZoneBtnText}>S'inscrire (Player Zone)</Text>
-                            </TouchableOpacity>
-                            
-                            {/* Hide tournament button */}
-                            <TouchableOpacity
-                              style={styles.hideTournamentBtn}
-                              onPress={() => handleHideTournament(selectedWeek.weekNumber, tournament.id)}
-                            >
-                              <Ionicons name="eye-off-outline" size={16} color="#9e9e9e" />
-                              <Text style={styles.hideTournamentText}>Pas intéressé</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                    
-                    {/* Show message if all other tournaments are hidden */}
-                    {!selectedWeek.selectedTournamentId && getVisibleTournaments(selectedWeek).length === 0 && (
-                      <View style={styles.noTournamentsMessage}>
-                        <Ionicons name="calendar-outline" size={48} color={Colors.text.muted} />
-                        <Text style={styles.noTournamentsText}>Aucun tournoi disponible</Text>
-                        <Text style={styles.noTournamentsHint}>Tous les tournois ont été masqués</Text>
-                      </View>
-                    )}
-                  </>
-                )}
-                
-                {/* SECTION 3: Message quand Accepté/Participe */}
-                {!shouldShowOtherTournaments(selectedWeek.status) && selectedWeek.selectedTournamentId && (
-                  <View style={styles.lockedMessage}>
-                    <Ionicons name="lock-closed" size={24} color={Colors.text.muted} />
-                    <Text style={styles.lockedMessageText}>
-                      Changez le statut ci-dessus pour voir les autres tournois
-                    </Text>
+                {/* Message si aucun tournoi visible */}
+                {getVisibleTournaments(selectedWeek).length === 0 && (
+                  <View style={styles.noTournamentsMessage}>
+                    <Ionicons name="calendar-outline" size={48} color={Colors.text.muted} />
+                    <Text style={styles.noTournamentsText}>Aucun tournoi disponible</Text>
+                    <Text style={styles.noTournamentsHint}>Tous les tournois ont été masqués</Text>
                   </View>
-                )}
-                
-                {/* Aucun tournoi button - only when no tournament selected */}
-                {!selectedWeek.selectedTournamentId && shouldShowOtherTournaments(selectedWeek.status) && (
-                  <TouchableOpacity
-                    style={styles.noTournamentBtn}
-                    onPress={() => {
-                      handleSelectTournament(selectedWeek.weekNumber, null);
-                      setShowTournamentModal(false);
-                    }}
-                  >
-                    <Ionicons name="close-circle-outline" size={20} color={Colors.text.secondary} />
-                    <Text style={styles.noTournamentBtnText}>Aucun tournoi cette semaine</Text>
-                  </TouchableOpacity>
                 )}
               </ScrollView>
             )}
