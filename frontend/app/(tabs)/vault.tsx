@@ -126,6 +126,8 @@ export default function DocumentsScreen() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showFinanceModal, setShowFinanceModal] = useState(false);
   const [showOCRResultModal, setShowOCRResultModal] = useState(false);
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentV1 | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [accountantEmail, setAccountantEmail] = useState<string | null>(null);
