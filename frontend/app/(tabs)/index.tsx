@@ -1660,4 +1660,43 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     marginTop: 4,
   },
+  // New modal structure styles
+  tournamentModalContent: {
+    maxHeight: 500,
+    paddingBottom: 16,
+  },
+  selectedTournamentSection: {
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginBottom: 10,
+    marginTop: 8,
+  },
+  otherTournamentsHeader: {
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  separatorLine: {
+    height: 1,
+    backgroundColor: Colors.border.light,
+    marginBottom: 12,
+  },
+  lockedMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 10,
+    marginTop: 12,
+  },
+  lockedMessageText: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.text.secondary,
+  },
 });
