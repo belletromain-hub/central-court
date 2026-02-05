@@ -133,99 +133,79 @@ export default function CalendarScreenV1() {
     return marks;
   }, [events, selectedDate, tournamentMarks]);
   
-  // Handle tournament selection
-  const handleSelectTournament = (weekNumber: number, tournamentId: string | null) => {
-    let updatedWeek: WeekTournaments | null = null;
-    
+  // Handle tournament registration (add or update)
+  const handleRegisterTournament = (weekNumber: number, tournamentId: string, status: TournamentStatus) => {
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
-        updatedWeek = {
-          ...week,
-          selectedTournamentId: tournamentId,
-          status: tournamentId ? 'interested' as TournamentStatus : 'none' as TournamentStatus
-        };
+        const existingRegIndex = week.registrations.findIndex(r => r.tournamentId === tournamentId);
+        let newRegistrations = [...week.registrations];
+        
+        if (existingRegIndex >= 0) {
+          // Update existing registration
+          newRegistrations[existingRegIndex] = { tournamentId, status };
+        } else {
+          // Add new registration
+          newRegistrations.push({ tournamentId, status });
+        }
+        
+        const updatedWeek = { ...week, registrations: newRegistrations };
+        // Update selectedWeek immediately
+        setSelectedWeek(updatedWeek);
         return updatedWeek;
       }
       return week;
     }));
-    
-    // Update selectedWeek to show status options immediately
-    if (updatedWeek) {
-      setSelectedWeek(updatedWeek);
-    }
-    
-    // If no tournament selected, close modal. Otherwise keep open to show status selection
-    if (!tournamentId) {
-      setShowTournamentModal(false);
-    }
   };
   
-  // Handle tournament status change
-  const handleStatusChange = (weekNumber: number, status: TournamentStatus) => {
+  // Handle removing registration (pas intéressé - hide tournament)
+  const handleRemoveRegistration = (weekNumber: number, tournamentId: string) => {
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
-        // If status is "none" (pas intéressé), hide the tournament completely
-        if (status === 'none' && week.selectedTournamentId) {
-          const newHiddenIds = [...(week.hiddenTournamentIds || []), week.selectedTournamentId];
-          return { 
-            ...week, 
-            selectedTournamentId: null, 
-            status: 'none',
-            hiddenTournamentIds: newHiddenIds
-          };
-        }
-        return { ...week, status };
+        // Remove from registrations
+        const newRegistrations = week.registrations.filter(r => r.tournamentId !== tournamentId);
+        // Add to hidden
+        const newHiddenIds = [...(week.hiddenTournamentIds || []), tournamentId];
+        
+        const updatedWeek = { ...week, registrations: newRegistrations, hiddenTournamentIds: newHiddenIds };
+        setSelectedWeek(updatedWeek);
+        return updatedWeek;
       }
       return week;
     }));
-    // Close modal after status selection
-    setShowTournamentModal(false);
   };
   
-  // Handle hiding a tournament without selecting it first (from the list)
+  // Handle hiding a tournament without registering (from the list)
   const handleHideTournament = (weekNumber: number, tournamentId: string) => {
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
         const newHiddenIds = [...(week.hiddenTournamentIds || []), tournamentId];
-        // If this was the selected tournament, clear it
-        const newSelectedId = week.selectedTournamentId === tournamentId ? null : week.selectedTournamentId;
-        const newStatus = newSelectedId ? week.status : 'none';
-        return { 
-          ...week, 
-          selectedTournamentId: newSelectedId,
-          status: newStatus,
-          hiddenTournamentIds: newHiddenIds
-        };
+        // Also remove from registrations if present
+        const newRegistrations = week.registrations.filter(r => r.tournamentId !== tournamentId);
+        
+        const updatedWeek = { ...week, hiddenTournamentIds: newHiddenIds, registrations: newRegistrations };
+        setSelectedWeek(updatedWeek);
+        return updatedWeek;
       }
       return week;
     }));
-    // Update selectedWeek state as well
-    if (selectedWeek?.weekNumber === weekNumber) {
-      setSelectedWeek(prev => {
-        if (!prev) return prev;
-        const newHiddenIds = [...(prev.hiddenTournamentIds || []), tournamentId];
-        const newSelectedId = prev.selectedTournamentId === tournamentId ? null : prev.selectedTournamentId;
-        return { ...prev, hiddenTournamentIds: newHiddenIds, selectedTournamentId: newSelectedId };
-      });
-    }
+  };
+  
+  // Get registration for a specific tournament
+  const getRegistration = (week: WeekTournaments, tournamentId: string): TournamentRegistration | undefined => {
+    return week.registrations.find(r => r.tournamentId === tournamentId);
   };
   
   // Get status options based on current status
-  // Si inscrit (pending) → L'option "Intéressé" ne doit plus s'afficher
   const getAvailableStatusOptions = (currentStatus: TournamentStatus): TournamentStatus[] => {
     if (currentStatus === 'pending' || currentStatus === 'accepted' || currentStatus === 'participating') {
-      // Once registered, can't go back to "interested"
       return ['pending', 'accepted', 'participating', 'declined'];
     }
-    // Before registration
     return ['interested', 'pending', 'accepted', 'participating', 'declined'];
   };
   
-  // Check if other tournaments should be visible
-  // Intéressé, En attente (Inscrit), Refusé → Voir les autres tournois
-  // Accepté, Participe → Masquer les autres tournois
-  const shouldShowOtherTournaments = (status: TournamentStatus): boolean => {
-    return status === 'interested' || status === 'pending' || status === 'declined' || status === 'none';
+  // Check if player has a "participating" or "accepted" status for any tournament this week
+  const hasConfirmedParticipation = (week: WeekTournaments): boolean => {
+    return week.registrations.some(r => r.status === 'participating' || r.status === 'accepted');
   };
   
   // Get visible tournaments for a week (filter out hidden ones)
