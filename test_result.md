@@ -101,3 +101,77 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Tennis Assistant V1 MVP - Enhancements:
+  1. Profile editing screen with DOB picker, photo, fiscal residence, accountant email
+  2. OCR for receipts using GPT-4o Vision to extract date, amount, category
+  3. 1-click export to accountant email
+
+backend:
+  - task: "OCR Receipt Analysis API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented /api/ocr/analyze-receipt endpoint using GPT-4o Vision via emergentintegrations. Extracts date, amount, merchant, category from receipt images."
+
+frontend:
+  - task: "Profile Edit Screen (Onboarding)"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/onboarding.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Multi-step onboarding with: personal info + photo, tennis circuit, fiscal residence, accountant email. Uses native DateTimePicker."
+
+  - task: "OCR Integration in Documents"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/vault.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Image capture triggers OCR analysis. Shows analyzing modal, then OCR result modal where user can confirm/edit extracted data before saving."
+
+  - task: "Accountant Email Export"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/vault.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Export modal shows accountant email if configured. Opens mailto: with pre-filled recipient, subject, and document list."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "OCR Receipt Analysis"
+    - "Accountant Email Export"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented OCR for receipts using GPT-4o Vision, profile editing screen with accountant email, and 1-click export. All features working. Ready for user testing."
