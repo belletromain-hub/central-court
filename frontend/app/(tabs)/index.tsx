@@ -188,6 +188,38 @@ export default function CalendarScreenV1() {
     });
   };
   
+  // Handle add observation
+  const handleAddObservation = () => {
+    if (!selectedEvent || !newObservationText.trim()) return;
+    
+    const newObservation: Observation = {
+      id: `obs-${Date.now()}`,
+      author: 'Moi', // In real app, get from user profile
+      role: 'Joueur',
+      text: newObservationText.trim(),
+      createdAt: new Date().toISOString()
+    };
+    
+    // Update the event with new observation
+    setEvents(prev => prev.map(event => {
+      if (event.id === selectedEvent.id) {
+        return {
+          ...event,
+          observations: [...event.observations, newObservation]
+        };
+      }
+      return event;
+    }));
+    
+    // Update selected event to show the new observation immediately
+    setSelectedEvent(prev => prev ? {
+      ...prev,
+      observations: [...prev.observations, newObservation]
+    } : null);
+    
+    setNewObservationText('');
+  };
+  
   // Get week number for a date
   const getWeekForDate = (date: string) => {
     return weekTournaments.find(week => {
