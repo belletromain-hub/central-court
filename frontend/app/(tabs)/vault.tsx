@@ -257,10 +257,15 @@ export default function DocumentsScreen() {
     setIsAnalyzing(true);
     
     try {
+      console.log('Starting OCR analysis for:', uri);
+      
       // Convert image to base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
+      
+      console.log('Base64 length:', base64.length);
+      console.log('Calling OCR API at:', `${API_BASE_URL}/api/ocr/analyze-receipt`);
       
       // Call OCR endpoint
       const response = await fetch(`${API_BASE_URL}/api/ocr/analyze-receipt`, {
@@ -273,31 +278,48 @@ export default function DocumentsScreen() {
         }),
       });
       
+      console.log('OCR Response status:', response.status);
       const ocrData = await response.json();
+      console.log('OCR Data:', JSON.stringify(ocrData));
+      
+      setIsAnalyzing(false);
       
       if (ocrData.success) {
+        console.log('OCR Success! Setting result and showing modal');
         // Show OCR result modal for user to confirm/edit
-        setOcrResult({
+        const result = {
           uri,
           type,
           date: ocrData.date || '',
           amount: ocrData.amount?.toString() || '',
-          category: ocrData.category || 'invoices',
+          category: (ocrData.category || 'invoices') as DocumentCategory,
           merchant: ocrData.merchant || '',
           confidence: ocrData.confidence || 'low',
-        });
-        setShowOCRResultModal(true);
+        };
+        setOcrResult(result);
+        
+        // Small delay to ensure state is set before showing modal
+        setTimeout(() => {
+          setShowOCRResultModal(true);
+        }, 100);
       } else {
-        // OCR failed, add document without extracted data
+        // OCR failed, show alert and add document without extracted data
         console.log('OCR failed:', ocrData.error);
-        await addDocument(uri, type, 'invoices', name);
+        Alert.alert(
+          'Analyse OCR échouée',
+          'Impossible d\'extraire les données automatiquement. Le document sera ajouté sans analyse.',
+          [{ text: 'OK', onPress: () => addDocument(uri, type, 'invoices', name) }]
+        );
       }
     } catch (error) {
       console.error('OCR error:', error);
-      // Fallback: add document without OCR
-      await addDocument(uri, type, 'invoices', name);
-    } finally {
       setIsAnalyzing(false);
+      // Fallback: add document without OCR
+      Alert.alert(
+        'Erreur réseau',
+        'Impossible de contacter le serveur OCR. Le document sera ajouté sans analyse.',
+        [{ text: 'OK', onPress: () => addDocument(uri, type, 'invoices', name) }]
+      );
     }
   };
   
