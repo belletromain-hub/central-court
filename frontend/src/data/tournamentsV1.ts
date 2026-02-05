@@ -19,14 +19,20 @@ export interface Tournament {
   endDate: string;
 }
 
+// Inscription à un tournoi avec son statut
+export interface TournamentRegistration {
+  tournamentId: string;
+  status: TournamentStatus;
+}
+
 export interface WeekTournaments {
   weekNumber: number;
   weekLabel: string;
   startDate: string;
   endDate: string;
   tournaments: Tournament[];
-  selectedTournamentId: string | null;
-  status: TournamentStatus;
+  // NOUVEAU: Support de plusieurs inscriptions par semaine
+  registrations: TournamentRegistration[];
   hiddenTournamentIds: string[]; // Tournois marqués "pas intéressé" - disparaissent
 }
 
