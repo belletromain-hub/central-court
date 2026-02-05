@@ -134,21 +134,24 @@ export default function CalendarScreenV1() {
   
   // Handle tournament selection
   const handleSelectTournament = (weekNumber: number, tournamentId: string | null) => {
+    let updatedWeek: WeekTournaments | null = null;
+    
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
-        const updated = {
+        updatedWeek = {
           ...week,
           selectedTournamentId: tournamentId,
           status: tournamentId ? 'interested' as TournamentStatus : 'none' as TournamentStatus
         };
-        // Update selectedWeek to show status options
-        if (selectedWeek?.weekNumber === weekNumber) {
-          setSelectedWeek(updated);
-        }
-        return updated;
+        return updatedWeek;
       }
       return week;
     }));
+    
+    // Update selectedWeek to show status options immediately
+    if (updatedWeek) {
+      setSelectedWeek(updatedWeek);
+    }
     
     // If no tournament selected, close modal. Otherwise keep open to show status selection
     if (!tournamentId) {
