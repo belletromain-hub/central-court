@@ -68,7 +68,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
       }
     ],
     selectedTournamentId: null,
-    status: 'none'
+    status: 'none',
+    hiddenTournamentIds: []
   },
   {
     weekNumber: 7,
