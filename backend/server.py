@@ -447,89 +447,194 @@ class OCRResult(BaseModel):
     merchant: Optional[str] = None
     confidence: str = "low"
     error: Optional[str] = None
+    raw_text: Optional[str] = None
 
 class OCRRequest(BaseModel):
     image_base64: str
 
+def extract_amount_from_text(text: str) -> Optional[float]:
+    """Extract the total amount from OCR text using regex patterns"""
+    # Common patterns for totals in receipts (French and English)
+    amount_patterns = [
+        # French patterns
+        r'(?:total|montant|solde|net\s*[àa]\s*payer|somme)\s*[:=]?\s*\$?\s*(\d+[\.,]\d{2})',
+        r'(?:total|montant)\s*[:=]?\s*(\d+[\.,]\d{2})\s*\$',
+        # Currency with $ sign
+        r'(\d+[\.,]\d{2})\s*\$',
+        r'\$\s*(\d+[\.,]\d{2})',
+        # Amount patterns at end of line (common for totals)
+        r'(?:total|ttc|tva\s*incluse|net).*?(\d+[\.,]\d{2})',
+        # Generic large amounts (likely totals)
+        r'(\d{2,}[\.,]\d{2})',
+    ]
+    
+    amounts = []
+    for pattern in amount_patterns:
+        matches = re.findall(pattern, text.lower(), re.IGNORECASE | re.MULTILINE)
+        for match in matches:
+            try:
+                # Convert comma to dot for float parsing
+                amount = float(match.replace(',', '.'))
+                if 0.01 <= amount <= 100000:  # Reasonable receipt amount range
+                    amounts.append(amount)
+            except ValueError:
+                continue
+    
+    # Return the largest amount found (likely the total)
+    if amounts:
+        return max(amounts)
+    return None
+
+def extract_date_from_text(text: str) -> Optional[str]:
+    """Extract date from OCR text"""
+    # Various date patterns
+    date_patterns = [
+        # DD/MM/YYYY or DD-MM-YYYY
+        r'(\d{1,2})[/\-](\d{1,2})[/\-](20\d{2})',
+        # YYYY-MM-DD
+        r'(20\d{2})[/\-](\d{1,2})[/\-](\d{1,2})',
+        # Month names in French
+        r'(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(20\d{2})',
+        # Abbreviated months
+        r'(\d{1,2})\s+(jan|fev|fév|mar|avr|mai|jun|jui|juil|aou|aoû|sep|oct|nov|dec|déc)\.?\s+(20\d{2})',
+    ]
+    
+    month_map = {
+        'janvier': '01', 'février': '02', 'mars': '03', 'avril': '04',
+        'mai': '05', 'juin': '06', 'juillet': '07', 'août': '08',
+        'septembre': '09', 'octobre': '10', 'novembre': '11', 'décembre': '12',
+        'jan': '01', 'fev': '02', 'fév': '02', 'mar': '03', 'avr': '04',
+        'jun': '06', 'jui': '07', 'juil': '07', 'aou': '08', 'aoû': '08',
+        'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12', 'déc': '12'
+    }
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, text.lower())
+        if match:
+            groups = match.groups()
+            if len(groups) == 3:
+                if groups[0].isdigit() and len(groups[0]) == 4:  # YYYY-MM-DD
+                    return f"{groups[2].zfill(2)}/{groups[1].zfill(2)}/{groups[0]}"
+                elif groups[1] in month_map:  # DD Month YYYY
+                    return f"{groups[0].zfill(2)}/{month_map[groups[1]]}/{groups[2]}"
+                else:  # DD/MM/YYYY
+                    day = groups[0].zfill(2)
+                    month = groups[1].zfill(2)
+                    year = groups[2]
+                    if int(month) <= 12:
+                        return f"{day}/{month}/{year}"
+    
+    return None
+
+def extract_merchant_from_text(text: str) -> Optional[str]:
+    """Extract merchant name from first lines of OCR text"""
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    
+    # Usually merchant name is in the first few lines
+    for line in lines[:5]:
+        # Skip lines that are just numbers, dates, or common header text
+        if re.match(r'^[\d\s\-/\.]+$', line):
+            continue
+        if any(skip in line.lower() for skip in ['facture', 'reçu', 'ticket', 'date', 'heure', 'www.', 'http']):
+            continue
+        if len(line) >= 3 and len(line) <= 50:
+            return line.title()
+    
+    return None
+
+def categorize_receipt(text: str, merchant: Optional[str]) -> str:
+    """Categorize the receipt based on text content"""
+    text_lower = text.lower()
+    merchant_lower = (merchant or '').lower()
+    
+    # Travel keywords
+    travel_keywords = ['avion', 'flight', 'airline', 'train', 'sncf', 'hotel', 'hôtel', 
+                      'taxi', 'uber', 'lyft', 'péage', 'carburant', 'essence', 'parking',
+                      'aeroport', 'aéroport', 'airport', 'baggage', 'voyage', 'air france',
+                      'booking', 'expedia', 'airbnb']
+    
+    # Medical keywords
+    medical_keywords = ['pharmacie', 'pharmacy', 'médecin', 'doctor', 'clinique', 'clinic',
+                       'hôpital', 'hospital', 'kiné', 'physio', 'dentiste', 'dentist',
+                       'ordonnance', 'prescription', 'laboratoire', 'analyse', 'santé']
+    
+    # Check for travel
+    if any(kw in text_lower or kw in merchant_lower for kw in travel_keywords):
+        return 'travel'
+    
+    # Check for medical
+    if any(kw in text_lower or kw in merchant_lower for kw in medical_keywords):
+        return 'medical'
+    
+    # Default to invoices (general expenses)
+    return 'invoices'
+
 @app.post("/api/ocr/analyze-receipt", response_model=OCRResult)
 async def analyze_receipt(request: OCRRequest):
-    """Analyze a receipt image using GPT-4o Vision to extract date, amount, and category"""
+    """Analyze a receipt image using Tesseract OCR to extract date, amount, and category"""
     try:
-        emergent_key = os.getenv("EMERGENT_LLM_KEY", "")
-        
-        if not emergent_key:
-            return OCRResult(
-                success=False,
-                error="EMERGENT_LLM_KEY not configured"
-            )
-        
-        # Initialize LlmChat with GPT-4o for vision
-        chat = LlmChat(
-            api_key=emergent_key,
-            session_id=f"ocr_{uuid.uuid4().hex[:8]}",
-            system_message="""Tu es un assistant expert en analyse de reçus et factures. 
-Ton travail est d'extraire les informations clés des images de reçus.
-Réponds UNIQUEMENT en JSON valide, sans texte avant ou après."""
-        ).with_model("openai", "gpt-4o")
-        
-        # Create image content
-        image_content = ImageContent(
-            image_base64=request.image_base64
-        )
-        
-        # Create message with image
-        user_message = UserMessage(
-            text="""Analyse cette image de reçu/facture et extrait les informations suivantes.
-            
-Réponds UNIQUEMENT avec ce JSON (pas de texte avant ou après):
-{
-    "date": "DD/MM/YYYY ou null si non trouvé",
-    "amount": nombre décimal ou null si non trouvé,
-    "merchant": "nom du commerce/prestataire ou null",
-    "category": "travel" ou "invoices" ou "medical" ou "other",
-    "confidence": "high" ou "medium" ou "low"
-}
-
-Règles pour la catégorie:
-- "travel": billets d'avion, train, hôtel, taxi, Uber, péage, carburant
-- "medical": pharmacie, médecin, kiné, hôpital, analyses
-- "invoices": restaurant, équipement sportif, abonnements, services
-- "other": tout le reste
-
-Si l'image n'est pas un reçu ou facture lisible, retourne: {"date": null, "amount": null, "merchant": null, "category": "other", "confidence": "low"}""",
-            file_contents=[image_content]
-        )
-        
-        # Send to GPT-4o Vision
-        response = await chat.send_message(user_message)
-        
-        # Parse JSON response
+        # Decode base64 image
         try:
-            # Clean response - remove markdown code blocks if present
-            clean_response = response.strip()
-            if clean_response.startswith("```"):
-                clean_response = re.sub(r'^```(?:json)?\n?', '', clean_response)
-                clean_response = re.sub(r'\n?```$', '', clean_response)
-            
-            data = json.loads(clean_response)
-            
-            return OCRResult(
-                success=True,
-                date=data.get("date"),
-                amount=data.get("amount"),
-                category=data.get("category", "other"),
-                merchant=data.get("merchant"),
-                confidence=data.get("confidence", "medium")
-            )
-        except json.JSONDecodeError as e:
-            print(f"JSON parse error: {e}, response: {response}")
+            image_data = base64.b64decode(request.image_base64)
+            image = Image.open(io.BytesIO(image_data))
+        except Exception as e:
             return OCRResult(
                 success=False,
-                error=f"Failed to parse AI response: {str(e)}"
+                error=f"Failed to decode image: {str(e)}"
             )
+        
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Preprocess image for better OCR
+        # Resize if too large
+        max_size = 2000
+        if max(image.size) > max_size:
+            ratio = max_size / max(image.size)
+            new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+            image = image.resize(new_size, Image.Resampling.LANCZOS)
+        
+        # Run Tesseract OCR with French language
+        try:
+            ocr_text = pytesseract.image_to_string(image, lang='fra+eng')
+        except Exception as e:
+            # Fallback to English only
+            ocr_text = pytesseract.image_to_string(image, lang='eng')
+        
+        if not ocr_text or len(ocr_text.strip()) < 10:
+            return OCRResult(
+                success=False,
+                error="No text could be extracted from the image",
+                raw_text=ocr_text
+            )
+        
+        print(f"OCR Raw Text:\n{ocr_text[:500]}...")  # Log for debugging
+        
+        # Extract information
+        amount = extract_amount_from_text(ocr_text)
+        date = extract_date_from_text(ocr_text)
+        merchant = extract_merchant_from_text(ocr_text)
+        category = categorize_receipt(ocr_text, merchant)
+        
+        # Calculate confidence based on what was found
+        found_count = sum([amount is not None, date is not None, merchant is not None])
+        confidence = 'high' if found_count >= 2 else ('medium' if found_count == 1 else 'low')
+        
+        return OCRResult(
+            success=True,
+            date=date,
+            amount=amount,
+            category=category,
+            merchant=merchant,
+            confidence=confidence,
+            raw_text=ocr_text[:500] if ocr_text else None  # Include truncated raw text for debugging
+        )
             
     except Exception as e:
         print(f"OCR error: {e}")
+        import traceback
+        traceback.print_exc()
         return OCRResult(
             success=False,
             error=str(e)
