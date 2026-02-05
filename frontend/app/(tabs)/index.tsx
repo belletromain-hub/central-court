@@ -162,7 +162,7 @@ export default function CalendarScreenV1() {
   };
   
   // Available status options for UI
-  const STATUS_OPTIONS: TournamentStatus[] = ['interested', 'pending', 'registered', 'accepted', 'declined'];
+  const STATUS_OPTIONS: TournamentStatus[] = ['interested', 'pending', 'registered', 'accepted', 'participating', 'declined'];
   
   // Handle add event
   const handleAddEvent = () => {
