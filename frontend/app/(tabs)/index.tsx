@@ -474,8 +474,19 @@ export default function CalendarScreenV1() {
         style={[styles.header, { paddingTop: insets.top + 12 }]}
       >
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>🎾 Tennis Assistant</Text>
-          <Text style={styles.headerSubtitle}>Calendrier {currentMonth.split('-')[1] === '02' ? 'Février' : ''} 2026</Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>🎾 Tennis Assistant</Text>
+            <Text style={styles.headerSubtitle}>Calendrier {currentMonth.split('-')[1] === '02' ? 'Février' : ''} 2026</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.notificationBtn}
+            onPress={() => router.push('/notifications')}
+          >
+            <Ionicons name="notifications" size={24} color="#fff" />
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>3</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
       
