@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Request, Response
+from fastapi import FastAPI, HTTPException, Depends, Request, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -9,6 +9,10 @@ import os
 import uuid
 import httpx
 import secrets
+import base64
+import json
+import re
+from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 load_dotenv()
 
