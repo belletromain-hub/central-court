@@ -1586,4 +1586,46 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#f44336',
   },
+  // Tournament option container
+  tournamentOptionContainer: {
+    marginBottom: 0,
+  },
+  // Tournament actions
+  tournamentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  // Hide tournament button
+  hideTournamentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f5',
+  },
+  hideTournamentText: {
+    fontSize: 11,
+    color: '#9e9e9e',
+    fontWeight: '500',
+  },
+  // No tournaments message
+  noTournamentsMessage: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  noTournamentsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginTop: 12,
+  },
+  noTournamentsHint: {
+    fontSize: 13,
+    color: Colors.text.muted,
+    marginTop: 4,
+  },
 });
