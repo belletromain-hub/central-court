@@ -521,6 +521,42 @@ export default function CalendarScreenV1() {
                   ))}
                 </ScrollView>
                 
+                {/* Status Selection - Only if tournament is selected */}
+                {selectedWeek.selectedTournamentId && (
+                  <View style={styles.statusSection}>
+                    <Text style={styles.statusSectionTitle}>Statut du tournoi</Text>
+                    <View style={styles.statusGrid}>
+                      {STATUS_OPTIONS.map(status => {
+                        const statusInfo = TOURNAMENT_STATUS_LABELS[status];
+                        const isSelected = selectedWeek.status === status;
+                        return (
+                          <TouchableOpacity
+                            key={status}
+                            style={[
+                              styles.statusOption,
+                              isSelected && { backgroundColor: statusInfo.color, borderColor: statusInfo.color }
+                            ]}
+                            onPress={() => handleStatusChange(selectedWeek.weekNumber, status)}
+                          >
+                            <Text style={[
+                              styles.statusOptionEmoji,
+                              isSelected && { color: '#fff' }
+                            ]}>
+                              {statusInfo.emoji}
+                            </Text>
+                            <Text style={[
+                              styles.statusOptionText,
+                              isSelected && { color: '#fff' }
+                            ]}>
+                              {statusInfo.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+                
                 <TouchableOpacity
                   style={styles.noTournamentBtn}
                   onPress={() => handleSelectTournament(selectedWeek.weekNumber, null)}
