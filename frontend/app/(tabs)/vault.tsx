@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,9 @@ import {
   Pressable,
   Modal,
   Alert,
-  Platform,
+  TextInput,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ interface Document {
   size: string;
   date: string;
   amount?: number;
+  uri?: string;
 }
 
 // Categories
@@ -51,7 +53,13 @@ export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<Document[]>(SAMPLE_DOCUMENTS);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const [editDate, setEditDate] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editCategory, setEditCategory] = useState<string>('other');
 
   // Filter documents
   const filteredDocs = selectedCategory 
@@ -74,7 +82,7 @@ export default function DocumentsScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      addDocument(result.assets[0].uri, 'image');
+      await processDocument(result.assets[0].uri, 'image', `Photo_${Date.now()}.jpg`);
     }
   };
 
@@ -89,33 +97,80 @@ export default function DocumentsScreen() {
       if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
         const type = file.mimeType?.includes('pdf') ? 'pdf' : 'image';
-        addDocument(file.uri, type, file.name);
+        await processDocument(file.uri, type, file.name || `Document_${Date.now()}`);
       }
     } catch (error) {
       console.error('Error:', error);
     }
   };
 
-  // Add document
-  const addDocument = async (uri: string, type: 'pdf' | 'image', name?: string) => {
+  // Process document with simulated OCR
+  const processDocument = async (uri: string, type: 'pdf' | 'image', name: string) => {
     setIsUploading(true);
     setShowUploadModal(false);
 
-    // Simulate upload
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simulate OCR processing
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Simulate automatic amount detection (random for demo)
+    const detectedAmount = Math.floor(Math.random() * 300) + 20;
+    const today = new Date().toLocaleDateString('fr-FR');
 
     const newDoc: Document = {
       id: `doc-${Date.now()}`,
-      name: name || `Document_${Date.now()}.${type === 'pdf' ? 'pdf' : 'jpg'}`,
+      name,
       category: 'other',
       type,
-      size: '-- KB',
-      date: new Date().toLocaleDateString('fr-FR'),
+      size: `${Math.floor(Math.random() * 2000) + 100} KB`,
+      date: today,
+      amount: detectedAmount,
+      uri,
     };
 
     setDocuments(prev => [newDoc, ...prev]);
     setIsUploading(false);
-    Alert.alert('✅ Document ajouté', newDoc.name);
+    
+    // Open edit modal to confirm/modify details
+    setSelectedDoc(newDoc);
+    setEditDate(today);
+    setEditAmount(detectedAmount.toString());
+    setEditCategory('other');
+    setShowEditModal(true);
+  };
+
+  // View document
+  const handleViewDoc = (doc: Document) => {
+    setSelectedDoc(doc);
+    setShowViewModal(true);
+  };
+
+  // Open edit modal
+  const handleEditDoc = (doc: Document) => {
+    setSelectedDoc(doc);
+    setEditDate(doc.date);
+    setEditAmount(doc.amount?.toString() || '');
+    setEditCategory(doc.category);
+    setShowEditModal(true);
+  };
+
+  // Save edited document
+  const handleSaveEdit = () => {
+    if (!selectedDoc) return;
+
+    setDocuments(prev => prev.map(d => {
+      if (d.id === selectedDoc.id) {
+        return {
+          ...d,
+          date: editDate,
+          amount: parseFloat(editAmount) || 0,
+          category: editCategory as Document['category'],
+        };
+      }
+      return d;
+    }));
+
+    setShowEditModal(false);
+    setSelectedDoc(null);
   };
 
   // Delete document
@@ -168,7 +223,7 @@ export default function DocumentsScreen() {
       {/* Total */}
       <View style={styles.totalBar}>
         <Text style={styles.totalLabel}>Total</Text>
-        <Text style={styles.totalAmount}>{total} €</Text>
+        <Text style={styles.totalAmount}>{total.toFixed(2)} €</Text>
       </View>
 
       {/* Documents List */}
@@ -185,6 +240,7 @@ export default function DocumentsScreen() {
               <TouchableOpacity
                 key={doc.id}
                 style={styles.docCard}
+                onPress={() => handleViewDoc(doc)}
                 onLongPress={() => handleDelete(doc)}
               >
                 <View style={[styles.docIcon, { backgroundColor: cat.color + '15' }]}>
@@ -198,9 +254,20 @@ export default function DocumentsScreen() {
                   <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
                   <Text style={styles.docMeta}>{doc.date} • {doc.size}</Text>
                 </View>
-                {doc.amount && (
-                  <Text style={styles.docAmount}>{doc.amount} €</Text>
-                )}
+                <View style={styles.docRight}>
+                  {doc.amount !== undefined && (
+                    <Text style={styles.docAmount}>{doc.amount.toFixed(2)} €</Text>
+                  )}
+                  <TouchableOpacity 
+                    style={styles.editBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleEditDoc(doc);
+                    }}
+                  >
+                    <Ionicons name="pencil" size={16} color={Colors.text.secondary} />
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
             );
           })
@@ -236,7 +303,7 @@ export default function DocumentsScreen() {
               </View>
               <View>
                 <Text style={styles.uploadLabel}>Prendre une photo</Text>
-                <Text style={styles.uploadDesc}>Photographiez votre reçu</Text>
+                <Text style={styles.uploadDesc}>Le montant sera détecté automatiquement</Text>
               </View>
             </TouchableOpacity>
 
@@ -246,9 +313,179 @@ export default function DocumentsScreen() {
               </View>
               <View>
                 <Text style={styles.uploadLabel}>Sélectionner un fichier</Text>
-                <Text style={styles.uploadDesc}>PDF ou image</Text>
+                <Text style={styles.uploadDesc}>PDF ou image depuis vos fichiers</Text>
               </View>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* View Document Modal */}
+      <Modal visible={showViewModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle} numberOfLines={1}>{selectedDoc?.name}</Text>
+              <TouchableOpacity onPress={() => setShowViewModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedDoc && (
+              <View style={styles.viewContent}>
+                {/* Document Preview */}
+                <View style={styles.previewContainer}>
+                  {selectedDoc.uri ? (
+                    selectedDoc.type === 'image' ? (
+                      <Image 
+                        source={{ uri: selectedDoc.uri }} 
+                        style={styles.previewImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <View style={styles.pdfPreview}>
+                        <Ionicons name="document-text" size={64} color="#f57c00" />
+                        <Text style={styles.pdfText}>Document PDF</Text>
+                      </View>
+                    )
+                  ) : (
+                    <View style={styles.pdfPreview}>
+                      <Ionicons name={selectedDoc.type === 'pdf' ? 'document-text' : 'image'} size={64} color="#f57c00" />
+                      <Text style={styles.pdfText}>Aperçu non disponible</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Document Details */}
+                <View style={styles.detailsContainer}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Catégorie</Text>
+                    <View style={[styles.categoryBadge, { backgroundColor: CATEGORIES[selectedDoc.category].color + '20' }]}>
+                      <Text style={[styles.categoryText, { color: CATEGORIES[selectedDoc.category].color }]}>
+                        {CATEGORIES[selectedDoc.category].label}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Date</Text>
+                    <Text style={styles.detailValue}>{selectedDoc.date}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Montant</Text>
+                    <Text style={[styles.detailValue, styles.amountValue]}>
+                      {selectedDoc.amount?.toFixed(2)} €
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Taille</Text>
+                    <Text style={styles.detailValue}>{selectedDoc.size}</Text>
+                  </View>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={styles.actionRow}>
+                  <TouchableOpacity 
+                    style={styles.actionBtn}
+                    onPress={() => {
+                      setShowViewModal(false);
+                      handleEditDoc(selectedDoc);
+                    }}
+                  >
+                    <Ionicons name="pencil" size={20} color="#fff" />
+                    <Text style={styles.actionBtnText}>Modifier</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, styles.deleteBtn]}
+                    onPress={() => {
+                      setShowViewModal(false);
+                      handleDelete(selectedDoc);
+                    }}
+                  >
+                    <Ionicons name="trash" size={20} color="#fff" />
+                    <Text style={styles.actionBtnText}>Supprimer</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Document Modal */}
+      <Modal visible={showEditModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Modifier le document</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedDoc && (
+              <View style={styles.editForm}>
+                {/* Category Picker */}
+                <Text style={styles.inputLabel}>Catégorie</Text>
+                <View style={styles.categoryPicker}>
+                  {Object.entries(CATEGORIES).map(([key, cat]) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.categoryOption,
+                        editCategory === key && { backgroundColor: cat.color + '20', borderColor: cat.color }
+                      ]}
+                      onPress={() => setEditCategory(key)}
+                    >
+                      <Ionicons 
+                        name={cat.icon as any} 
+                        size={18} 
+                        color={editCategory === key ? cat.color : Colors.text.secondary} 
+                      />
+                      <Text style={[
+                        styles.categoryOptionText,
+                        editCategory === key && { color: cat.color }
+                      ]}>
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Date Input */}
+                <Text style={styles.inputLabel}>Date</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editDate}
+                  onChangeText={setEditDate}
+                  placeholder="JJ/MM/AAAA"
+                  placeholderTextColor={Colors.text.muted}
+                />
+
+                {/* Amount Input */}
+                <Text style={styles.inputLabel}>Montant (€)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editAmount}
+                  onChangeText={setEditAmount}
+                  placeholder="0.00"
+                  placeholderTextColor={Colors.text.muted}
+                  keyboardType="decimal-pad"
+                />
+
+                {/* Info */}
+                <View style={styles.infoBox}>
+                  <Ionicons name="information-circle" size={18} color="#2196F3" />
+                  <Text style={styles.infoText}>
+                    Le montant a été détecté automatiquement. Vous pouvez le modifier si nécessaire.
+                  </Text>
+                </View>
+
+                {/* Save Button */}
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}>
+                  <Text style={styles.saveBtnText}>Enregistrer</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -257,7 +494,8 @@ export default function DocumentsScreen() {
       {isUploading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.loadingText}>Upload...</Text>
+          <Text style={styles.loadingText}>Analyse du document...</Text>
+          <Text style={styles.loadingSubtext}>Détection du montant en cours</Text>
         </View>
       )}
     </View>
@@ -378,10 +616,17 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: 2,
   },
+  docRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
   docAmount: {
     fontSize: 15,
     fontWeight: '600',
     color: '#4CAF50',
+  },
+  editBtn: {
+    padding: 4,
   },
   fab: {
     position: 'absolute',
@@ -421,6 +666,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: Colors.text.primary,
+    flex: 1,
   },
   uploadOption: {
     flexDirection: 'row',
@@ -448,6 +694,151 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: 2,
   },
+  // View Modal
+  viewContent: {
+    gap: 16,
+  },
+  previewContainer: {
+    height: 200,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  pdfPreview: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdfText: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginTop: 8,
+  },
+  detailsContainer: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.text.primary,
+  },
+  amountValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4CAF50',
+  },
+  categoryBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  categoryText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  actionBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  deleteBtn: {
+    backgroundColor: '#f44336',
+  },
+  // Edit Modal
+  editForm: {
+    gap: 12,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginBottom: 4,
+  },
+  input: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    color: Colors.text.primary,
+  },
+  categoryPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  categoryOptionText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#E3F2FD',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1565C0',
+    lineHeight: 18,
+  },
+  saveBtn: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -457,6 +848,12 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#fff',
     fontSize: 16,
-    marginTop: 12,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  loadingSubtext: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    marginTop: 4,
   },
 });
