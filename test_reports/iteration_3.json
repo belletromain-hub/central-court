@@ -1,0 +1,65 @@
+{
+  "summary": "Completed comprehensive backend API testing for Le Court Central Admin Dashboard. All 25 tests passed (100% success rate). Tested admin authentication, metrics dashboard, user management (list/filter/search/pagination), user detail with staff, status management (suspend/reactivate), password reset for users and staff, user soft delete, and activity logs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_endpoints.py",
+    "/app/test_reports/pytest/pytest_admin_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "All admin API routes properly exclude MongoDB _id from responses",
+    "JWT authentication is correctly implemented with 24-hour token expiry",
+    "Password reset endpoints return success even if email fails (test mode) - this is expected behavior",
+    "Soft delete correctly marks user as 'deleted' and staff as 'removed'",
+    "Activity logs are correctly sorted by timestamp descending",
+    "User search correctly searches across prenom, nom, and email fields"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_endpoints.py"
+  ],
+  "success_rate": {
+    "backend": "100% (25/25 tests passed)",
+    "frontend": "Not tested (backend only requested)"
+  },
+  "test_credentials": "Admin: admin@lecourtcentral.com / admin123",
+  "seed_data_creation": "Used existing seed data: 10 app_users (now 9 after user-008 deletion), 14 staff_members, 30+ activity_logs, 1 admin_user",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 18 specified admin API features tested and working. User-008 (Nicolas Petit) was soft-deleted during testing. User-003 was suspended then reactivated. Password reset endpoints work but email delivery depends on Resend test mode. Frontend admin dashboard not tested as per request.",
+  "endpoints_tested": {
+    "POST /api/admin/login (correct credentials)": "PASS - Returns JWT token and user object",
+    "POST /api/admin/login (wrong password)": "PASS - Returns 401 Unauthorized",
+    "GET /api/admin/metrics": "PASS - Returns users (total/active/byCircuit), activation rates, engagement stats",
+    "GET /api/admin/users": "PASS - Returns paginated users list with total count",
+    "GET /api/admin/users?circuit=ATP": "PASS - Filters by ATP circuit (3 users)",
+    "GET /api/admin/users?circuit=WTA": "PASS - Filters by WTA circuit (3 users)",
+    "GET /api/admin/users?search=Thomas": "PASS - Searches by name (1 user found)",
+    "GET /api/admin/users?search=tennis.fr": "PASS - Searches by email (4 users found)",
+    "GET /api/admin/users?status=suspended": "PASS - Filters by status",
+    "GET /api/admin/users?page=1&limit=3": "PASS - Pagination works correctly",
+    "GET /api/admin/users/user-001": "PASS - Returns user detail with 3 staff and 30-day activityChart",
+    "GET /api/admin/users/user-005": "PASS - Returns Lucas with 4 staff members",
+    "PUT /api/admin/users/user-003/status (suspended)": "PASS - Suspends user correctly",
+    "PUT /api/admin/users/user-003/status (active)": "PASS - Reactivates user correctly",
+    "POST /api/admin/users/user-001/reset-password": "PASS - Returns success message",
+    "DELETE /api/admin/users/user-008": "PASS - Soft deletes user and returns deletedStaffCount",
+    "GET /api/admin/activity/recent": "PASS - Returns activity logs sorted by timestamp desc",
+    "POST /api/admin/staff/sm-001/reset-password": "PASS - Resets staff password"
+  },
+  "data_state_after_tests": {
+    "total_users": 9,
+    "deleted_users": "user-008 (Nicolas Petit)",
+    "active_users": 9,
+    "suspended_users": 0,
+    "total_staff": 14
+  },
+  "mocked_apis_note": "Resend email is in test mode - password reset endpoints return success but email delivery may fail for non-owner emails"
+}
