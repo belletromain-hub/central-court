@@ -192,88 +192,51 @@ export default function CalendarScreenV1() {
   }, [events, selectedDate, tournamentMarks]);
   
   // Handle tournament registration (add or update)
-  const handleRegisterTournament = (weekNumber: number, tournamentId: string, status: TournamentStatus) => {
-    // Find the tournament name for potential travel prompt
+  const handleRegisterTournament = async (weekNumber: number, tournamentId: string, status: TournamentStatus) => {
     let tournamentName = '';
-    
-    setWeekTournaments(prev => prev.map(week => {
-      if (week.weekNumber === weekNumber) {
-        let newRegistrations = [...week.registrations];
-        let newHiddenIds = [...(week.hiddenTournamentIds || [])];
-        
-        // Get tournament name
-        const tournament = week.tournaments.find(t => t.id === tournamentId);
-        if (tournament) tournamentName = tournament.name;
-        
-        // Si "Participe" est sélectionné, masquer tous les autres tournois
-        if (status === 'participating') {
-          // Garder seulement l'inscription pour ce tournoi
-          newRegistrations = [{ tournamentId, status }];
-          
-          // Masquer tous les autres tournois de la semaine
-          week.tournaments.forEach(t => {
-            if (t.id !== tournamentId && !newHiddenIds.includes(t.id)) {
-              newHiddenIds.push(t.id);
-            }
-          });
-        } else {
-          // Comportement normal pour les autres statuts
-          const existingRegIndex = newRegistrations.findIndex(r => r.tournamentId === tournamentId);
-          
-          if (existingRegIndex >= 0) {
-            // Update existing registration
-            newRegistrations[existingRegIndex] = { tournamentId, status };
-          } else {
-            // Add new registration
-            newRegistrations.push({ tournamentId, status });
-          }
-        }
-        
-        const updatedWeek = { ...week, registrations: newRegistrations, hiddenTournamentIds: newHiddenIds };
-        // Update selectedWeek immediately
-        setSelectedWeek(updatedWeek);
-        return updatedWeek;
+    const week = weekTournaments.find((w: any) => w.weekNumber === weekNumber);
+    if (week) {
+      const t = week.tournaments.find((t: any) => t.id === tournamentId);
+      if (t) tournamentName = t.name;
+    }
+    try {
+      await apiRegisterTournament(tournamentId, status);
+      const weeksData = await fetchTournamentWeeks('atp');
+      setWeekTournaments(weeksData);
+      const updatedWeek = weeksData.find((w: any) => w.weekNumber === weekNumber);
+      if (updatedWeek) setSelectedWeek(updatedWeek);
+      if ((status === 'participating' || status === 'accepted') && tournamentName) {
+        checkTravelPreferences(tournamentName);
       }
-      return week;
-    }));
-    
-    // Trigger progressive onboarding for travel when registering as participating/accepted
-    if ((status === 'participating' || status === 'accepted') && tournamentName) {
-      checkTravelPreferences(tournamentName);
+    } catch (e) {
+      console.error('Registration failed:', e);
     }
   };
   
   // Handle removing registration (pas intéressé - hide tournament)
-  const handleRemoveRegistration = (weekNumber: number, tournamentId: string) => {
-    setWeekTournaments(prev => prev.map(week => {
-      if (week.weekNumber === weekNumber) {
-        // Remove from registrations
-        const newRegistrations = week.registrations.filter(r => r.tournamentId !== tournamentId);
-        // Add to hidden
-        const newHiddenIds = [...(week.hiddenTournamentIds || []), tournamentId];
-        
-        const updatedWeek = { ...week, registrations: newRegistrations, hiddenTournamentIds: newHiddenIds };
-        setSelectedWeek(updatedWeek);
-        return updatedWeek;
-      }
-      return week;
-    }));
+  const handleRemoveRegistration = async (weekNumber: number, tournamentId: string) => {
+    try {
+      await apiHideTournament(tournamentId);
+      const weeksData = await fetchTournamentWeeks('atp');
+      setWeekTournaments(weeksData);
+      const updatedWeek = weeksData.find((w: any) => w.weekNumber === weekNumber);
+      if (updatedWeek) setSelectedWeek(updatedWeek);
+    } catch (e) {
+      console.error('Hide failed:', e);
+    }
   };
   
   // Handle hiding a tournament without registering (from the list)
-  const handleHideTournament = (weekNumber: number, tournamentId: string) => {
-    setWeekTournaments(prev => prev.map(week => {
-      if (week.weekNumber === weekNumber) {
-        const newHiddenIds = [...(week.hiddenTournamentIds || []), tournamentId];
-        // Also remove from registrations if present
-        const newRegistrations = week.registrations.filter(r => r.tournamentId !== tournamentId);
-        
-        const updatedWeek = { ...week, hiddenTournamentIds: newHiddenIds, registrations: newRegistrations };
-        setSelectedWeek(updatedWeek);
-        return updatedWeek;
-      }
-      return week;
-    }));
+  const handleHideTournament = async (weekNumber: number, tournamentId: string) => {
+    try {
+      await apiHideTournament(tournamentId);
+      const weeksData = await fetchTournamentWeeks('atp');
+      setWeekTournaments(weeksData);
+      const updatedWeek = weeksData.find((w: any) => w.weekNumber === weekNumber);
+      if (updatedWeek) setSelectedWeek(updatedWeek);
+    } catch (e) {
+      console.error('Hide failed:', e);
+    }
   };
   
   // Get registration for a specific tournament
