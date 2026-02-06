@@ -1,157 +1,145 @@
 <analysis>
 
-**original_problem_statement**: The user initially requested a series of enhancements to a feature-rich tennis player management app. However, the project underwent a major pivot to a simplified V1 MVP, as detailed in a new product requirements document.
+**original_problem_statement**: The user wants to add a full user registration flow and a progressive onboarding system to the Tennis Management App.
 
-**PRODUCT REQUIREMENTS (V1 MVP)**:
-The goal is to create an ultra-simplified, calendar-centric mobile app.
+**Initial Requests (from previous forks):**
+*   **Alerts & Notifications System**: Create alerts for upcoming tournaments for missing flight/hotel bookings. Deliver via in-app, push, and email.
+*   **Staff Observations & Collaboration**: Allow staff to write observations on events and notify relevant people. Implement a slot suggestion feature.
+*   **Smart Booking**: Clicking on a travel-related notification should open a pre-filled search on Booking.com or Skyscanner.
 
-1.  **Simplified Navigation**: A three-tab layout: **Calendrier** (Calendar), **Documents**, and **Profil** (Profile).
-2.  **Calendar (Core Feature)**:
-    *   **Month View Only**: With color-coded dots for events.
-    *   **Tournament Management**: A weekly list of available tournaments (ATP/WTA/ITF based on player profile). The player can select a tournament for the week, which then updates its status (e.g., Interested).
-    *   **Event Types**: Specific, color-coded event categories (Tournament, Training, Medical, Media, Sponsor, Personal).
-    *   **Observations**: A simple text field on each event to replace the chat system, allowing staff to add notes.
-3.  **Documents (Simplified for Expense Tracking)**:
-    *   **Receipt Upload**: Upload receipts via photo or file selection.
-    *   **Automatic Classification**: Documents are automatically categorized by the month of upload.
-    *   **Expense Categories**: Travel, Invoices, Medical, etc.
-    *   **Monthly Export**: Functionality to export all documents for a given month as a ZIP file or send them via email.
-4.  **Geolocation (Simplified as Travel Days)**:
-    *   Manual tracking of days spent in different countries. No automatic GPS tracking in V1.
-5.  **Profiles & Permissions**:
-    *   **Player Onboarding**: A multi-step flow to capture personal info and tennis circuit (ATP/WTA/ITF), which determines the tournament data shown.
-    *   **Staff Roles**: Predefined roles (Coach, Physio, Agent, etc.) with specific, granular permissions.
-    *   **Invitations**: The player can invite staff members by email, assigning them a role.
-6.  **Financial Dashboard (Simplified)**:
-    *   A read-only monthly summary of expenses, calculated automatically from uploaded receipts.
+**New Feature Requests (from this session):**
+1.  **7-Step Registration Flow**: A detailed, 7-screen onboarding process for new users with auto-progression, real-time validation, and a specific Notion-like design system. The flow includes steps for name, DOB, circuits (ATP/WTA), tournament levels, ranking, email, and password.
+2.  **Progressive Onboarding**: A non-intrusive, 3-module onboarding system to gather user preferences post-registration.
+    *   **Module 1 (Voyages)**: Asks for flight class and preferred airlines.
+    *   **Module 2 (Hébergement)**: Asks for preferred hotel amenities.
+    *   **Module 3 (Alimentation)**: Asks for preferred cuisines and dietary restrictions.
+3.  **App Renaming**: Rename the application to Le Court Central.
+4.  **Contextual Trigger**: The new progressive onboarding flow should be triggered when a user registers for a tournament that requires travel.
 
 **User's preferred language**: French
 
 **what currently exists?**
-The application has been successfully refactored to meet the V1 MVP specifications. It is a frontend-heavy application using static data stored in  files.
-
--   **Navigation**: A 3-tab navigator is in place for Calendar, Documents, and Profile.
--   **Calendar ()**: Fully functional month view using . It displays weekly tournament selection modals, allows users to select a tournament, and shows a list of events with observations for any selected day.
--   **Documents ()**: A complete expense tracking module. It displays documents grouped by category, calculates the total monthly expense, and provides modals for uploading new documents (via camera or file picker), viewing a financial breakdown, and exporting monthly receipts.
--   **Profile ()**: A V1 profile screen showing user info, a Travel Days counter, and a staff management section with a functional Invite modal that includes the new V1 roles.
--   **Onboarding ()**: A multi-step onboarding screen for new players exists.
--   **Data**: All data (tournaments, events, documents, staff) is static and hardcoded in . The backend () exists but is not currently used for the V1 features.
+The application has significantly evolved. All core features are UI-complete but rely on static data.
+- **Notifications & Alerts**: A fully-functional in-app notification screen at  displays alerts for missing bookings, staff observations, and slot suggestions. It features a minimalist, Notion-inspired UI.
+- **Smart Booking**: Clicking flight/hotel alerts opens a custom modal with pre-filled travel details and buttons to launch an external search on Skyscanner or Booking.com.
+- **Event & Slot Management**: The UI for managing calendar events and slot suggestions is complete. Users can accept, refuse (with a note), or make a counter-proposal for slot suggestions. They can also open modals to edit an existing event or suggest a modification.
+- **User Registration (Onboarding)**: A comprehensive 7-step registration flow has been implemented in the  directory. It features auto-advancing screens, a progress bar, real-time validation, and saves data to . The app has been renamed to Le Court Central on the welcome screen.
+- **Progressive Onboarding (Preferences)**: Three separate modules for gathering user preferences (travel, hotel, food) have been created under . They feature a rich UI with multi-select cards, search functionality, and follow the specified design system.
 
 **Last working item**:
--   Last item agent was working: The agent started implementing a new set of user requests to enhance the V1 MVP. The very last action was overwriting the  file with the intention of creating a **profile editing screen**.
--   Status: IN PROGRESS
+-   Last item agent was working: The agent was just about to start implementing the contextual trigger for the progressive onboarding flow, as requested by the user. The goal is to show the Voyages preference module when a user registers for a tournament.
+-   Status: NOT STARTED
 -   Agent Testing Done: N
--   Which testing method agent to use?: both
+-   Which testing method agent to use?: frontend testing agent
 -   User Testing Done: N
 
 **All Pending/In progress Issue list**:
--   Issue 1: Implement Post-V1 Enhancements (P0)
-
-Issues Detail:
--   Issue 1:
-    -   Attempted fixes: The agent started by overwriting  to begin creating a profile editing screen. This was an incorrect file choice.
-    -   Next debug checklist:
-        1.  **Correct File Structure**: Create a new file  for the profile editing UI. Restore the original  from git history or recreate it if necessary.
-        2.  **Link Edit Screen**: Add a button on the main profile tab () to navigate to the new  screen.
-        3.  **Implement Profile Editing**: Build the UI for editing the profile, including a native date picker for the date of birth, an image picker for the profile photo, and a selector for fiscal residence.
-        4.  **Implement OCR for Receipts**: This is a significant task requiring backend changes.
-            -   Research and choose an OCR library/service compatible with Python.
-            -   Create a new FastAPI endpoint in  that accepts an image file.
-            -   The endpoint should process the image with OCR to extract the date and total amount. It could also attempt to suggest a category based on keywords.
-            -   Modify the upload flow in  to call this new endpoint and pre-fill the document details form with the OCR results.
-        5.  **Implement Accountant Email**:
-            -   Add a field in the new  screen to save an accountant's email address.
-            -   Store this email in the app's context or .
-            -   Update the export modal in  so the Send by email button uses the saved accountant's email address.
-    -   Why fix this issue and what will be achieved with the fix?: Fulfills the user's latest feature requests, making the profile editable and streamlining the expense tracking workflow with automation.
-    -   Status: IN PROGRESS
-    -   Is recurring issue? N
-    -   Should Test frontend/backend/both after fix? both
-    -   Blocked on other issue: None
+There are no pending bugs. All work is feature development.
 
 **In progress Task List**:
-(None, all current work is captured in the issue above)
+-   Task 1: **Implement Contextual Trigger for Progressive Onboarding (P0)**
+
+  Task Detail:
+  -   Task 1:
+      -   Where to resume: In , locate the function responsible for handling tournament registration (e.g., ).
+      -   What will be achieved with this?: The progressive onboarding flow for travel preferences will be triggered contextually when a user registers for a tournament, making the data collection timely and relevant.
+      -   Status: NOT STARTED
+      -   Should Test frontend/backend/both after fix?: frontend
+      -   Blocked on something: None
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
-    -   **Backend Data Migration (P0)**: The most critical next step for the app's viability. All static data from  (users, events, documents, staff, tournaments) must be migrated to MongoDB. This involves creating DB schemas and corresponding FastAPI CRUD endpoints for each data model.
-    -   **Full Authentication & Permissions (P1)**: The staff invitation flow is currently frontend-only. This task involves implementing the full end-to-end flow:
-        -   Backend generates a secure, unique invitation token.
-        -   (Future) Send an email with the invitation link.
-        -   A new user registers using the token, linking them to the player's team.
-        -   Enforce the V1 staff permissions on all backend endpoints to ensure users can only view/edit data they are authorized for.
+    -   **Backend/Push Notification Integration (P0)**: The in-app notification UI is complete, but the system to generate and send actual push notifications (via ) and emails is not implemented. The logic for an observation/suggestion to notify *other* staff members needs to be connected to this system.
 -   **Future Tasks**:
-    -   **Push Notifications & Reminders (P2)**: Implement the notification system (e.g., using ) for event reminders as specified in the V1 requirements.
-    -   **Automatic GPS Fiscal Tracking (P3)**: Implement the V2 vision for automatic location tracking to automate the Travel Days feature.
-    -   **Live Tournament Data (P3)**: Replace static tournament data with live data from an official API or a web scraper.
+    -   **Backend Data Migration (P0 - CRITICAL DEBT)**: Migrate all static data (, , etc.) and user-generated data (onboarding, preferences) from  to a persistent MongoDB database. This requires creating schemas and FastAPI CRUD endpoints.
+    -   **Calendar Sync (P1)**: Implement synchronization with Google Calendar, iCalendar, and Outlook.
+    -   **Full Authentication & Permissions (P2)**: Replace the mock login with a full backend authentication flow and implement role-based access control.
 
 **Completed work in this session**
--   **Major App Refactor to V1 MVP**:
-    -   **Sprint 1**: Implemented a simplified 3-tab navigation. Created the V1 Calendar screen with a month view, weekly tournament selection workflow, and a list view for daily events.
-    -   **Sprint 2**: Implemented the V1 Profile screen with staff roles, an invitation modal, and a Travel Days counter. Added the Observations feature to calendar events, allowing users to add notes.
-    -   **Sprint 3**: Implemented the V1 Documents screen as a full expense tracking module, including receipt upload (photo/file), automatic monthly classification, a financial summary dashboard, and an export function.
--   (Pre-Refactor) Implemented a notification settings screen, document viewer, AI-powered chat replies, a fiscality onboarding flow, and native date/time pickers for event creation. These features have since been removed or replaced during the V1 refactor.
+-   **Full Registration Flow**: Implemented a 7-step user registration process under  with auto-progression, real-time validation, and a custom UI, resolving a routing conflict by renaming the old profile page to .
+-   **Progressive Onboarding Flow**: Built three distinct UI modules for gathering user preferences on Travel, Hotels, and Food, located under .
+-   **App Renaming**: The app's welcome screen now displays Le Court Central.
+-   **Smart Booking Modals**: Enhanced the notification system with custom modals that show pre-filled booking information for flights and hotels before linking out to Skyscanner/Booking.com.
+-   **Advanced Suggestion/Event Modals**:
+    -   In : Implemented a full UX flow for handling slot suggestions (Accept, Refuse with note, Counter-propose).
+    -   In : Added modals to allow users to directly Modifier an event or Suggérer une modification from the event details view.
 
 **Earlier issues found/mentioned but not fixed**
-(None, the V1 refactor superseded all previous issues.)
+- None. The agent encountered and resolved syntax errors during development.
+
+**Known issue recurrence from previous fork**
+- None.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Frontend**: Expo (React Native), Expo Router, , , , React Context API for state.
--   **Backend**: FastAPI (currently underutilized for V1).
--   **Data Management**: The application currently runs entirely on static data loaded into the React Context from  files in the frontend. There is no active database interaction for the core features.
+-   **Frontend**: Expo (React Native), Expo Router (with nested layouts), React Context,  for onboarding persistence.
+-   **Backend**: FastAPI. No changes in this session.
+-   **UI/UX**: Heavy focus on a minimalist Notion-like aesthetic. Extensive use of custom Modals, real-time input validation, auto-progressing multi-step forms, and a custom progress bar.
+-   **State Management**: Relies on , React Context, and now  for the onboarding flow. This is becoming complex and is a candidate for refactoring.
 
 **key DB schema**
-(Note: The following schemas are the *target* for the backend migration task, they are **not currently implemented**.)
--   : { , , , , , , ,  }
--   : { , , , , Thu Feb  5 01:24:17 UTC 2026, , , , : [{ , ,  }] }
--   : { , , , , , , Thu Feb  5 01:24:17 UTC 2026 }
--   : { , , : [{ ,  }] }
+(Note: The target schemas remain the same; no backend migration has occurred.)
+-   : { , , , , , , , : {...} }
+-   : { , ... }
+-   : { , ... }
+
+**changes in tech stack**
+-   None.
 
 **All files of reference**
--   **/app/frontend/app/(tabs)/index.tsx**: The new V1 calendar screen.
--   **/app/frontend/app/(tabs)/vault.tsx**: The new V1 expense tracking screen (was ).
--   **/app/frontend/app/(tabs)/profile.tsx**: The new V1 profile and staff management screen.
--   **/app/frontend/app/(tabs)/_layout.tsx**: The simplified 3-tab navigator layout.
--   **/app/frontend/src/context/AppContext.tsx**: The heart of the current application, holding all state and static data.
--   **/app/frontend/app/onboarding.tsx**: The player onboarding screen, which was **incorrectly overwritten** at the end of the session.
+-   **/app/frontend/app/(tabs)/index.tsx**: Modified to include modals for editing events and suggesting modifications. This is also the file to modify for the next task.
+-   **/app/frontend/app/notifications.tsx**: Completely refactored to handle complex modal flows for smart booking and slot suggestions.
+-   **/app/frontend/app/onboarding/**: New directory containing the 7-step registration flow.
+-   **/app/frontend/app/preferences/**: New directory containing the 3 progressive onboarding modules.
+-   **/app/frontend/src/utils/progressiveOnboarding.ts**: New file containing logic and data for the preference modules.
+-   **/app/frontend/app/profile-edit.tsx**: The old  file, renamed to avoid routing conflicts.
+
+**Areas that need refactoring**
+-   **State Management**: The application's state is managed by a combination of , context, and . As features grow, this will become difficult to maintain. Migrating to a dedicated state management library (like Zustand or Redux Toolkit) and a proper backend is the main technical debt.
+
+**key api endpoints**
+-   No new endpoints were created. The only existing custom endpoint is .
 
 **Critical Info for New Agent**
--   **V1 MVP Pivot**: The project's direction has completely changed. Refer to the V1 MVP requirements, not the initial problem statement. The app is now much simpler.
--   **Static Data**: The entire app is a facade running on static data in the frontend. The highest priority technical debt is to migrate this data to the MongoDB backend and build out the corresponding APIs.
--   **Incorrect File Edit**: The previous agent overwrote  while trying to create a profile *editing* screen. Your first action should be to create a new  file and restore the original onboarding screen.
--   **OCR is a Major Task**: The user's request for OCR on receipts is not trivial. It will require backend development and integration of a third-party OCR service or library. Plan this task carefully.
+-   **State Persistence**: The app still lacks a backend database for state. The new registration flow saves user data to , which is client-side and not a substitute for a proper user database.
+-   **Two Onboarding Flows**: Be aware that there are two distinct onboarding systems: the initial 7-step *registration* flow and the *progressive* preference-gathering flow. Your immediate task is to link the two by triggering the latter from an action in the main app.
+-   **Design System is Key**: A strong, minimalist Notion-like design language has been established. All new UI components must follow this style (e.g., custom modals, specific colors, border radiuses, button styles).
+
+**documents created in this job**
+-   None.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **Request**: Add profile editing (DOB, photo, fiscal residence), OCR for receipts, and an accountant email setting for 1-click export. (IN PROGRESS)
-2.  **Confirmation**: sprint 3. (Completed)
-3.  **Confirmation**: sprint 2. (Completed)
-4.  **Confirmation**: oui allons y avec le sprint 1. (Completed)
-5.  **New Requirement**: A full V1 MVP product requirements document was provided, pivoting the entire project. (Completed - All 3 sprints)
-6.  **Clarification**: Asked for an onboarding flow for the fiscality tab: first ask for residency, then offer geolocation. (Completed, but feature now simplified in V1)
-7.  **Request**: Make fiscality data more realistic, implement real geolocation, and use native date/time pickers. (Completed, but features now simplified/removed in V1)
-8.  **Confirmation**: Chose to proceed with mocked data instead of providing API keys. (Acknowledged)
+1.  **Request (PENDING)**: Trigger the progressive onboarding when a user signs up for a tournament.
+2.  **Request**: Provide a detailed PRD for a 3-module progressive onboarding system (Voyages, Hébergement, Alimentation) and an updated list of premium airlines. (COMPLETED)
+3.  **Request**: Rename the app to Le Court Central. (COMPLETED)
+4.  **Request**: Provide a detailed PRD for a 7-step user registration flow with specific UI/UX rules (auto-progression, no next button, etc.). (COMPLETED)
+5.  **Request**: Enhance the slot suggestion flow (accept, refuse with note, counter-propose) and add event modification capabilities (edit, suggest change) to the calendar. (COMPLETED)
+6.  **Request**: Implement smart booking links in notifications that generate pre-filled searches for Booking.com (hotels) and Skyscanner (flights). (COMPLETED)
+7.  **Request**: Add more static data and create a very minimalist, Notion-like UI for notifications. (COMPLETED)
 
 **Project Health Check:**
--   **Mocked**: The entire data layer (users, events, documents, etc.) is mocked using static data on the frontend.
--   **Broken**: The  file was incorrectly overwritten.
+-   **Mocked**: The entire data layer remains mocked with static files. User registration data is saved to local , not a backend database.
+-   **Broken**: No. The agent resolved syntax errors it introduced during development.
 
 **3rd Party Integrations**
--   **OpenAI GPT-4o**: Previously used for AI chat replies, but the chat feature has been removed in V1. — uses Emergent LLM Key.
--   **React Native Calendars**: Core component for the calendar view.
--   **@react-native-community/datetimepicker**: Used for native date/time selection.
--   **expo-image-picker**: Used for uploading receipts from the camera or gallery.
--   **expo-location**: Installed, but the V1 spec requires manual location tracking, so it's not actively used.
+-   **Tesseract OCR**: Backend OCR engine.
+-   **React Native Calendars**: Frontend calendar view.
+-   **expo-image-picker**: For document uploads.
+-   The app generates links for **Booking.com** and **Skyscanner** but does not use their APIs.
 
 **Testing status**
--   Testing agent used after significant changes: NO (Agent relied on the ).
+-   Testing agent used after significant changes: NO (The main agent used the  extensively for UI verification).
 -   Troubleshoot agent used after agent stuck in loop: NO
 -   Test files created: []
--   Known regressions: The  file is non-functional as it was overwritten.
+-   Known regressions: None.
+
+**Credentials to test flow:**
+N/A
 
 **What agent forgot to execute**
--   The agent did not create a separate file for the edit profile functionality, instead overwriting the existing onboarding file. This needs to be corrected.
+-   **Push/Email Notifications**: While the in-app UI for notifications is complete, the actual implementation of sending push notifications (using ) or emails remains an upcoming task from the initial sprint definition.
+-   **Notifying Other Staff**: The logic to ensure an observation or suggestion from one user generates a notification for *another* relevant staff member is not yet implemented.
 
 </analysis>
