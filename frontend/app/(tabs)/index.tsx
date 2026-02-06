@@ -958,8 +958,197 @@ export default function CalendarScreenV1() {
                     </View>
                   </View>
                 </View>
+                
+                {/* Action buttons - Modifier / Suggérer */}
+                <View style={styles.eventActionsSection}>
+                  <TouchableOpacity style={styles.editEventBtn} onPress={openEditEvent}>
+                    <Ionicons name="create-outline" size={18} color="#1a1a1a" />
+                    <Text style={styles.editEventBtnText}>Modifier</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity style={styles.suggestChangeBtn} onPress={openSuggestChange}>
+                    <Ionicons name="git-compare-outline" size={18} color="#9b51e0" />
+                    <Text style={styles.suggestChangeBtnText}>Suggérer une modification</Text>
+                  </TouchableOpacity>
+                </View>
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Edit Event Modal */}
+      <Modal visible={showEditEventModal} animationType="fade" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Modifier l'événement</Text>
+              <TouchableOpacity onPress={() => setShowEditEventModal(false)}>
+                <Ionicons name="close" size={24} color="#9e9e9e" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.editInputGroup}>
+              <Text style={styles.editInputLabel}>Titre</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editedEvent.title}
+                onChangeText={(text) => setEditedEvent(prev => ({ ...prev, title: text }))}
+                placeholder="Titre de l'événement"
+                placeholderTextColor="#bdbdbd"
+              />
+            </View>
+            
+            <View style={styles.editInputGroup}>
+              <Text style={styles.editInputLabel}>Date</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editedEvent.date}
+                onChangeText={(text) => setEditedEvent(prev => ({ ...prev, date: text }))}
+                placeholder="2026-02-05"
+                placeholderTextColor="#bdbdbd"
+              />
+            </View>
+            
+            <View style={styles.editTimeRow}>
+              <View style={[styles.editInputGroup, { flex: 1 }]}>
+                <Text style={styles.editInputLabel}>Début</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={editedEvent.time}
+                  onChangeText={(text) => setEditedEvent(prev => ({ ...prev, time: text }))}
+                  placeholder="09:00"
+                  placeholderTextColor="#bdbdbd"
+                />
+              </View>
+              <View style={[styles.editInputGroup, { flex: 1, marginLeft: 12 }]}>
+                <Text style={styles.editInputLabel}>Fin</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={editedEvent.endTime}
+                  onChangeText={(text) => setEditedEvent(prev => ({ ...prev, endTime: text }))}
+                  placeholder="11:00"
+                  placeholderTextColor="#bdbdbd"
+                />
+              </View>
+            </View>
+            
+            <View style={styles.editInputGroup}>
+              <Text style={styles.editInputLabel}>Lieu</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editedEvent.location}
+                onChangeText={(text) => setEditedEvent(prev => ({ ...prev, location: text }))}
+                placeholder="Lieu de l'événement"
+                placeholderTextColor="#bdbdbd"
+              />
+            </View>
+            
+            <View style={styles.editActionsRow}>
+              <TouchableOpacity style={styles.editCancelBtn} onPress={() => setShowEditEventModal(false)}>
+                <Text style={styles.editCancelBtnText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.editSaveBtn} onPress={saveEventModifications}>
+                <Ionicons name="checkmark" size={18} color="#fff" />
+                <Text style={styles.editSaveBtnText}>Enregistrer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      
+      {/* Suggest Change Modal */}
+      <Modal visible={showSuggestChangeModal} animationType="fade" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Suggérer une modification</Text>
+              <TouchableOpacity onPress={() => setShowSuggestChangeModal(false)}>
+                <Ionicons name="close" size={24} color="#9e9e9e" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.suggestionInfo}>
+              <Ionicons name="information-circle-outline" size={18} color="#2d9cdb" />
+              <Text style={styles.suggestionInfoText}>
+                Votre suggestion sera envoyée au staff concerné pour validation
+              </Text>
+            </View>
+            
+            <View style={styles.editInputGroup}>
+              <Text style={styles.editInputLabel}>Nouvelle date (optionnel)</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editedEvent.date}
+                onChangeText={(text) => setEditedEvent(prev => ({ ...prev, date: text }))}
+                placeholder="2026-02-06"
+                placeholderTextColor="#bdbdbd"
+              />
+            </View>
+            
+            <View style={styles.editTimeRow}>
+              <View style={[styles.editInputGroup, { flex: 1 }]}>
+                <Text style={styles.editInputLabel}>Nouveau début</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={editedEvent.time}
+                  onChangeText={(text) => setEditedEvent(prev => ({ ...prev, time: text }))}
+                  placeholder="10:00"
+                  placeholderTextColor="#bdbdbd"
+                />
+              </View>
+              <View style={[styles.editInputGroup, { flex: 1, marginLeft: 12 }]}>
+                <Text style={styles.editInputLabel}>Nouvelle fin</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={editedEvent.endTime}
+                  onChangeText={(text) => setEditedEvent(prev => ({ ...prev, endTime: text }))}
+                  placeholder="12:00"
+                  placeholderTextColor="#bdbdbd"
+                />
+              </View>
+            </View>
+            
+            <View style={styles.editInputGroup}>
+              <Text style={styles.editInputLabel}>Message (optionnel)</Text>
+              <TextInput
+                style={[styles.editInput, { minHeight: 80, textAlignVertical: 'top' }]}
+                value={suggestionMessage}
+                onChangeText={setSuggestionMessage}
+                placeholder="Expliquez la raison de votre demande..."
+                placeholderTextColor="#bdbdbd"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+            
+            <View style={styles.editActionsRow}>
+              <TouchableOpacity style={styles.editCancelBtn} onPress={() => setShowSuggestChangeModal(false)}>
+                <Text style={styles.editCancelBtnText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.suggestSendBtn} onPress={sendSuggestion}>
+                <Ionicons name="send" size={16} color="#fff" />
+                <Text style={styles.suggestSendBtnText}>Envoyer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      
+      {/* Event Confirmation Modal */}
+      <Modal visible={showEventConfirmation} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmationModalContent}>
+            <Text style={styles.confirmationModalText}>{eventConfirmationMessage}</Text>
+            <TouchableOpacity 
+              style={styles.confirmationOkBtn} 
+              onPress={() => {
+                setShowEventConfirmation(false);
+                setSelectedEvent(null);
+              }}
+            >
+              <Text style={styles.confirmationOkBtnText}>OK</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
