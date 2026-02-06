@@ -629,7 +629,9 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   editBtn: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
   },
   fab: {
     position: 'absolute',
