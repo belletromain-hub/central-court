@@ -89,7 +89,7 @@ export default function CalendarScreenV1() {
   const [showTournamentModal, setShowTournamentModal] = useState(false);
   const [showAddEventModal, setShowAddEventModal] = useState(false);
   const [showEventDetailModal, setShowEventDetailModal] = useState(false);
-  const [selectedWeek, setSelectedWeek] = useState<WeekTournaments | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<any | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventV1 | null>(null);
   
   // New event form
