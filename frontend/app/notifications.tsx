@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   Modal,
   Alert as RNAlert,
-  Platform,
-  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,50 +17,24 @@ import {
   AlertType,
   ALERT_TYPE_CONFIG,
   DEMO_ALERTS,
-  generateTournamentAlerts,
-  createSlotSuggestion,
 } from '../src/data/alertsV1';
-import { ATP_TOURNAMENTS_FEB_2026 } from '../src/data/tournamentsV1';
-import { DEMO_EVENTS_FEB_2026 } from '../src/data/eventsV1';
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
-  // State
   const [alerts, setAlerts] = useState<Alert[]>(DEMO_ALERTS);
-  const [filter, setFilter] = useState<'all' | 'unread' | AlertType>('all');
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
-  const [suggestionMessage, setSuggestionMessage] = useState('');
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
   
-  // Generate alerts from tournaments
-  useEffect(() => {
-    const generatedAlerts = generateTournamentAlerts(
-      ATP_TOURNAMENTS_FEB_2026,
-      DEMO_EVENTS_FEB_2026,
-      [7, 3]
-    );
-    
-    // Combine with existing alerts, avoiding duplicates
-    setAlerts(prev => {
-      const existingIds = new Set(prev.map(a => a.id));
-      const newAlerts = generatedAlerts.filter(a => !existingIds.has(a.id));
-      return [...prev, ...newAlerts];
-    });
-  }, []);
-  
-  // Filter alerts
+  // Filtrer les alertes
   const filteredAlerts = useMemo(() => {
     let result = alerts.filter(a => !a.dismissed);
-    
     if (filter === 'unread') {
       result = result.filter(a => !a.read);
-    } else if (filter !== 'all') {
-      result = result.filter(a => a.type === filter);
     }
-    
-    // Sort by priority and date
+    // Trier par priorité puis date
     return result.sort((a, b) => {
       const priorityOrder = { high: 0, medium: 1, low: 2 };
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
@@ -72,85 +44,43 @@ export default function NotificationsScreen() {
     });
   }, [alerts, filter]);
   
-  // Count unread
   const unreadCount = alerts.filter(a => !a.read && !a.dismissed).length;
   
-  // Mark as read
   const markAsRead = (alertId: string) => {
     setAlerts(prev => prev.map(a => 
       a.id === alertId ? { ...a, read: true } : a
     ));
   };
   
-  // Dismiss alert
   const dismissAlert = (alertId: string) => {
     setAlerts(prev => prev.map(a => 
       a.id === alertId ? { ...a, dismissed: true } : a
     ));
   };
   
-  // Mark all as read
   const markAllAsRead = () => {
     setAlerts(prev => prev.map(a => ({ ...a, read: true })));
   };
   
-  // Handle alert action
   const handleAlertAction = (alert: Alert) => {
     markAsRead(alert.id);
     
-    switch (alert.type) {
-      case 'flight_missing':
-      case 'hotel_missing':
-        RNAlert.alert(
-          alert.title,
-          `Voulez-vous ajouter un événement de voyage pour ${alert.tournamentName} ?`,
-          [
-            { text: 'Annuler', style: 'cancel' },
-            { 
-              text: 'Ajouter', 
-              onPress: () => {
-                // Navigate to calendar to add travel event
-                router.push('/');
-              }
-            }
-          ]
-        );
-        break;
-        
-      case 'registration_pending':
-        RNAlert.alert(
-          alert.title,
-          'Voulez-vous voir les détails du tournoi ?',
-          [
-            { text: 'Annuler', style: 'cancel' },
-            { 
-              text: 'Voir', 
-              onPress: () => router.push('/')
-            }
-          ]
-        );
-        break;
-        
-      case 'observation_new':
-        router.push('/');
-        break;
-        
-      case 'slot_suggestion':
-        setSelectedAlert(alert);
-        setShowSuggestionModal(true);
-        break;
+    if (alert.type === 'slot_suggestion') {
+      setSelectedAlert(alert);
+      setShowSuggestionModal(true);
+    } else {
+      router.push('/');
     }
   };
   
-  // Respond to slot suggestion
   const respondToSuggestion = (accept: boolean) => {
     if (!selectedAlert) return;
     
     RNAlert.alert(
-      accept ? 'Créneau accepté' : 'Créneau refusé',
+      accept ? 'Accepté' : 'Refusé',
       accept 
-        ? `Vous avez accepté la suggestion de ${selectedAlert.fromUserName}. Il/Elle sera notifié(e).`
-        : `Vous avez refusé la suggestion de ${selectedAlert.fromUserName}.`,
+        ? `${selectedAlert.fromUserName} sera notifié.`
+        : 'La suggestion a été refusée.',
       [{ text: 'OK' }]
     );
     
@@ -159,9 +89,26 @@ export default function NotificationsScreen() {
     setSelectedAlert(null);
   };
   
-  // Render alert card
+  // Formatage du temps
+  const formatTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'maintenant';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}j`;
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  };
+  
+  // Render une carte d'alerte minimaliste style Notion
   const renderAlertCard = (alert: Alert) => {
     const config = ALERT_TYPE_CONFIG[alert.type];
+    const isUrgent = alert.priority === 'high';
     
     return (
       <TouchableOpacity
@@ -169,193 +116,181 @@ export default function NotificationsScreen() {
         style={[
           styles.alertCard,
           !alert.read && styles.alertCardUnread,
-          alert.priority === 'high' && styles.alertCardHigh
         ]}
         onPress={() => handleAlertAction(alert)}
+        activeOpacity={0.7}
       >
-        <View style={[styles.alertIcon, { backgroundColor: config.color + '20' }]}>
-          <Text style={styles.alertIconEmoji}>{config.icon}</Text>
-        </View>
+        {/* Indicateur de priorité */}
+        {isUrgent && <View style={[styles.priorityIndicator, { backgroundColor: config.color }]} />}
         
-        <View style={styles.alertContent}>
-          <View style={styles.alertHeader}>
-            <Text style={styles.alertTitle} numberOfLines={1}>{alert.title}</Text>
-            {!alert.read && <View style={styles.unreadDot} />}
-          </View>
+        <View style={styles.alertMain}>
+          {/* Icône */}
+          <Text style={styles.alertIcon}>{config.icon}</Text>
           
-          <Text style={styles.alertMessage} numberOfLines={2}>
-            {alert.message}
-          </Text>
-          
-          <View style={styles.alertFooter}>
-            <Text style={styles.alertTime}>
-              {formatTimeAgo(alert.createdAt)}
+          {/* Contenu */}
+          <View style={styles.alertContent}>
+            <View style={styles.alertTitleRow}>
+              <Text style={[styles.alertTitle, !alert.read && styles.alertTitleUnread]} numberOfLines={1}>
+                {alert.title}
+              </Text>
+              <Text style={styles.alertTime}>{formatTime(alert.createdAt)}</Text>
+            </View>
+            <Text style={styles.alertMessage} numberOfLines={1}>
+              {alert.message}
             </Text>
-            
-            {alert.dueDate && (
-              <View style={[styles.dueBadge, alert.priority === 'high' && styles.dueBadgeHigh]}>
-                <Ionicons name="time-outline" size={12} color={alert.priority === 'high' ? '#fff' : Colors.text.secondary} />
-                <Text style={[styles.dueText, alert.priority === 'high' && styles.dueTextHigh]}>
-                  {formatDueDate(alert.dueDate)}
+          </View>
+          
+          {/* Actions */}
+          <View style={styles.alertActions}>
+            {config.actionLabel && (
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: config.color + '15' }]}
+                onPress={() => handleAlertAction(alert)}
+              >
+                <Text style={[styles.actionBtnText, { color: config.color }]}>
+                  {config.actionLabel}
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
+            <TouchableOpacity
+              style={styles.dismissBtn}
+              onPress={() => dismissAlert(alert.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={18} color="#bdbdbd" />
+            </TouchableOpacity>
           </View>
         </View>
-        
-        <TouchableOpacity
-          style={styles.dismissBtn}
-          onPress={() => dismissAlert(alert.id)}
-        >
-          <Ionicons name="close" size={20} color={Colors.text.muted} />
-        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
   
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
+      {/* Header minimaliste */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+        <TouchableOpacity 
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
+        
         <Text style={styles.headerTitle}>Notifications</Text>
-        {unreadCount > 0 && (
+        
+        {unreadCount > 0 ? (
           <TouchableOpacity onPress={markAllAsRead}>
             <Text style={styles.markAllRead}>Tout lire</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={{ width: 60 }} />
         )}
       </View>
       
-      {/* Filter tabs */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContent}
-      >
+      {/* Filtres minimalistes */}
+      <View style={styles.filterRow}>
         <TouchableOpacity
-          style={[styles.filterTab, filter === 'all' && styles.filterTabActive]}
+          style={[styles.filterBtn, filter === 'all' && styles.filterBtnActive]}
           onPress={() => setFilter('all')}
         >
-          <Text style={[styles.filterTabText, filter === 'all' && styles.filterTabTextActive]}>
+          <Text style={[styles.filterBtnText, filter === 'all' && styles.filterBtnTextActive]}>
             Toutes
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.filterTab, filter === 'unread' && styles.filterTabActive]}
+          style={[styles.filterBtn, filter === 'unread' && styles.filterBtnActive]}
           onPress={() => setFilter('unread')}
         >
-          <Text style={[styles.filterTabText, filter === 'unread' && styles.filterTabTextActive]}>
-            Non lues {unreadCount > 0 && `(${unreadCount})`}
+          <Text style={[styles.filterBtnText, filter === 'unread' && styles.filterBtnTextActive]}>
+            Non lues
           </Text>
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.filterTab, filter === 'flight_missing' && styles.filterTabActive]}
-          onPress={() => setFilter('flight_missing')}
-        >
-          <Text style={[styles.filterTabText, filter === 'flight_missing' && styles.filterTabTextActive]}>
-            ✈️ Vols
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.filterTab, filter === 'hotel_missing' && styles.filterTabActive]}
-          onPress={() => setFilter('hotel_missing')}
-        >
-          <Text style={[styles.filterTabText, filter === 'hotel_missing' && styles.filterTabTextActive]}>
-            🏨 Hôtels
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.filterTab, filter === 'observation_new' && styles.filterTabActive]}
-          onPress={() => setFilter('observation_new')}
-        >
-          <Text style={[styles.filterTabText, filter === 'observation_new' && styles.filterTabTextActive]}>
-            💬 Observations
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+      </View>
       
-      {/* Alerts list */}
-      <ScrollView style={styles.alertsList} showsVerticalScrollIndicator={false}>
+      {/* Liste des alertes */}
+      <ScrollView 
+        style={styles.list} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+      >
         {filteredAlerts.length > 0 ? (
           filteredAlerts.map(renderAlertCard)
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="notifications-off-outline" size={64} color={Colors.text.muted} />
-            <Text style={styles.emptyText}>Aucune notification</Text>
+            <Text style={styles.emptyIcon}>✓</Text>
+            <Text style={styles.emptyText}>Tout est à jour</Text>
             <Text style={styles.emptySubtext}>
               {filter === 'unread' 
                 ? 'Toutes les notifications ont été lues'
-                : 'Vous êtes à jour !'}
+                : 'Aucune notification pour le moment'}
             </Text>
           </View>
         )}
-        
-        <View style={{ height: 100 }} />
       </ScrollView>
       
-      {/* Slot Suggestion Response Modal */}
-      <Modal visible={showSuggestionModal} animationType="slide" transparent>
+      {/* Modal suggestion de créneau */}
+      <Modal visible={showSuggestionModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🔄 Suggestion de créneau</Text>
+              <Text style={styles.modalTitle}>Suggestion de créneau</Text>
               <TouchableOpacity onPress={() => setShowSuggestionModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
+                <Ionicons name="close" size={24} color={Colors.text.secondary} />
               </TouchableOpacity>
             </View>
             
             {selectedAlert && (
               <>
-                <View style={styles.suggestionInfo}>
-                  <Text style={styles.suggestionFrom}>
-                    De: <Text style={styles.suggestionFromName}>{selectedAlert.fromUserName}</Text>
-                    {' '}({selectedAlert.fromUserRole})
-                  </Text>
+                <View style={styles.suggestionBox}>
+                  <View style={styles.suggestionRow}>
+                    <Text style={styles.suggestionLabel}>De</Text>
+                    <Text style={styles.suggestionValue}>
+                      {selectedAlert.fromUserName}
+                      <Text style={styles.suggestionRole}> • {selectedAlert.fromUserRole}</Text>
+                    </Text>
+                  </View>
                   
                   {selectedAlert.targetSlot && (
-                    <View style={styles.slotInfo}>
-                      <Ionicons name="calendar" size={20} color={Colors.primary} />
-                      <Text style={styles.slotText}>
+                    <View style={styles.suggestionRow}>
+                      <Text style={styles.suggestionLabel}>Créneau</Text>
+                      <Text style={styles.suggestionValue}>
                         {new Date(selectedAlert.targetSlot.date).toLocaleDateString('fr-FR', {
-                          weekday: 'long',
+                          weekday: 'short',
                           day: 'numeric',
-                          month: 'long'
-                        })}
-                      </Text>
-                      <Ionicons name="time" size={20} color={Colors.primary} />
-                      <Text style={styles.slotText}>
-                        {selectedAlert.targetSlot.time} - {selectedAlert.targetSlot.endTime}
+                          month: 'short'
+                        })} • {selectedAlert.targetSlot.time} - {selectedAlert.targetSlot.endTime}
                       </Text>
                     </View>
                   )}
                   
-                  <Text style={styles.suggestionMessage}>
-                    "{selectedAlert.message.split('Message: "')[1]?.replace('"', '') || selectedAlert.message}"
-                  </Text>
+                  <View style={styles.suggestionRow}>
+                    <Text style={styles.suggestionLabel}>Message</Text>
+                    <Text style={styles.suggestionMessage}>
+                      {selectedAlert.message.split('"')[1] || selectedAlert.message}
+                    </Text>
+                  </View>
                 </View>
                 
                 <View style={styles.suggestionActions}>
                   <TouchableOpacity
-                    style={[styles.suggestionBtn, styles.suggestionBtnAccept]}
-                    onPress={() => respondToSuggestion(true)}
+                    style={styles.declineBtn}
+                    onPress={() => respondToSuggestion(false)}
                   >
-                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                    <Text style={styles.suggestionBtnText}>Accepter</Text>
+                    <Text style={styles.declineBtnText}>Refuser</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
-                    style={[styles.suggestionBtn, styles.suggestionBtnDecline]}
-                    onPress={() => respondToSuggestion(false)}
+                    style={styles.acceptBtn}
+                    onPress={() => respondToSuggestion(true)}
                   >
-                    <Ionicons name="close-circle" size={20} color="#f44336" />
-                    <Text style={[styles.suggestionBtnText, { color: '#f44336' }]}>Refuser</Text>
+                    <Text style={styles.acceptBtnText}>Accepter</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -367,211 +302,193 @@ export default function NotificationsScreen() {
   );
 }
 
-// Helper functions
-function formatTimeAgo(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-  
-  if (diffMins < 1) return 'À l\'instant';
-  if (diffMins < 60) return `Il y a ${diffMins} min`;
-  if (diffHours < 24) return `Il y a ${diffHours}h`;
-  if (diffDays < 7) return `Il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
-  
-  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-}
-
-function formatDueDate(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((date.getTime() - now.getTime()) / 86400000);
-  
-  if (diffDays <= 0) return 'Aujourd\'hui';
-  if (diffDays === 1) return 'Demain';
-  return `Dans ${diffDays} jours`;
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: '#f0f0f0',
+  },
+  backBtn: {
+    width: 40,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text.primary,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    letterSpacing: -0.3,
   },
   markAllRead: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  filterContainer: {
-    maxHeight: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
-  },
-  filterContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  filterTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.background.secondary,
-    marginRight: 8,
-  },
-  filterTabActive: {
-    backgroundColor: Colors.primary,
-  },
-  filterTabText: {
-    fontSize: 13,
     fontWeight: '500',
-    color: Colors.text.secondary,
+    color: '#2d9cdb',
   },
-  filterTabTextActive: {
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+  },
+  filterBtnActive: {
+    backgroundColor: '#f5f5f5',
+  },
+  filterBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#9e9e9e',
+  },
+  filterBtnTextActive: {
+    color: '#1a1a1a',
+  },
+  badge: {
+    marginLeft: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#eb5757',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: '#fff',
   },
-  alertsList: {
+  list: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+  },
+  listContent: {
+    paddingVertical: 8,
   },
   alertCard: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
   },
   alertCardUnread: {
-    backgroundColor: '#f8f9ff',
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.primary,
+    backgroundColor: '#fafbff',
   },
-  alertCardHigh: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#f44336',
+  priorityIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 12,
+    bottom: 12,
+    width: 3,
+    borderRadius: 2,
+  },
+  alertMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   alertIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  alertIconEmoji: {
     fontSize: 20,
+    width: 28,
+    textAlign: 'center',
   },
   alertContent: {
     flex: 1,
+    gap: 2,
   },
-  alertHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  alertTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
-    marginLeft: 8,
-  },
-  alertMessage: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  alertFooter: {
+  alertTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  alertTime: {
-    fontSize: 11,
-    color: Colors.text.muted,
+  alertTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4f4f4f',
+    flex: 1,
   },
-  dueBadge: {
+  alertTitleUnread: {
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  alertTime: {
+    fontSize: 12,
+    color: '#bdbdbd',
+    marginLeft: 8,
+  },
+  alertMessage: {
+    fontSize: 13,
+    color: '#9e9e9e',
+    lineHeight: 18,
+  },
+  alertActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 10,
+    gap: 8,
   },
-  dueBadgeHigh: {
-    backgroundColor: '#f44336',
+  actionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
   },
-  dueText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: Colors.text.secondary,
-  },
-  dueTextHigh: {
-    color: '#fff',
+  actionBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   dismissBtn: {
     padding: 4,
-    marginLeft: 8,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    color: '#27ae60',
+    marginBottom: 16,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
-    color: Colors.text.secondary,
-    marginTop: 16,
+    color: '#1a1a1a',
+    marginBottom: 4,
   },
   emptySubtext: {
     fontSize: 14,
-    color: Colors.text.muted,
-    marginTop: 4,
+    color: '#9e9e9e',
   },
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
+    width: '100%',
+    maxWidth: 400,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 12,
     padding: 20,
-    maxHeight: '60%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -580,65 +497,65 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text.primary,
-  },
-  suggestionInfo: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  suggestionFrom: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-    marginBottom: 12,
-  },
-  suggestionFromName: {
+    fontSize: 17,
     fontWeight: '600',
-    color: Colors.text.primary,
+    color: '#1a1a1a',
   },
-  slotInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-    flexWrap: 'wrap',
+  suggestionBox: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 16,
+    gap: 12,
   },
-  slotText: {
+  suggestionRow: {
+    gap: 4,
+  },
+  suggestionLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9e9e9e',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  suggestionValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: Colors.text.primary,
+    color: '#1a1a1a',
+  },
+  suggestionRole: {
+    fontWeight: '400',
+    color: '#9e9e9e',
   },
   suggestionMessage: {
     fontSize: 14,
+    color: '#4f4f4f',
     fontStyle: 'italic',
-    color: Colors.text.secondary,
-    lineHeight: 20,
   },
   suggestionActions: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 20,
   },
-  suggestionBtn: {
+  declineBtn: {
     flex: 1,
-    flexDirection: 'row',
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
   },
-  suggestionBtnAccept: {
-    backgroundColor: '#4caf50',
+  declineBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4f4f4f',
   },
-  suggestionBtnDecline: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#f44336',
+  acceptBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#1a1a1a',
+    alignItems: 'center',
   },
-  suggestionBtnText: {
+  acceptBtnText: {
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',

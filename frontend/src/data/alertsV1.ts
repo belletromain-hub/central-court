@@ -1,4 +1,4 @@
-// Système d'alertes et notifications V1
+// Système d'alertes et notifications V1 - Style Notion minimaliste
 
 export type AlertType = 
   | 'flight_missing'      // Vol non réservé
@@ -38,19 +38,17 @@ export interface NotificationPreferences {
   inApp: boolean;
   push: boolean;
   email: boolean;
-  // Délais de rappel (en jours)
   reminderDays: number[];
 }
 
-// Configuration par défaut
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
   inApp: true,
   push: true,
   email: true,
-  reminderDays: [7, 3] // 7 jours et 3 jours avant
+  reminderDays: [7, 3]
 };
 
-// Labels et couleurs pour les types d'alertes
+// Configuration minimaliste pour les types d'alertes
 export const ALERT_TYPE_CONFIG: Record<AlertType, { 
   icon: string; 
   color: string; 
@@ -59,46 +57,46 @@ export const ALERT_TYPE_CONFIG: Record<AlertType, {
 }> = {
   flight_missing: {
     icon: '✈️',
-    color: '#f44336',
-    label: 'Vol manquant',
-    actionLabel: 'Réserver un vol'
+    color: '#eb5757',
+    label: 'Vol',
+    actionLabel: 'Réserver'
   },
   hotel_missing: {
     icon: '🏨',
-    color: '#ff9800',
-    label: 'Hôtel manquant',
-    actionLabel: 'Réserver un hôtel'
+    color: '#f2994a',
+    label: 'Hôtel',
+    actionLabel: 'Réserver'
   },
   registration_pending: {
     icon: '📋',
-    color: '#2196f3',
-    label: 'Inscription à confirmer',
-    actionLabel: 'Voir le tournoi'
+    color: '#2d9cdb',
+    label: 'Inscription',
+    actionLabel: 'Confirmer'
   },
   observation_new: {
     icon: '💬',
-    color: '#4caf50',
-    label: 'Nouvelle observation',
+    color: '#27ae60',
+    label: 'Observation',
     actionLabel: 'Voir'
   },
   slot_suggestion: {
     icon: '🔄',
-    color: '#9c27b0',
-    label: 'Suggestion de créneau',
+    color: '#9b51e0',
+    label: 'Créneau',
     actionLabel: 'Répondre'
   },
   reminder: {
     icon: '⏰',
-    color: '#607d8b',
+    color: '#828282',
     label: 'Rappel',
     actionLabel: 'Voir'
   }
 };
 
-// Fonction pour générer des alertes basées sur les tournois et événements
+// Génération d'alertes intelligentes basées sur les tournois
 export function generateTournamentAlerts(
-  tournaments: any[], // WeekTournaments[]
-  events: any[], // CalendarEventV1[]
+  tournaments: any[],
+  events: any[],
   reminderDays: number[] = [7, 3]
 ): Alert[] {
   const alerts: Alert[] = [];
@@ -106,37 +104,36 @@ export function generateTournamentAlerts(
   today.setHours(0, 0, 0, 0);
   
   tournaments.forEach(week => {
-    // Pour chaque inscription à un tournoi
     week.registrations?.forEach((reg: any) => {
       const tournament = week.tournaments.find((t: any) => t.id === reg.tournamentId);
       if (!tournament) return;
       
-      // Ne vérifier que si le statut est "participating" ou "accepted"
+      // Ne vérifier que si le statut nécessite un voyage
       if (reg.status !== 'participating' && reg.status !== 'accepted' && reg.status !== 'pending') return;
       
       const tournamentStart = new Date(tournament.startDate);
       const daysUntil = Math.ceil((tournamentStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
-      // Vérifier si on est dans la période de rappel
+      // Ignorer les tournois passés ou trop lointains
       if (daysUntil <= 0 || daysUntil > Math.max(...reminderDays)) return;
       
       const shouldAlert = reminderDays.some(days => daysUntil <= days);
       if (!shouldAlert) return;
       
-      // Vérifier si un vol est réservé pour ce tournoi
+      // Vérifier vol - chercher un événement de type 'travel' pour cette ville
       const hasFlightToTournament = events.some(e => 
         e.type === 'travel' && 
-        e.title.toLowerCase().includes(tournament.city.toLowerCase()) &&
-        new Date(e.date) <= tournamentStart
+        (e.tournamentId === tournament.id ||
+         e.title.toLowerCase().includes(tournament.city.toLowerCase()))
       );
       
       if (!hasFlightToTournament) {
         alerts.push({
-          id: `alert-flight-${tournament.id}-${daysUntil}`,
+          id: `alert-flight-${tournament.id}`,
           type: 'flight_missing',
           priority: daysUntil <= 3 ? 'high' : 'medium',
-          title: `Vol non réservé - ${tournament.name}`,
-          message: `Le tournoi ${tournament.name} commence dans ${daysUntil} jour${daysUntil > 1 ? 's' : ''}. Aucun vol n'est encore réservé.`,
+          title: 'Vol non réservé',
+          message: `${tournament.name} dans ${daysUntil}j`,
           tournamentId: tournament.id,
           tournamentName: tournament.name,
           createdAt: new Date().toISOString(),
@@ -146,22 +143,22 @@ export function generateTournamentAlerts(
         });
       }
       
-      // Vérifier si un hôtel est réservé (on cherche un événement perso ou voyage mentionnant hôtel)
+      // Vérifier hôtel
       const hasHotel = events.some(e => 
-        (e.title.toLowerCase().includes('hôtel') || 
-         e.title.toLowerCase().includes('hotel') ||
-         e.title.toLowerCase().includes('hébergement')) &&
-        new Date(e.date) >= new Date(tournament.startDate) &&
-        new Date(e.date) <= new Date(tournament.endDate)
+        e.type === 'hotel' && 
+        (e.tournamentId === tournament.id ||
+         e.title.toLowerCase().includes(tournament.city.toLowerCase()) ||
+         (e.title.toLowerCase().includes('hôtel') && 
+          new Date(e.date) <= tournamentStart))
       );
       
       if (!hasHotel) {
         alerts.push({
-          id: `alert-hotel-${tournament.id}-${daysUntil}`,
+          id: `alert-hotel-${tournament.id}`,
           type: 'hotel_missing',
           priority: daysUntil <= 3 ? 'high' : 'medium',
-          title: `Hôtel non réservé - ${tournament.name}`,
-          message: `Le tournoi ${tournament.name} commence dans ${daysUntil} jour${daysUntil > 1 ? 's' : ''}. Aucun hébergement n'est enregistré.`,
+          title: 'Hôtel non réservé',
+          message: `${tournament.name} dans ${daysUntil}j`,
           tournamentId: tournament.id,
           tournamentName: tournament.name,
           createdAt: new Date().toISOString(),
@@ -171,14 +168,14 @@ export function generateTournamentAlerts(
         });
       }
       
-      // Vérifier si l'inscription est confirmée
-      if (reg.status === 'pending' || reg.status === 'interested') {
+      // Inscription en attente
+      if (reg.status === 'pending') {
         alerts.push({
-          id: `alert-reg-${tournament.id}-${daysUntil}`,
+          id: `alert-reg-${tournament.id}`,
           type: 'registration_pending',
           priority: daysUntil <= 3 ? 'high' : 'medium',
-          title: `Inscription à confirmer - ${tournament.name}`,
-          message: `Votre inscription au ${tournament.name} n'est pas encore confirmée. Le tournoi commence dans ${daysUntil} jour${daysUntil > 1 ? 's' : ''}.`,
+          title: 'Inscription en attente',
+          message: `${tournament.name} dans ${daysUntil}j`,
           tournamentId: tournament.id,
           tournamentName: tournament.name,
           createdAt: new Date().toISOString(),
@@ -193,7 +190,7 @@ export function generateTournamentAlerts(
   return alerts;
 }
 
-// Fonction pour créer une alerte de nouvelle observation
+// Créer une alerte d'observation
 export function createObservationAlert(
   eventId: string,
   eventTitle: string,
@@ -205,8 +202,8 @@ export function createObservationAlert(
     id: `alert-obs-${eventId}-${Date.now()}`,
     type: 'observation_new',
     priority: 'low',
-    title: `Nouvelle observation de ${authorName}`,
-    message: `${authorRole} a ajouté une observation sur "${eventTitle}": "${observationText.substring(0, 100)}${observationText.length > 100 ? '...' : ''}"`,
+    title: authorName,
+    message: `"${observationText.substring(0, 60)}${observationText.length > 60 ? '...' : ''}"`,
     eventId,
     createdAt: new Date().toISOString(),
     read: false,
@@ -217,7 +214,7 @@ export function createObservationAlert(
   };
 }
 
-// Fonction pour créer une suggestion de créneau
+// Créer une suggestion de créneau
 export function createSlotSuggestion(
   fromUserName: string,
   fromUserRole: string,
@@ -230,8 +227,8 @@ export function createSlotSuggestion(
     id: `alert-slot-${Date.now()}`,
     type: 'slot_suggestion',
     priority: 'medium',
-    title: `Suggestion de ${fromUserName}`,
-    message: `${fromUserRole} souhaite prendre le créneau ${slot.time}-${slot.endTime} du ${new Date(slot.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}. Message: "${message}"`,
+    title: `${fromUserName} suggère un créneau`,
+    message: `${slot.time}-${slot.endTime} • "${message}"`,
     createdAt: new Date().toISOString(),
     read: false,
     dismissed: false,
@@ -242,14 +239,14 @@ export function createSlotSuggestion(
   };
 }
 
-// Alertes de démo
+// Alertes de démo avec données réalistes
 export const DEMO_ALERTS: Alert[] = [
   {
     id: 'demo-alert-1',
     type: 'flight_missing',
     priority: 'high',
-    title: 'Vol non réservé - Open Occitanie',
-    message: 'Le tournoi Open Occitanie commence dans 5 jours. Aucun vol n\'est encore réservé pour Montpellier.',
+    title: 'Vol non réservé',
+    message: 'Open Occitanie dans 5j',
     tournamentId: 'montpellier-2026',
     tournamentName: 'Open Occitanie',
     createdAt: new Date().toISOString(),
@@ -260,27 +257,57 @@ export const DEMO_ALERTS: Alert[] = [
   {
     id: 'demo-alert-2',
     type: 'hotel_missing',
-    priority: 'medium',
-    title: 'Hôtel non réservé - Rotterdam',
-    message: 'Le tournoi ABN AMRO Open commence dans 12 jours. Pensez à réserver votre hébergement.',
-    tournamentId: 'rotterdam-2026',
-    tournamentName: 'ABN AMRO Open',
+    priority: 'high',
+    title: 'Hôtel non réservé',
+    message: 'Open Occitanie dans 5j',
+    tournamentId: 'montpellier-2026',
+    tournamentName: 'Open Occitanie',
     createdAt: new Date().toISOString(),
-    dueDate: '2026-02-09',
+    dueDate: '2026-02-02',
     read: false,
     dismissed: false
   },
   {
     id: 'demo-alert-3',
+    type: 'hotel_missing',
+    priority: 'medium',
+    title: 'Hôtel non réservé',
+    message: 'Acapulco dans 14j',
+    tournamentId: 'acapulco-2026',
+    tournamentName: 'Abierto Mexicano Telcel',
+    createdAt: new Date().toISOString(),
+    dueDate: '2026-02-23',
+    read: false,
+    dismissed: false
+  },
+  {
+    id: 'demo-alert-4',
     type: 'observation_new',
     priority: 'low',
-    title: 'Nouvelle observation de Dr. Laurent',
-    message: 'Kiné a ajouté une observation sur "Séance Kiné Épaule": "Épaule droite OK pour entraînement..."',
+    title: 'Dr. Sophie Laurent',
+    message: '"Épaule droite OK pour entraînement..."',
     eventId: 'evt-020',
     createdAt: new Date(Date.now() - 3600000).toISOString(),
     read: true,
     dismissed: false,
     fromUserName: 'Dr. Sophie Laurent',
     fromUserRole: 'Kiné'
+  },
+  {
+    id: 'demo-alert-5',
+    type: 'slot_suggestion',
+    priority: 'medium',
+    title: 'Marc Dupont suggère un créneau',
+    message: '16:00-17:00 • "Séance récup après le match"',
+    createdAt: new Date(Date.now() - 7200000).toISOString(),
+    read: false,
+    dismissed: false,
+    fromUserName: 'Marc Dupont',
+    fromUserRole: 'Préparateur Physique',
+    targetSlot: {
+      date: '2026-02-05',
+      time: '16:00',
+      endTime: '17:00'
+    }
   }
 ];

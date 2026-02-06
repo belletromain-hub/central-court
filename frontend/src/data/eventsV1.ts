@@ -8,7 +8,8 @@ export type EventTypeV1 =
   | 'media'
   | 'sponsor'
   | 'personal'
-  | 'travel';
+  | 'travel'
+  | 'hotel';
 
 export interface EventCategoryV1 {
   color: string;
@@ -57,7 +58,12 @@ export const EVENT_CATEGORIES: Record<EventTypeV1, EventCategoryV1> = {
   travel: {
     color: '#00796b',
     icon: '✈️',
-    label: 'Voyage'
+    label: 'Vol'
+  },
+  hotel: {
+    color: '#5d4037',
+    icon: '🏨',
+    label: 'Hôtel'
   }
 };
 
@@ -83,9 +89,11 @@ export interface CalendarEventV1 {
   cost?: number;
   tournamentId?: string;
   visibleToStaff: boolean;
+  // Nouveau: Lien avec le staff assigné
+  assignedStaffIds?: string[];
 }
 
-// Événements de démo - Février 2026
+// Événements de démo - Février 2026 (avec plus de données pour tester les alertes)
 export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
   // Entraînements Tennis
   {
@@ -105,7 +113,8 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
         createdAt: '2026-02-03T11:15:00'
       }
     ],
-    visibleToStaff: true
+    visibleToStaff: true,
+    assignedStaffIds: ['staff-001']
   },
   {
     id: 'evt-002',
@@ -116,7 +125,8 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
     endTime: '12:00',
     location: 'Mouratoglou Academy, Nice',
     observations: [],
-    visibleToStaff: true
+    visibleToStaff: true,
+    assignedStaffIds: ['staff-001']
   },
   {
     id: 'evt-003',
@@ -127,7 +137,8 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
     endTime: '11:30',
     location: 'CNE Paris',
     observations: [],
-    visibleToStaff: true
+    visibleToStaff: true,
+    assignedStaffIds: ['staff-001']
   },
   
   // Préparation Physique
@@ -148,7 +159,8 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
         createdAt: '2026-02-04T08:45:00'
       }
     ],
-    visibleToStaff: true
+    visibleToStaff: true,
+    assignedStaffIds: ['staff-002']
   },
   {
     id: 'evt-011',
@@ -159,7 +171,8 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
     endTime: '08:00',
     location: 'Salle de sport, Nice',
     observations: [],
-    visibleToStaff: true
+    visibleToStaff: true,
+    assignedStaffIds: ['staff-002']
   },
   
   // Kiné
@@ -181,7 +194,8 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
       }
     ],
     cost: 80,
-    visibleToStaff: true
+    visibleToStaff: true,
+    assignedStaffIds: ['staff-003']
   },
   {
     id: 'evt-021',
@@ -193,7 +207,8 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
     location: 'Cabinet Dr. Laurent, Paris',
     observations: [],
     cost: 90,
-    visibleToStaff: true
+    visibleToStaff: true,
+    assignedStaffIds: ['staff-003']
   },
   
   // Médias
@@ -244,7 +259,7 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
     visibleToStaff: false
   },
   
-  // Voyages
+  // === VOYAGES - Réservés pour Rotterdam (semaine 7) ===
   {
     id: 'evt-060',
     type: 'travel',
@@ -255,7 +270,8 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
     location: 'AF1234',
     cost: 285,
     observations: [],
-    visibleToStaff: true
+    visibleToStaff: true,
+    tournamentId: 'rotterdam-2026'
   },
   {
     id: 'evt-061',
@@ -267,6 +283,39 @@ export const DEMO_EVENTS_FEB_2026: CalendarEventV1[] = [
     location: 'AF5678',
     cost: 310,
     observations: [],
-    visibleToStaff: true
+    visibleToStaff: true,
+    tournamentId: 'rotterdam-2026'
+  },
+  
+  // === HÔTEL - Rotterdam ===
+  {
+    id: 'evt-070',
+    type: 'hotel',
+    title: 'Hôtel Mainport Rotterdam',
+    date: '2026-02-08',
+    endDate: '2026-02-16',
+    location: 'Leuvehaven 77, Rotterdam',
+    cost: 1890,
+    observations: [],
+    visibleToStaff: true,
+    tournamentId: 'rotterdam-2026'
+  },
+  
+  // === PAS de vol/hôtel pour Montpellier (semaine 6) - Génère des alertes ===
+  // === PAS de vol/hôtel pour Doha (semaine 8) - Génère des alertes ===
+  
+  // === VOYAGES - Acapulco (semaine 9) - Vol réservé mais pas d'hôtel ===
+  {
+    id: 'evt-080',
+    type: 'travel',
+    title: 'Vol Paris → Acapulco',
+    date: '2026-02-22',
+    time: '11:00',
+    endTime: '18:00',
+    location: 'AM456 via Mexico City',
+    cost: 1450,
+    observations: [],
+    visibleToStaff: true,
+    tournamentId: 'acapulco-2026'
   }
 ];
