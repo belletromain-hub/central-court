@@ -167,8 +167,36 @@ export default function CalendarScreenV1() {
   
   // Combine all marks for calendar
   const calendarMarks = useMemo(() => {
-    const marks: Record<string, any> = { ...tournamentMarks };
+    const marks: Record<string, any> = {};
     
+    // First, add tournament marks
+    weekTournaments.forEach(week => {
+      week.registrations.forEach(reg => {
+        const tournament = week.tournaments.find(t => t.id === reg.tournamentId);
+        if (tournament) {
+          let currentDate = new Date(tournament.startDate);
+          const endDate = new Date(tournament.endDate);
+          
+          while (currentDate <= endDate) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            if (!marks[dateStr]) {
+              marks[dateStr] = { dots: [] };
+            }
+            // Only add tournament dot if not already present
+            const hasTournamentDot = marks[dateStr].dots?.some((d: any) => d.key === `tournament-${tournament.id}`);
+            if (!hasTournamentDot) {
+              marks[dateStr].dots.push({ 
+                key: `tournament-${tournament.id}`,
+                color: EVENT_CATEGORIES.tournament.color 
+              });
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        }
+      });
+    });
+    
+    // Then add event marks with unique keys
     events.forEach(event => {
       const category = EVENT_CATEGORIES[event.type];
       if (!marks[event.date]) {
@@ -177,7 +205,14 @@ export default function CalendarScreenV1() {
       if (!marks[event.date].dots) {
         marks[event.date].dots = [];
       }
-      marks[event.date].dots.push({ color: category.color });
+      // Only add if not already present (using event id as key)
+      const hasEventDot = marks[event.date].dots.some((d: any) => d.key === `event-${event.id}`);
+      if (!hasEventDot) {
+        marks[event.date].dots.push({ 
+          key: `event-${event.id}`,
+          color: category.color 
+        });
+      }
     });
     
     // Add selected date highlight
@@ -190,7 +225,7 @@ export default function CalendarScreenV1() {
     }
     
     return marks;
-  }, [events, selectedDate, tournamentMarks]);
+  }, [events, selectedDate, weekTournaments]);
   
   // Handle tournament registration (add or update)
   const handleRegisterTournament = async (weekNumber: number, tournamentId: string, status: TournamentStatus) => {
