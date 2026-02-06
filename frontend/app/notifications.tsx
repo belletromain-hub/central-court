@@ -412,6 +412,80 @@ export default function NotificationsScreen() {
         )}
       </ScrollView>
       
+      {/* Modal de réservation (Vol / Hôtel) */}
+      <Modal visible={showBookingModal} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {bookingInfo?.type === 'flight' ? '✈️ Réserver un vol' : '🏨 Réserver un hôtel'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowBookingModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            
+            {bookingInfo && (
+              <>
+                <View style={styles.bookingBox}>
+                  <View style={styles.bookingRow}>
+                    <Text style={styles.bookingLabel}>
+                      {bookingInfo.type === 'flight' ? 'Trajet' : 'Destination'}
+                    </Text>
+                    <Text style={styles.bookingValue}>{bookingInfo.details.destination}</Text>
+                  </View>
+                  
+                  <View style={styles.bookingRow}>
+                    <Text style={styles.bookingLabel}>Dates</Text>
+                    <Text style={styles.bookingValue}>{bookingInfo.details.dates}</Text>
+                    {bookingInfo.details.nights && (
+                      <Text style={styles.bookingNights}>{bookingInfo.details.nights} nuits</Text>
+                    )}
+                  </View>
+                  
+                  <View style={styles.bookingRow}>
+                    <Text style={styles.bookingLabel}>Tournoi</Text>
+                    <Text style={styles.bookingTournament}>{bookingInfo.details.tournamentName}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.bookingTip}>
+                  <Ionicons name="bulb-outline" size={16} color="#f2994a" />
+                  <Text style={styles.bookingTipText}>
+                    {bookingInfo.type === 'flight' 
+                      ? 'Dates optimisées: arrivée 1j avant, retour 1j après le tournoi'
+                      : 'Filtres pré-sélectionnés: WiFi gratuit, salle de sport'}
+                  </Text>
+                </View>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.bookingBtn,
+                    { backgroundColor: bookingInfo.type === 'flight' ? '#00a698' : '#003580' }
+                  ]}
+                  onPress={() => {
+                    Linking.openURL(bookingInfo.url);
+                    setShowBookingModal(false);
+                  }}
+                >
+                  <Text style={styles.bookingBtnText}>
+                    Ouvrir {bookingInfo.type === 'flight' ? 'Skyscanner' : 'Booking.com'}
+                  </Text>
+                  <Ionicons name="open-outline" size={18} color="#fff" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setShowBookingModal(false)}
+                >
+                  <Text style={styles.cancelBtnText}>Plus tard</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+      
       {/* Modal suggestion de créneau */}
       <Modal visible={showSuggestionModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
