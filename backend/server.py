@@ -41,6 +41,7 @@ from routes.event_routes import router as event_router, init_db as init_event_db
 from routes.tournament_routes import router as tournament_router, init_db as init_tournament_db
 from routes.alert_routes import router as alert_router, init_db as init_alert_db
 from routes.preference_routes import router as preference_router, init_db as init_preference_db
+from routes.admin_routes import router as admin_router, init_db as init_admin_db
 
 # Initialize DB in all routes
 init_staff_db(db)
