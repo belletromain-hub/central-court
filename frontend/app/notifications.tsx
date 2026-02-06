@@ -181,20 +181,16 @@ export default function NotificationsScreen() {
           const returnD = new Date(alert.tournamentEndDate);
           returnD.setDate(returnD.getDate() + 1);
           
-          RNAlert.alert(
-            '✈️ Recherche de vols',
-            `${PLAYER_HOME_CITY} → ${alert.tournamentCity}\n\n` +
-            `Aller: ${outbound.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })}\n` +
-            `Retour: ${returnD.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })}\n\n` +
-            `Tournoi: ${alert.tournamentName}`,
-            [
-              { text: 'Annuler', style: 'cancel' },
-              { 
-                text: 'Ouvrir Skyscanner', 
-                onPress: () => Linking.openURL(skyscannerUrl)
-              }
-            ]
-          );
+          setBookingInfo({
+            type: 'flight',
+            url: skyscannerUrl,
+            details: {
+              destination: `${PLAYER_HOME_CITY} → ${alert.tournamentCity}`,
+              dates: `${outbound.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} → ${returnD.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}`,
+              tournamentName: alert.tournamentName || '',
+            }
+          });
+          setShowBookingModal(true);
         }
         break;
         
@@ -215,21 +211,17 @@ export default function NotificationsScreen() {
           
           const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
           
-          RNAlert.alert(
-            '🏨 Recherche d\'hôtels',
-            `${alert.tournamentCity}, ${alert.tournamentCountry}\n\n` +
-            `Arrivée: ${checkIn.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })}\n` +
-            `Départ: ${checkOut.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })}\n` +
-            `(${nights} nuits)\n\n` +
-            `Tournoi: ${alert.tournamentName}`,
-            [
-              { text: 'Annuler', style: 'cancel' },
-              { 
-                text: 'Ouvrir Booking', 
-                onPress: () => Linking.openURL(bookingUrl)
-              }
-            ]
-          );
+          setBookingInfo({
+            type: 'hotel',
+            url: bookingUrl,
+            details: {
+              destination: `${alert.tournamentCity}, ${alert.tournamentCountry}`,
+              dates: `${checkIn.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} → ${checkOut.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}`,
+              nights,
+              tournamentName: alert.tournamentName || '',
+            }
+          });
+          setShowBookingModal(true);
         }
         break;
         
