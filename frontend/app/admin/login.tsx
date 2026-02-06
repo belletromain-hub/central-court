@@ -34,7 +34,7 @@ export default function AdminLogin() {
   return (
     <View style={s.container}>
       <View style={s.card}>
-        <Text style={s.emoji}>\uD83C\uDFBE</Text>
+        <Text style={s.emoji}>🎾</Text>
         <Text style={s.title}>LE COURT CENTRAL</Text>
         <Text style={s.subtitle}>Tableau de bord administrateur</Text>
         {error ? <Text style={s.error}>{error}</Text> : null}
