@@ -36,7 +36,25 @@ db = client.central_court
 
 # Register routers
 from routes.email_routes import router as email_router
+from routes.staff_routes import router as staff_router, init_db as init_staff_db
+from routes.event_routes import router as event_router, init_db as init_event_db
+from routes.tournament_routes import router as tournament_router, init_db as init_tournament_db
+from routes.alert_routes import router as alert_router, init_db as init_alert_db
+from routes.preference_routes import router as preference_router, init_db as init_preference_db
+
+# Initialize DB in all routes
+init_staff_db(db)
+init_event_db(db)
+init_tournament_db(db)
+init_alert_db(db)
+init_preference_db(db)
+
 app.include_router(email_router)
+app.include_router(staff_router)
+app.include_router(event_router)
+app.include_router(tournament_router)
+app.include_router(alert_router)
+app.include_router(preference_router)
 
 # ============ MODELS ============
 
