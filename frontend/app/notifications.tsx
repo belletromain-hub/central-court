@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   Alert as RNAlert,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,10 +15,99 @@ import { useRouter } from 'expo-router';
 import Colors from '../src/constants/colors';
 import {
   Alert,
-  AlertType,
   ALERT_TYPE_CONFIG,
   DEMO_ALERTS,
 } from '../src/data/alertsV1';
+
+// ============================================
+// GÉNÉRATEURS DE LIENS INTELLIGENTS
+// ============================================
+
+// Ville de départ du joueur (à personnaliser dans le profil)
+const PLAYER_HOME_CITY = 'Paris';
+const PLAYER_HOME_AIRPORT = 'CDG'; // Code IATA
+
+// Générer un lien Booking.com intelligent
+function generateBookingUrl(
+  city: string,
+  country: string,
+  checkIn: string, // Date d'arrivée (1 jour avant tournoi)
+  checkOut: string // Date de départ (1 jour après fin tournoi)
+): string {
+  // Calcul des dates optimales
+  const checkInDate = new Date(checkIn);
+  checkInDate.setDate(checkInDate.getDate() - 1); // Arriver 1 jour avant
+  
+  const checkOutDate = new Date(checkOut);
+  checkOutDate.setDate(checkOutDate.getDate() + 1); // Partir 1 jour après
+  
+  // Format dates pour Booking: YYYY-MM-DD
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+  
+  // Construire le lieu de recherche
+  const destination = encodeURIComponent(`${city}, ${country}`);
+  
+  // URL Booking avec paramètres optimisés pour sportif pro
+  const params = new URLSearchParams({
+    ss: `${city}, ${country}`,
+    checkin: formatDate(checkInDate),
+    checkout: formatDate(checkOutDate),
+    group_adults: '1',
+    no_rooms: '1',
+    group_children: '0',
+    sb_travel_purpose: 'business', // Voyage pro
+    nflt: 'hotelfacility=11;hotelfacility=107', // WiFi gratuit + Salle de sport
+  });
+  
+  return `https://www.booking.com/searchresults.fr.html?${params.toString()}`;
+}
+
+// Générer un lien Skyscanner intelligent
+function generateSkyscannerUrl(
+  destinationCity: string,
+  tournamentStart: string,
+  tournamentEnd: string
+): string {
+  // Dates optimales pour un sportif:
+  // Aller: 1-2 jours avant le début
+  // Retour: 1 jour après la fin
+  
+  const outboundDate = new Date(tournamentStart);
+  outboundDate.setDate(outboundDate.getDate() - 1); // 1 jour avant
+  
+  const returnDate = new Date(tournamentEnd);
+  returnDate.setDate(returnDate.getDate() + 1); // 1 jour après
+  
+  // Format date pour Skyscanner: YYMMDD
+  const formatDateSky = (d: Date) => {
+    const y = String(d.getFullYear()).slice(2);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}${m}${day}`;
+  };
+  
+  // Mapping des villes vers codes aéroports (simplifié)
+  const cityToAirport: Record<string, string> = {
+    'Montpellier': 'MPL',
+    'Rotterdam': 'RTM',
+    'Pune': 'PNQ',
+    'Acapulco': 'ACA',
+    'Doha': 'DOH',
+    'Dubai': 'DXB',
+    'Buenos Aires': 'EZE',
+    'Santiago': 'SCL',
+    'Delray Beach': 'PBI', // Palm Beach
+  };
+  
+  const destAirport = cityToAirport[destinationCity] || destinationCity.toLowerCase().slice(0, 3);
+  
+  // URL Skyscanner format: /transport/flights/FROM/TO/DATE1/DATE2/
+  return `https://www.skyscanner.fr/transport/vols/${PLAYER_HOME_AIRPORT.toLowerCase()}/${destAirport.toLowerCase()}/${formatDateSky(outboundDate)}/${formatDateSky(returnDate)}/?adultsv2=1&cabinclass=economy&childrenv2=&ref=home&rtn=1&preferdirects=false&outboundaltsenabled=false&inboundaltsenabled=false`;
+}
+
+// ============================================
+// COMPOSANT PRINCIPAL
+// ============================================
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
@@ -34,7 +124,6 @@ export default function NotificationsScreen() {
     if (filter === 'unread') {
       result = result.filter(a => !a.read);
     }
-    // Trier par priorité puis date
     return result.sort((a, b) => {
       const priorityOrder = { high: 0, medium: 1, low: 2 };
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
@@ -62,14 +151,87 @@ export default function NotificationsScreen() {
     setAlerts(prev => prev.map(a => ({ ...a, read: true })));
   };
   
-  const handleAlertAction = (alert: Alert) => {
+  // Action intelligente selon le type d'alerte
+  const handleAlertAction = async (alert: Alert) => {
     markAsRead(alert.id);
     
-    if (alert.type === 'slot_suggestion') {
-      setSelectedAlert(alert);
-      setShowSuggestionModal(true);
-    } else {
-      router.push('/');
+    switch (alert.type) {
+      case 'flight_missing':
+        if (alert.tournamentCity && alert.tournamentStartDate && alert.tournamentEndDate) {
+          const skyscannerUrl = generateSkyscannerUrl(
+            alert.tournamentCity,
+            alert.tournamentStartDate,
+            alert.tournamentEndDate
+          );
+          
+          // Calculer les dates pour l'affichage
+          const outbound = new Date(alert.tournamentStartDate);
+          outbound.setDate(outbound.getDate() - 1);
+          const returnD = new Date(alert.tournamentEndDate);
+          returnD.setDate(returnD.getDate() + 1);
+          
+          RNAlert.alert(
+            '✈️ Recherche de vols',
+            `${PLAYER_HOME_CITY} → ${alert.tournamentCity}\n\n` +
+            `Aller: ${outbound.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })}\n` +
+            `Retour: ${returnD.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })}\n\n` +
+            `Tournoi: ${alert.tournamentName}`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { 
+                text: 'Ouvrir Skyscanner', 
+                onPress: () => Linking.openURL(skyscannerUrl)
+              }
+            ]
+          );
+        }
+        break;
+        
+      case 'hotel_missing':
+        if (alert.tournamentCity && alert.tournamentCountry && alert.tournamentStartDate && alert.tournamentEndDate) {
+          const bookingUrl = generateBookingUrl(
+            alert.tournamentCity,
+            alert.tournamentCountry,
+            alert.tournamentStartDate,
+            alert.tournamentEndDate
+          );
+          
+          // Calculer les dates pour l'affichage
+          const checkIn = new Date(alert.tournamentStartDate);
+          checkIn.setDate(checkIn.getDate() - 1);
+          const checkOut = new Date(alert.tournamentEndDate);
+          checkOut.setDate(checkOut.getDate() + 1);
+          
+          const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+          
+          RNAlert.alert(
+            '🏨 Recherche d\'hôtels',
+            `${alert.tournamentCity}, ${alert.tournamentCountry}\n\n` +
+            `Arrivée: ${checkIn.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })}\n` +
+            `Départ: ${checkOut.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' })}\n` +
+            `(${nights} nuits)\n\n` +
+            `Tournoi: ${alert.tournamentName}`,
+            [
+              { text: 'Annuler', style: 'cancel' },
+              { 
+                text: 'Ouvrir Booking', 
+                onPress: () => Linking.openURL(bookingUrl)
+              }
+            ]
+          );
+        }
+        break;
+        
+      case 'slot_suggestion':
+        setSelectedAlert(alert);
+        setShowSuggestionModal(true);
+        break;
+        
+      case 'observation_new':
+      case 'registration_pending':
+      default:
+        router.push('/');
+        break;
     }
   };
   
@@ -105,10 +267,17 @@ export default function NotificationsScreen() {
     return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   };
   
-  // Render une carte d'alerte minimaliste style Notion
+  // Render une carte d'alerte minimaliste
   const renderAlertCard = (alert: Alert) => {
     const config = ALERT_TYPE_CONFIG[alert.type];
     const isUrgent = alert.priority === 'high';
+    
+    // Texte du bouton selon le type
+    const getActionLabel = () => {
+      if (alert.type === 'flight_missing') return 'Skyscanner';
+      if (alert.type === 'hotel_missing') return 'Booking';
+      return config.actionLabel;
+    };
     
     return (
       <TouchableOpacity
@@ -120,14 +289,11 @@ export default function NotificationsScreen() {
         onPress={() => handleAlertAction(alert)}
         activeOpacity={0.7}
       >
-        {/* Indicateur de priorité */}
         {isUrgent && <View style={[styles.priorityIndicator, { backgroundColor: config.color }]} />}
         
         <View style={styles.alertMain}>
-          {/* Icône */}
           <Text style={styles.alertIcon}>{config.icon}</Text>
           
-          {/* Contenu */}
           <View style={styles.alertContent}>
             <View style={styles.alertTitleRow}>
               <Text style={[styles.alertTitle, !alert.read && styles.alertTitleUnread]} numberOfLines={1}>
@@ -138,20 +304,23 @@ export default function NotificationsScreen() {
             <Text style={styles.alertMessage} numberOfLines={1}>
               {alert.message}
             </Text>
+            {/* Afficher la destination pour vol/hôtel */}
+            {(alert.type === 'flight_missing' || alert.type === 'hotel_missing') && alert.tournamentCity && (
+              <Text style={styles.alertDestination}>
+                📍 {alert.tournamentCity}
+              </Text>
+            )}
           </View>
           
-          {/* Actions */}
           <View style={styles.alertActions}>
-            {config.actionLabel && (
-              <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: config.color + '15' }]}
-                onPress={() => handleAlertAction(alert)}
-              >
-                <Text style={[styles.actionBtnText, { color: config.color }]}>
-                  {config.actionLabel}
-                </Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity 
+              style={[styles.actionBtn, { backgroundColor: config.color + '15' }]}
+              onPress={() => handleAlertAction(alert)}
+            >
+              <Text style={[styles.actionBtnText, { color: config.color }]}>
+                {getActionLabel()}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.dismissBtn}
               onPress={() => dismissAlert(alert.id)}
@@ -188,7 +357,7 @@ export default function NotificationsScreen() {
         )}
       </View>
       
-      {/* Filtres minimalistes */}
+      {/* Filtres */}
       <View style={styles.filterRow}>
         <TouchableOpacity
           style={[styles.filterBtn, filter === 'all' && styles.filterBtnActive]}
@@ -212,6 +381,12 @@ export default function NotificationsScreen() {
             </View>
           )}
         </TouchableOpacity>
+      </View>
+      
+      {/* Info ville de départ */}
+      <View style={styles.homeInfo}>
+        <Ionicons name="home-outline" size={14} color="#9e9e9e" />
+        <Text style={styles.homeInfoText}>Recherches depuis {PLAYER_HOME_CITY}</Text>
       </View>
       
       {/* Liste des alertes */}
@@ -273,7 +448,7 @@ export default function NotificationsScreen() {
                   <View style={styles.suggestionRow}>
                     <Text style={styles.suggestionLabel}>Message</Text>
                     <Text style={styles.suggestionMessage}>
-                      {selectedAlert.message.split('"')[1] || selectedAlert.message}
+                      {selectedAlert.message.split('•')[1]?.trim().replace(/"/g, '') || selectedAlert.message}
                     </Text>
                   </View>
                 </View>
@@ -372,6 +547,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
+  homeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fafafa',
+  },
+  homeInfoText: {
+    fontSize: 12,
+    color: '#9e9e9e',
+  },
   list: {
     flex: 1,
   },
@@ -381,7 +568,7 @@ const styles = StyleSheet.create({
   alertCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -393,8 +580,8 @@ const styles = StyleSheet.create({
   priorityIndicator: {
     position: 'absolute',
     left: 0,
-    top: 12,
-    bottom: 12,
+    top: 14,
+    bottom: 14,
     width: 3,
     borderRadius: 2,
   },
@@ -438,6 +625,11 @@ const styles = StyleSheet.create({
     color: '#9e9e9e',
     lineHeight: 18,
   },
+  alertDestination: {
+    fontSize: 12,
+    color: '#2d9cdb',
+    marginTop: 2,
+  },
   alertActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -445,7 +637,7 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 4,
   },
   actionBtnText: {
