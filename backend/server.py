@@ -34,6 +34,10 @@ MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client.central_court
 
+# Register routers
+from routes.email_routes import router as email_router
+app.include_router(email_router)
+
 # ============ MODELS ============
 
 class User(BaseModel):
