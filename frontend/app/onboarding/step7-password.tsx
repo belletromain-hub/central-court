@@ -245,7 +245,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textSecondary,
   },
-  backButton: {
     position: 'absolute',
     top: 60,
     left: 16,
