@@ -63,7 +63,7 @@ export default function OnboardingStart() {
           {/* Logo */}
           <View style={styles.logoContainer}>
             <Text style={styles.logoEmoji}>🎾</Text>
-            <Text style={styles.logoText}>Tennis Pro</Text>
+            <Text style={styles.logoText}>Le Court Central</Text>
           </View>
           
           {/* Welcome text */}
