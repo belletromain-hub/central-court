@@ -55,7 +55,7 @@ export default function UserDetail() {
     setActionModal({ type: '', target: null });
   };
 
-  const roleLabels: Record<string, string> = { coach: 'Coach', manager: 'Manager', physio: 'Kin\u00e9sith\u00e9rapeute', nutritionist: 'Nutritionniste', other: 'Autre' };
+  const roleLabels: Record<string, string> = { coach: 'Coach', manager: 'Manager', physio: 'Kinésithérapeute', nutritionist: 'Nutritionniste', other: 'Autre' };
   const timeAgo = (ts: string) => {
     const diff = (Date.now() - new Date(ts).getTime()) / 60000;
     if (diff < 60) return `Il y a ${Math.round(diff)} min`;
@@ -78,7 +78,7 @@ export default function UserDetail() {
     <View style={s.container}>
       <View style={s.topBar}>
         <TouchableOpacity onPress={() => router.push('/admin/users')} style={s.backBtn}>
-          <Text style={s.backText}>\u2190 Utilisateurs</Text>
+          <Text style={s.backText}>← Utilisateurs</Text>
         </TouchableOpacity>
         <Text style={s.topBarTitle}>{user.prenom} {user.nom}</Text>
       </View>
@@ -94,9 +94,9 @@ export default function UserDetail() {
             <Text style={s.headerEmail}>{user.email}</Text>
             {user.telephone && <Text style={s.headerPhone}>{user.telephone}</Text>}
             <View style={s.headerMeta}>
-              <Text style={s.headerTag}>\uD83C\uDFBE {user.circuits?.join(', ')}</Text>
-              {user.classement && <Text style={s.headerTag}>\uD83C\uDFC6 #{user.classement}</Text>}
-              <Text style={s.headerTag}>\uD83D\uDCC5 Inscrit {formatDate(user.createdAt)}</Text>
+              <Text style={s.headerTag}>🎾 {user.circuits?.join(', ')}</Text>
+              {user.classement && <Text style={s.headerTag}>🏆 #{user.classement}</Text>}
+              <Text style={s.headerTag}>📅 Inscrit {formatDate(user.createdAt)}</Text>
               <View style={s.headerStatusRow}>
                 <View style={[s.statusDotSmall, { backgroundColor: getStatusColor(user.activity.lastLoginAt) }]} />
                 <Text style={s.headerTag}>Dernier login : {timeAgo(user.activity.lastLoginAt)}</Text>
@@ -107,13 +107,13 @@ export default function UserDetail() {
           <View style={s.actionsCard}>
             <Text style={s.actionsTitle}>Actions rapides</Text>
             <TouchableOpacity style={s.quickAction} onPress={() => setActionModal({ type: 'reset_password_user', target: user })}>
-              <Text style={s.quickActionText}>\uD83D\uDD12 Reset mot de passe</Text>
+              <Text style={s.quickActionText}>🔒 Reset mot de passe</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.quickAction, { backgroundColor: '#FFF3E0' }]} onPress={() => setActionModal({ type: 'suspend', target: user })}>
-              <Text style={[s.quickActionText, { color: '#E65100' }]}>\u23F8\uFE0F Suspendre compte</Text>
+              <Text style={[s.quickActionText, { color: '#E65100' }]}>⏸️ Suspendre compte</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.quickAction, { backgroundColor: '#FEE2E2' }]} onPress={() => setActionModal({ type: 'delete', target: user })}>
-              <Text style={[s.quickActionText, { color: '#B91C1C' }]}>\uD83D\uDDD1\uFE0F Supprimer compte</Text>
+              <Text style={[s.quickActionText, { color: '#B91C1C' }]}>🗑️ Supprimer compte</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -121,14 +121,14 @@ export default function UserDetail() {
         {/* Metric Cards */}
         <View style={s.metricsGrid}>
           <View style={s.mCard}><Text style={s.mValue}>{user.activity.loginCount}</Text><Text style={s.mLabel}>Connexions/mois</Text></View>
-          <View style={s.mCard}><Text style={s.mValue}>{user.events?.total || 0}</Text><Text style={s.mLabel}>\u00c9v\u00e9nements ({user.events?.accepted || 0} accept\u00e9s)</Text></View>
+          <View style={s.mCard}><Text style={s.mValue}>{user.events?.total || 0}</Text><Text style={s.mLabel}>Événements ({user.events?.accepted || 0} acceptés)</Text></View>
           <View style={s.mCard}><Text style={s.mValue}>{user.documents?.vaultItemsCount || 0}</Text><Text style={s.mLabel}>Documents ({user.documents?.invoicesCount || 0} factures)</Text></View>
           <View style={s.mCard}><Text style={s.mValue}>{staff.length}</Text><Text style={s.mLabel}>Membres staff</Text></View>
         </View>
 
         {/* Activity Chart */}
         <View style={s.chartCard}>
-          <Text style={s.sectionTitle}>\uD83D\uDCCA Connexions par jour (30 derniers jours)</Text>
+          <Text style={s.sectionTitle}>📊 Connexions par jour (30 derniers jours)</Text>
           <View style={{ height: 220, width: '100%' }}>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={activityChart}>
@@ -142,8 +142,8 @@ export default function UserDetail() {
           </View>
           {user.geolocation?.enabled && user.geolocation?.lastKnownLocation && (
             <View style={s.geoRow}>
-              <Text style={s.geoLabel}>\uD83D\uDCCD G\u00e9olocalisation active</Text>
-              <Text style={s.geoValue}>{user.geolocation.lastKnownLocation.city}, {user.geolocation.lastKnownLocation.country} \u2022 {timeAgo(user.geolocation.lastKnownLocation.timestamp)}</Text>
+              <Text style={s.geoLabel}>📍 Géolocalisation active</Text>
+              <Text style={s.geoValue}>{user.geolocation.lastKnownLocation.city}, {user.geolocation.lastKnownLocation.country} • {timeAgo(user.geolocation.lastKnownLocation.timestamp)}</Text>
             </View>
           )}
         </View>
@@ -151,12 +151,12 @@ export default function UserDetail() {
         {/* Events Summary */}
         {user.events && (
           <View style={s.eventsCard}>
-            <Text style={s.sectionTitle}>\uD83D\uDCC5 \u00c9v\u00e9nements</Text>
+            <Text style={s.sectionTitle}>📅 Événements</Text>
             <View style={s.eventsRow}>
               <Text style={s.eventStat}>Total: <Text style={s.bold}>{user.events.total}</Text></Text>
-              <Text style={s.eventStat}>Accept\u00e9s: <Text style={[s.bold, { color: '#10B981' }]}>{user.events.accepted}</Text></Text>
-              <Text style={s.eventStat}>Refus\u00e9s: <Text style={[s.bold, { color: '#EF4444' }]}>{user.events.declined}</Text></Text>
-              <Text style={s.eventStat}>Report\u00e9s: <Text style={[s.bold, { color: '#F59E0B' }]}>{user.events.rescheduled}</Text></Text>
+              <Text style={s.eventStat}>Acceptés: <Text style={[s.bold, { color: '#10B981' }]}>{user.events.accepted}</Text></Text>
+              <Text style={s.eventStat}>Refusés: <Text style={[s.bold, { color: '#EF4444' }]}>{user.events.declined}</Text></Text>
+              <Text style={s.eventStat}>Reportés: <Text style={[s.bold, { color: '#F59E0B' }]}>{user.events.rescheduled}</Text></Text>
               <Text style={s.eventStat}>Avec notes: <Text style={s.bold}>{user.events.withNotes} ({user.events.total > 0 ? Math.round(user.events.withNotes / user.events.total * 100) : 0}%)</Text></Text>
             </View>
           </View>
@@ -164,7 +164,7 @@ export default function UserDetail() {
 
         {/* Staff Members */}
         <View style={s.staffSection}>
-          <Text style={s.sectionTitle}>\uD83D\uDC65 Membres du Staff ({staff.length})</Text>
+          <Text style={s.sectionTitle}>👥 Membres du Staff ({staff.length})</Text>
           {staff.length === 0 ? (
             <Text style={s.emptyText}>Aucun membre du staff</Text>
           ) : staff.map(sm => (
@@ -173,48 +173,48 @@ export default function UserDetail() {
                 <View style={s.staffInfo}>
                   <View style={[s.statusDotSmall, { backgroundColor: getStatusColor(sm.activity?.lastLoginAt || '') }]} />
                   <View>
-                    <Text style={s.staffName}>{sm.prenom} {sm.nom} \u2014 {roleLabels[sm.role] || sm.role}</Text>
+                    <Text style={s.staffName}>{sm.prenom} {sm.nom} — {roleLabels[sm.role] || sm.role}</Text>
                     <Text style={s.staffEmail}>{sm.email}</Text>
                   </View>
                 </View>
                 <View style={s.staffRight}>
                   <TouchableOpacity style={s.miniActionBtn} onPress={() => setActionModal({ type: 'reset_password_staff', target: sm })}>
-                    <Text style={{ fontSize: 12 }}>\uD83D\uDD12</Text>
+                    <Text style={{ fontSize: 12 }}>🔒</Text>
                   </TouchableOpacity>
-                  <Text style={s.toggleIcon}>{expandedStaff === sm.id ? '\u25B2' : '\u25BC'}</Text>
+                  <Text style={s.toggleIcon}>{expandedStaff === sm.id ? '▲' : '▼'}</Text>
                 </View>
               </TouchableOpacity>
 
               {expandedStaff !== sm.id && (
                 <View style={s.staffSummary}>
-                  <Text style={s.staffSumText}>\uD83D\uDCCA {sm.activity?.loginCount || 0} conn./mois</Text>
-                  <Text style={s.staffSumText}>\uD83D\uDCC5 {sm.events?.created || 0} \u00e9v\u00e9nements cr\u00e9\u00e9s</Text>
+                  <Text style={s.staffSumText}>📊 {sm.activity?.loginCount || 0} conn./mois</Text>
+                  <Text style={s.staffSumText}>📅 {sm.events?.created || 0} événements créés</Text>
                 </View>
               )}
 
               {expandedStaff === sm.id && (
                 <View style={s.staffDetails}>
                   <View style={s.detailSection}>
-                    <Text style={s.detailTitle}>ACTIVIT\u00c9</Text>
-                    <Text style={s.detailItem}>\u2022 Dernier login : {sm.activity?.lastLoginAt ? timeAgo(sm.activity.lastLoginAt) : 'N/A'}</Text>
-                    <Text style={s.detailItem}>\u2022 Connexions/mois : {sm.activity?.loginCount || 0}</Text>
+                    <Text style={s.detailTitle}>ACTIVITÉ</Text>
+                    <Text style={s.detailItem}>• Dernier login : {sm.activity?.lastLoginAt ? timeAgo(sm.activity.lastLoginAt) : 'N/A'}</Text>
+                    <Text style={s.detailItem}>• Connexions/mois : {sm.activity?.loginCount || 0}</Text>
                   </View>
                   <View style={s.detailSection}>
-                    <Text style={s.detailTitle}>\u00c9V\u00c9NEMENTS</Text>
-                    <Text style={s.detailItem}>\u2022 Cr\u00e9\u00e9s : {sm.events?.created || 0}</Text>
-                    <Text style={s.detailItem}>\u2022 Modifi\u00e9s : {sm.events?.modified || 0}</Text>
-                    <Text style={s.detailItem}>\u2022 Supprim\u00e9s : {sm.events?.deleted || 0}</Text>
+                    <Text style={s.detailTitle}>ÉVÉNEMENTS</Text>
+                    <Text style={s.detailItem}>• Créés : {sm.events?.created || 0}</Text>
+                    <Text style={s.detailItem}>• Modifiés : {sm.events?.modified || 0}</Text>
+                    <Text style={s.detailItem}>• Supprimés : {sm.events?.deleted || 0}</Text>
                   </View>
                   <View style={s.detailSection}>
-                    <Text style={s.detailTitle}>ACC\u00c8S DOCUMENTS</Text>
-                    <Text style={s.detailItem}>\u2022 Lecture : {sm.documentsAccess?.canView ? '\u2705' : '\u274C'}</Text>
-                    <Text style={s.detailItem}>\u2022 \u00c9dition : {sm.documentsAccess?.canEdit ? '\u2705' : '\u274C'}</Text>
-                    <Text style={s.detailItem}>\u2022 Upload : {sm.documentsAccess?.canUpload ? '\u2705' : '\u274C'}</Text>
+                    <Text style={s.detailTitle}>ACCÈS DOCUMENTS</Text>
+                    <Text style={s.detailItem}>• Lecture : {sm.documentsAccess?.canView ? '✅' : '❌'}</Text>
+                    <Text style={s.detailItem}>• Édition : {sm.documentsAccess?.canEdit ? '✅' : '❌'}</Text>
+                    <Text style={s.detailItem}>• Upload : {sm.documentsAccess?.canUpload ? '✅' : '❌'}</Text>
                   </View>
                   <View style={s.detailSection}>
                     <Text style={s.detailTitle}>MEMBRE DEPUIS</Text>
-                    <Text style={s.detailItem}>\u2022 Invit\u00e9 : {sm.invitedAt ? formatDate(sm.invitedAt) : 'N/A'}</Text>
-                    {sm.acceptedAt && <Text style={s.detailItem}>\u2022 Accept\u00e9 : {formatDate(sm.acceptedAt)}</Text>}
+                    <Text style={s.detailItem}>• Invité : {sm.invitedAt ? formatDate(sm.invitedAt) : 'N/A'}</Text>
+                    {sm.acceptedAt && <Text style={s.detailItem}>• Accepté : {formatDate(sm.acceptedAt)}</Text>}
                   </View>
                 </View>
               )}
@@ -228,14 +228,14 @@ export default function UserDetail() {
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
             <Text style={s.modalTitle}>
-              {actionModal.type === 'delete' ? '\u26A0\uFE0F Supprimer l\'utilisateur' :
-               actionModal.type.includes('reset') ? '\uD83D\uDD10 R\u00e9initialiser le mot de passe' : '\u23F8\uFE0F Suspendre le compte'}
+              {actionModal.type === 'delete' ? '⚠️ Supprimer l\'utilisateur' :
+               actionModal.type.includes('reset') ? '🔐 Réinitialiser le mot de passe' : '⏸️ Suspendre le compte'}
             </Text>
             <View style={s.modalUserBox}>
               <Text style={s.modalUserName}>{actionModal.target?.prenom} {actionModal.target?.nom}</Text>
               <Text style={s.modalUserEmail}>{actionModal.target?.email}</Text>
             </View>
-            {actionModal.type === 'delete' && <Text style={s.modalWarning}>Action irr\u00e9versible. Toutes les donn\u00e9es et {staff.length} membre(s) staff seront supprim\u00e9s.</Text>}
+            {actionModal.type === 'delete' && <Text style={s.modalWarning}>Action irréversible. Toutes les données et {staff.length} membre(s) staff seront supprimés.</Text>}
             <View style={s.modalBtns}>
               <TouchableOpacity style={s.modalCancelBtn} onPress={() => setActionModal({ type: '', target: null })}>
                 <Text style={s.modalCancelText}>Annuler</Text>

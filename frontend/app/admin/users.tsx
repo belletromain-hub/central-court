@@ -66,7 +66,7 @@ export default function AdminUsers() {
     const days = (Date.now() - new Date(user.activity.lastLoginAt).getTime()) / 86400000;
     if (days < 7) return 'Actif';
     if (days < 30) return 'Inactif';
-    return 'Tr\u00e8s inactif';
+    return 'Très inactif';
   };
 
   const handleAction = async (type: string) => {
@@ -102,27 +102,27 @@ export default function AdminUsers() {
       <View style={s.topBar}>
         <View style={s.topBarLeft}>
           <TouchableOpacity onPress={() => router.push('/admin')}>
-            <Text style={s.topBarTitle}>\uD83C\uDFBE LE COURT CENTRAL</Text>
+            <Text style={s.topBarTitle}>🎾 LE COURT CENTRAL</Text>
           </TouchableOpacity>
           <Text style={s.topBarTag}>Admin</Text>
         </View>
         <View style={s.topBarRight}>
           <TouchableOpacity style={s.navBtn} onPress={() => router.push('/admin')}>
-            <Text style={s.navBtnText}>\uD83D\uDCCA Dashboard</Text>
+            <Text style={s.navBtnText}>📊 Dashboard</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-            <Text style={s.logoutText}>D\u00e9connexion</Text>
+            <Text style={s.logoutText}>Déconnexion</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView style={s.content} contentContainerStyle={s.contentInner}>
-        <Text style={s.pageTitle}>\uD83D\uDC65 Utilisateurs</Text>
+        <Text style={s.pageTitle}>👥 Utilisateurs</Text>
         <Text style={s.pageSubtitle}>{total} utilisateur{total > 1 ? 's' : ''} au total</Text>
 
         {/* Filters */}
         <View style={s.filtersRow}>
-          <TextInput style={s.searchInput} placeholder="\uD83D\uDD0D Rechercher par nom ou email..." value={search} onChangeText={setSearch} placeholderTextColor="#9CA3AF" />
+          <TextInput style={s.searchInput} placeholder="🔍 Rechercher par nom ou email..." value={search} onChangeText={setSearch} placeholderTextColor="#9CA3AF" />
           <View style={s.filterGroup}>
             <TouchableOpacity style={[s.filterChip, !circuit && s.filterChipActive]} onPress={() => { setCircuit(''); setPage(1); }}>
               <Text style={[s.filterChipText, !circuit && s.filterChipTextActive]}>Tous</Text>
@@ -153,7 +153,7 @@ export default function AdminUsers() {
                     <View>
                       <Text style={s.userName}>{user.prenom} {user.nom}</Text>
                       <Text style={s.userEmail}>{user.email}</Text>
-                      {(user.staffCount || 0) > 0 && <Text style={s.staffBadge}>\uD83D\uDC65 {user.staffCount} staff</Text>}
+                      {(user.staffCount || 0) > 0 && <Text style={s.staffBadge}>👥 {user.staffCount} staff</Text>}
                     </View>
                   </View>
                 </View>
@@ -170,13 +170,13 @@ export default function AdminUsers() {
                 </View>
                 <View style={[s.td, { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', gap: 6 }]}>
                   <TouchableOpacity style={s.actionBtn} onPress={(e) => { e.stopPropagation(); setActionModal({ type: 'reset_password', user }); }}>
-                    <Text style={s.actionBtnIcon}>\uD83D\uDD12</Text>
+                    <Text style={s.actionBtnIcon}>🔒</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={s.actionBtn} onPress={(e) => { e.stopPropagation(); setActionModal({ type: user.status === 'suspended' ? 'activate' : 'suspend', user }); }}>
-                    <Text style={s.actionBtnIcon}>{user.status === 'suspended' ? '\u25B6\uFE0F' : '\u23F8\uFE0F'}</Text>
+                    <Text style={s.actionBtnIcon}>{user.status === 'suspended' ? '▶️' : '⏸️'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[s.actionBtn, s.deleteBtn]} onPress={(e) => { e.stopPropagation(); setActionModal({ type: 'delete', user }); }}>
-                    <Text style={s.actionBtnIcon}>\uD83D\uDDD1\uFE0F</Text>
+                    <Text style={s.actionBtnIcon}>🗑️</Text>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -188,11 +188,11 @@ export default function AdminUsers() {
         {totalPages > 1 && (
           <View style={s.pagination}>
             <TouchableOpacity style={[s.pageBtn, page <= 1 && s.pageBtnDisabled]} onPress={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>
-              <Text style={s.pageBtnText}>\u2190</Text>
+              <Text style={s.pageBtnText}>←</Text>
             </TouchableOpacity>
             <Text style={s.pageInfo}>Page {page} / {totalPages}</Text>
             <TouchableOpacity style={[s.pageBtn, page >= totalPages && s.pageBtnDisabled]} onPress={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
-              <Text style={s.pageBtnText}>\u2192</Text>
+              <Text style={s.pageBtnText}>→</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -202,23 +202,23 @@ export default function AdminUsers() {
       <Modal visible={!!actionModal.type} animationType="fade" transparent>
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
-            {actionModal.type === 'delete' && <Text style={s.modalEmoji}>\u26A0\uFE0F</Text>}
-            {actionModal.type === 'reset_password' && <Text style={s.modalEmoji}>\uD83D\uDD10</Text>}
-            {(actionModal.type === 'suspend' || actionModal.type === 'activate') && <Text style={s.modalEmoji}>\u23F8\uFE0F</Text>}
+            {actionModal.type === 'delete' && <Text style={s.modalEmoji}>⚠️</Text>}
+            {actionModal.type === 'reset_password' && <Text style={s.modalEmoji}>🔐</Text>}
+            {(actionModal.type === 'suspend' || actionModal.type === 'activate') && <Text style={s.modalEmoji}>⏸️</Text>}
             <Text style={s.modalTitle}>
               {actionModal.type === 'delete' ? 'Supprimer l\'utilisateur' :
-               actionModal.type === 'reset_password' ? 'R\u00e9initialiser le mot de passe' :
-               actionModal.type === 'suspend' ? 'Suspendre le compte' : 'R\u00e9activer le compte'}
+               actionModal.type === 'reset_password' ? 'Réinitialiser le mot de passe' :
+               actionModal.type === 'suspend' ? 'Suspendre le compte' : 'Réactiver le compte'}
             </Text>
             <View style={s.modalUserBox}>
               <Text style={s.modalUserName}>{actionModal.user?.prenom} {actionModal.user?.nom}</Text>
               <Text style={s.modalUserEmail}>{actionModal.user?.email}</Text>
             </View>
             {actionModal.type === 'delete' && (
-              <Text style={s.modalWarning}>\u26A0\uFE0F Cette action est irr\u00e9versible. Toutes les donn\u00e9es seront perdues.</Text>
+              <Text style={s.modalWarning}>⚠️ Cette action est irréversible. Toutes les données seront perdues.</Text>
             )}
             {actionModal.type === 'reset_password' && (
-              <Text style={s.modalInfo}>Un email de r\u00e9initialisation sera envoy\u00e9 \u00e0 cette adresse.</Text>
+              <Text style={s.modalInfo}>Un email de réinitialisation sera envoyé à cette adresse.</Text>
             )}
             <View style={s.modalBtns}>
               <TouchableOpacity style={s.modalCancelBtn} onPress={() => setActionModal({ type: '', user: null })}>

@@ -52,8 +52,8 @@ export default function AdminDashboard() {
   };
 
   const activityIcon = (type: string) => {
-    const icons: Record<string, string> = { login: '\uD83D\uDFE2', upload: '\uD83D\uDCC4', invite: '\uD83D\uDC65', event_create: '\uD83D\uDCC5', event_update: '\u270F\uFE0F', password_reset: '\uD83D\uDD12', user_deleted: '\uD83D\uDDD1\uFE0F' };
-    return icons[type] || '\u25CF';
+    const icons: Record<string, string> = { login: '🟢', upload: '📄', invite: '👥', event_create: '📅', event_update: '✏️', password_reset: '🔒', user_deleted: '🗑️' };
+    return icons[type] || '●';
   };
 
   const timeAgo = (ts: string) => {
@@ -73,44 +73,44 @@ export default function AdminDashboard() {
       {/* TopBar */}
       <View style={s.topBar}>
         <View style={s.topBarLeft}>
-          <Text style={s.topBarEmoji}>\uD83C\uDFBE</Text>
+          <Text style={s.topBarEmoji}>🎾</Text>
           <Text style={s.topBarTitle}>LE COURT CENTRAL</Text>
           <Text style={s.topBarTag}>Admin</Text>
         </View>
         <View style={s.topBarRight}>
           <TouchableOpacity style={s.navBtn} onPress={() => router.push('/admin/users')}>
-            <Text style={s.navBtnText}>\uD83D\uDC65 Utilisateurs</Text>
+            <Text style={s.navBtnText}>👥 Utilisateurs</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-            <Text style={s.logoutText}>D\u00e9connexion</Text>
+            <Text style={s.logoutText}>Déconnexion</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView style={s.content} contentContainerStyle={s.contentInner}>
-        <Text style={s.pageTitle}>\uD83D\uDCCA Vue d'ensemble</Text>
+        <Text style={s.pageTitle}>📊 Vue d'ensemble</Text>
 
         {/* Metric Cards */}
         <View style={s.metricsGrid}>
           <View style={[s.metricCard, { borderLeftColor: '#2D5016' }]}>
             <Text style={s.metricLabel}>Utilisateurs</Text>
             <Text style={s.metricValue}>{metrics.users.total}</Text>
-            <Text style={s.metricSub}>Total enregistr\u00e9s</Text>
+            <Text style={s.metricSub}>Total enregistrés</Text>
           </View>
           <View style={[s.metricCard, { borderLeftColor: '#10B981' }]}>
             <Text style={s.metricLabel}>Actifs</Text>
             <Text style={[s.metricValue, { color: '#10B981' }]}>{metrics.users.active}</Text>
-            <Text style={s.metricSub}>Connect\u00e9s r\u00e9cemment</Text>
+            <Text style={s.metricSub}>Connectés récemment</Text>
           </View>
           <View style={[s.metricCard, { borderLeftColor: '#F59E0B' }]}>
             <Text style={s.metricLabel}>Taux d'activation</Text>
             <Text style={[s.metricValue, { color: '#F59E0B' }]}>{metrics.activation.onboardingCompletionRate}%</Text>
-            <Text style={s.metricSub}>Onboarding compl\u00e9t\u00e9</Text>
+            <Text style={s.metricSub}>Onboarding complété</Text>
           </View>
           <View style={[s.metricCard, { borderLeftColor: '#3B82F6' }]}>
             <Text style={s.metricLabel}>Staff</Text>
             <Text style={[s.metricValue, { color: '#3B82F6' }]}>{metrics.engagement.totalStaff}</Text>
-            <Text style={s.metricSub}>Membres rattach\u00e9s</Text>
+            <Text style={s.metricSub}>Membres rattachés</Text>
           </View>
         </View>
 
@@ -152,30 +152,30 @@ export default function AdminDashboard() {
         {/* Stats Grid */}
         <View style={s.statsRow}>
           <View style={s.statBox}>
-            <Text style={s.statIcon}>\uD83D\uDCCD</Text>
+            <Text style={s.statIcon}>📍</Text>
             <Text style={s.statValue}>{metrics.geolocation.enabledRate}%</Text>
-            <Text style={s.statLabel}>G\u00e9olocalisation activ\u00e9e</Text>
+            <Text style={s.statLabel}>Géolocalisation activée</Text>
           </View>
           <View style={s.statBox}>
-            <Text style={s.statIcon}>\uD83D\uDCC4</Text>
+            <Text style={s.statIcon}>📄</Text>
             <Text style={s.statValue}>{metrics.documents.totalUploads}</Text>
-            <Text style={s.statLabel}>Documents upload\u00e9s</Text>
+            <Text style={s.statLabel}>Documents uploadés</Text>
           </View>
           <View style={s.statBox}>
-            <Text style={s.statIcon}>\uD83E\uDDFE</Text>
+            <Text style={s.statIcon}>🧾</Text>
             <Text style={s.statValue}>{metrics.documents.totalInvoices}</Text>
             <Text style={s.statLabel}>Factures</Text>
           </View>
           <View style={s.statBox}>
-            <Text style={s.statIcon}>\uD83D\uDCBE</Text>
+            <Text style={s.statIcon}>💾</Text>
             <Text style={s.statValue}>{metrics.documents.totalStorageUsed} GB</Text>
-            <Text style={s.statLabel}>Stockage utilis\u00e9</Text>
+            <Text style={s.statLabel}>Stockage utilisé</Text>
           </View>
         </View>
 
         {/* Recent Activity */}
         <View style={s.activityCard}>
-          <Text style={s.chartTitle}>Activit\u00e9 r\u00e9cente</Text>
+          <Text style={s.chartTitle}>Activité récente</Text>
           {activities.map((a, i) => (
             <View key={i} style={s.activityRow}>
               <Text style={s.activityIconText}>{activityIcon(a.type)}</Text>
