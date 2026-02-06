@@ -26,7 +26,7 @@ import Colors from '../../src/constants/colors';
 
 const API_BASE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL 
   || process.env.EXPO_PUBLIC_BACKEND_URL 
-  || 'https://court-registration.preview.emergentagent.com';
+  || 'https://matchpoint-39.preview.emergentagent.com';
 
 const PROFILE_STORAGE_KEY = '@central_court_player_profile';
 
