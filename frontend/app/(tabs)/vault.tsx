@@ -273,41 +273,45 @@ export default function DocumentsScreen() {
           filteredDocs.map(doc => {
             const cat = CATEGORIES[doc.category];
             return (
-              <TouchableOpacity
-                key={doc.id}
-                style={styles.docCard}
-                onPress={() => handleViewDoc(doc)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-              >
-                <View style={[styles.docIcon, { backgroundColor: cat.color + '15' }]}>
-                  <Ionicons 
-                    name={doc.type === 'pdf' ? 'document-text' : 'image'} 
-                    size={22} 
-                    color={cat.color} 
-                  />
-                </View>
-                <View style={styles.docInfo}>
-                  <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
-                  <Text style={styles.docMeta}>{doc.date} • {doc.size}</Text>
-                </View>
+              <View key={doc.id} style={styles.docCard}>
+                <TouchableOpacity 
+                  style={styles.docCardContent}
+                  onPress={() => handleViewDoc(doc)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.docIcon, { backgroundColor: cat.color + '15' }]}>
+                    <Ionicons 
+                      name={doc.type === 'pdf' ? 'document-text' : 'image'} 
+                      size={22} 
+                      color={cat.color} 
+                    />
+                  </View>
+                  <View style={styles.docInfo}>
+                    <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
+                    <Text style={styles.docMeta}>{doc.date} • {doc.size}</Text>
+                  </View>
+                </TouchableOpacity>
                 <View style={styles.docRight}>
-                  {doc.amount !== undefined && (
+                  {doc.amount !== undefined && doc.amount > 0 ? (
                     <Text style={styles.docAmount}>{doc.amount.toFixed(2)} €</Text>
+                  ) : (
+                    <Text style={styles.docAmountMissing}>-- €</Text>
                   )}
                   <TouchableOpacity 
                     style={styles.editBtn}
-                    onPress={() => handleEditDoc(doc)}
-                    activeOpacity={0.6}
-                    accessibilityRole="button"
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => {
+                      console.log('Edit pressed for:', doc.name);
+                      handleEditDoc(doc);
+                    }}
+                    activeOpacity={0.5}
                   >
-                    <Ionicons name="create-outline" size={18} color={Colors.text.secondary} />
+                    <Ionicons name="create-outline" size={20} color="#f57c00" />
                   </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           })
+        )}
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
