@@ -587,10 +587,10 @@ export default function CalendarScreenV1() {
             onPress={() => router.push('/notifications')}
           >
             <Ionicons name="notifications-outline" size={24} color="#fff" />
-            {DEMO_ALERTS.filter(a => !a.read).length > 0 && (
+            {unreadAlertCount > 0 && (
               <View style={styles.notificationBadge}>
                 <Text style={styles.notificationBadgeText}>
-                  {DEMO_ALERTS.filter(a => !a.read).length}
+                  {unreadAlertCount}
                 </Text>
               </View>
             )}
