@@ -1604,7 +1604,11 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
   },
   modalForm: {
-    maxHeight: 400,
+    maxHeight: 500,
+  },
+  pickerSection: {
+    marginVertical: 16,
+    alignItems: 'center',
   },
   inputLabel: {
     fontSize: 13,
