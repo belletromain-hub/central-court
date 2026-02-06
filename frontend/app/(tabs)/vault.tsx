@@ -663,7 +663,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 1,
-    cursor: 'pointer',
+  },
+  docCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   docIcon: {
     width: 44,
