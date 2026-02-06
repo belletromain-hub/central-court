@@ -3,7 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const ONBOARDING_COMPLETE_KEY = '@onboarding_complete';
+const ONBOARDING_COMPLETE_KEY = 'onboarding_completed';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
