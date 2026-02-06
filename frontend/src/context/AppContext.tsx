@@ -157,7 +157,7 @@ const initialMessages: Message[] = [
   },
 ];
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments);
   const [events, setEvents] = useState<CalendarEvent[]>(sampleEvents);
   const [documents, setDocuments] = useState<Document[]>([]);
