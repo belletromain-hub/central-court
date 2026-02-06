@@ -497,6 +497,7 @@ export default function CalendarScreenV1() {
             })}
           </Text>
           <TouchableOpacity
+            data-testid="add-event-btn"
             style={styles.addEventBtn}
             onPress={() => {
               setNewEvent(prev => ({ ...prev, date: selectedDate }));
