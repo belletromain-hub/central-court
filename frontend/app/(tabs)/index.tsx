@@ -485,10 +485,14 @@ export default function CalendarScreenV1() {
             style={styles.notificationBtn}
             onPress={() => router.push('/notifications')}
           >
-            <Ionicons name="notifications" size={24} color="#fff" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>3</Text>
-            </View>
+            <Ionicons name="notifications-outline" size={24} color="#fff" />
+            {DEMO_ALERTS.filter(a => !a.read).length > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {DEMO_ALERTS.filter(a => !a.read).length}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </LinearGradient>
