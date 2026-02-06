@@ -828,4 +828,75 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
+  // Booking modal styles
+  bookingBox: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 16,
+    gap: 14,
+  },
+  bookingRow: {
+    gap: 4,
+  },
+  bookingLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9e9e9e',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  bookingValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  bookingNights: {
+    fontSize: 13,
+    color: '#2d9cdb',
+    marginTop: 2,
+  },
+  bookingTournament: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4f4f4f',
+  },
+  bookingTip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#fff9f0',
+    borderRadius: 8,
+  },
+  bookingTipText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#9e6c00',
+    lineHeight: 18,
+  },
+  bookingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  bookingBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  cancelBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#9e9e9e',
+  },
 });
