@@ -41,7 +41,14 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - ✅ NotesInput - Zone de notes avec templates
 - ✅ RecurrencePicker - Sélecteur de récurrence
 
-#### 5. Onboarding Initial (7 étapes)
+#### 5. Apple-Style Wheel Pickers (NEW - Février 2026)
+- ✅ WheelPicker - Composant wheel picker de base style Apple iOS
+- ✅ AppleTimePicker - Sélecteur d'heure avec minutes toutes les 5 min
+- ✅ AppleDatePicker - Sélecteur de date sans saisie manuelle
+- ✅ AppleOptionPicker - Sélecteur d'options générique
+- ✅ Intégration dans le modal d'ajout d'événement
+
+#### 6. Onboarding Initial (7 étapes)
 - ✅ Step 1: Prénom
 - ✅ Step 2: Date de naissance
 - ✅ Step 3: Circuit(s) (ATP/WTA/ITF)
@@ -50,7 +57,7 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - ✅ Step 6: Email
 - ✅ Step 7: Mot de passe (avec critères de sécurité)
 
-#### 6. Onboarding Progressif (3 modules)
+#### 7. Onboarding Progressif (3 modules)
 - ✅ Module Voyage - Classe de vol et compagnies préférées
 - ✅ Module Hôtel - Équipements essentiels
 - ✅ Module Alimentation - Cuisines et restrictions alimentaires
@@ -77,78 +84,45 @@ Construire une application professionnelle de tennis pour les joueurs profession
     └── src/
         ├── components/
         │   ├── admin/      # Admin components
-        │   └── inputs/     # Fluid input components
+        │   └── inputs/     # Fluid input + Apple wheel pickers
         ├── utils/
         │   ├── onboardingStorage.ts
         │   └── progressiveOnboarding.ts
         └── context/        # React contexts
 ```
 
-## API Endpoints
-
-### Public
-- `GET /api/tournaments/weeks?circuits=atp`
-- `GET /api/tournaments/by-week`
-- `POST /api/users/:userId/register/:tournamentId`
-- `GET /api/users/:userId/alerts`
-
-### Admin
-- `POST /api/admin/login`
-- `GET /api/admin/metrics`
-- `GET /api/admin/users`
-- `GET /api/admin/activity/recent`
-
-## Database Schema
-
-### tournaments
-```json
-{
-  "id": "string",
-  "name": "string",
-  "city": "string",
-  "country": "string",
-  "circuit": "atp|wta|itf",
-  "surface": "string",
-  "category": "string",
-  "prize": "string"
-}
-```
-
-### users
-```json
-{
-  "email": "string",
-  "prenom": "string",
-  "dateNaissance": "date",
-  "circuits": ["string"],
-  "classement": "number"
-}
-```
-
-## Tech Stack
-- **Frontend:** React Native, Expo SDK 54, Expo Router v5, TypeScript
+## Tech Stack (Updated Février 2026)
+- **Frontend:** React Native, Expo SDK 54, Expo Router v6.0.23, React 19.1.0, TypeScript
 - **Backend:** Python, Flask, Uvicorn
 - **Database:** MongoDB
 - **Email:** Resend API (test mode)
-- **UI:** Custom Fluid components + LinearGradient
+- **UI:** Custom Fluid components + Apple Wheel Pickers + LinearGradient
 
 ## Credentials
 - **Admin Dashboard:** admin@lecourtcentral.com / admin123
 - **Preview URL:** https://matchpoint-39.preview.emergentagent.com
 
+## Testing Results (Février 2026)
+- ✅ Application loads correctly
+- ✅ Calendar day selection works
+- ✅ FAB button opens add event modal
+- ✅ Apple-style wheel pickers functional
+- ✅ Time picker shows 5-minute increments
+- ✅ Date picker is wheel-based (no manual input)
+
 ## Priority Backlog
 
-### P2 - In Progress Tasks
-- Intégrer les Fluid Inputs dans les formulaires existants de l'app
+### P2 - Upcoming Tasks
 - Connecter l'onboarding au backend pour sauvegarder les données utilisateur
+- Intégrer les Apple wheel pickers dans d'autres formulaires de l'app
 
-### P3 - Upcoming Tasks
+### P3 - Future Tasks
 - Amélioration des core features (Calendar, Staff Management, Document Vault)
-- Animations et haptic feedback
-- Tests E2E complets
+- Animations et haptic feedback sur les pickers
+- Tests E2E complets sur Expo Go (iPhone/Android)
 - Préparation pour publication app stores
 
-### P4 - Future/Backlog
+### P4 - Backlog
 - Notifications push
 - Synchronisation calendrier externe
 - Mode hors ligne
@@ -156,4 +130,5 @@ Construire une application professionnelle de tennis pour les joueurs profession
 
 ## Notes
 - Email Resend en mode test (emails limités à l'adresse vérifiée)
-- Application optimisée pour web, adaptation mobile en cours
+- Application optimisée pour web, compatible mobile via Expo Go
+- Les wheel pickers utilisent un design inspiré d'iOS avec 3 options visibles
