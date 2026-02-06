@@ -20,6 +20,7 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useRouter } from 'expo-router';
 import Colors from '../../src/constants/colors';
 import { getOnboardingStatus } from '../../src/utils/progressiveOnboarding';
+import { AppleDatePicker, AppleTimePicker, AppleOptionPicker } from '../../src/components/inputs';
 import {
   fetchEvents,
   fetchTournamentWeeks,
