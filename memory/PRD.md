@@ -105,6 +105,7 @@ Construire une application professionnelle de tennis pour les joueurs profession
 ## Testing Results (Février 2026)
 - ✅ Application loads correctly
 - ✅ Calendar day selection works
+- ✅ Calendar dots bug FIXED - no more duplication when clicking dates
 - ✅ FAB button opens add event modal
 - ✅ Apple-style wheel pickers functional
 - ✅ Time picker shows 5-minute increments
@@ -112,8 +113,12 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - ✅ Documents tab - minimalist design with category filters
 - ✅ Documents tab - total expenses updates correctly
 - ✅ Documents tab - upload modal functional
+- ✅ Documents tab - view document modal with preview
+- ✅ Documents tab - edit modal for date/amount/category
+- ✅ Documents tab - automatic amount detection (simulated OCR)
 - ✅ Onboarding welcome screen displays correctly
 - ✅ Onboarding navigation to step1-prenom works
+- ✅ New users redirected to onboarding on first visit
 
 ## Priority Backlog
 
