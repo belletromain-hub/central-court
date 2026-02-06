@@ -905,7 +905,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-    maxHeight: '85%',
+    minHeight: 400,
+    maxHeight: '80%',
   },
   modalHandle: {
     width: 40,
@@ -920,7 +921,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   editFormScroll: {
-    flex: 1,
+    flexGrow: 1,
   },
   editForm: {
     gap: 12,
