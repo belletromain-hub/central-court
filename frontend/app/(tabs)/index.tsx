@@ -409,10 +409,10 @@ export default function CalendarScreenV1() {
   };
   
   // Render tournament week card
-  const renderTournamentWeekCard = (week: WeekTournaments) => {
+  const renderTournamentWeekCard = (week: any) => {
     const visibleTournaments = getVisibleTournaments(week);
-    const registeredTournaments = week.registrations
-      .map(r => ({
+    const registeredTournaments = (week.registrations || [])
+      .map((r: any) => ({
         tournament: week.tournaments.find(t => t.id === r.tournamentId),
         status: r.status
       }))
