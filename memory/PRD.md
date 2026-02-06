@@ -109,6 +109,11 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - ✅ Apple-style wheel pickers functional
 - ✅ Time picker shows 5-minute increments
 - ✅ Date picker is wheel-based (no manual input)
+- ✅ Documents tab - minimalist design with category filters
+- ✅ Documents tab - total expenses updates correctly
+- ✅ Documents tab - upload modal functional
+- ✅ Onboarding welcome screen displays correctly
+- ✅ Onboarding navigation to step1-prenom works
 
 ## Priority Backlog
 
