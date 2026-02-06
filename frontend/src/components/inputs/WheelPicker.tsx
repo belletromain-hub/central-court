@@ -4,10 +4,8 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Animated,
   Platform,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 
 const ITEM_HEIGHT = 44;
 const VISIBLE_ITEMS = 3;
@@ -49,10 +47,6 @@ export default function WheelPicker({
       const newValue = items[index].value;
       if (newValue !== selectedValue) {
         onValueChange(newValue);
-        // Haptic feedback
-        if (Platform.OS !== 'web') {
-          Haptics.selectionAsync();
-        }
       }
     }
   };
