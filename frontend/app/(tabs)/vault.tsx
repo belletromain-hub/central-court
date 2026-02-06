@@ -699,10 +699,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4CAF50',
   },
+  docAmountMissing: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.text.muted,
+  },
   editBtn: {
-    padding: 8,
+    padding: 10,
     borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#FFF3E0',
+    marginTop: 4,
   },
   fab: {
     position: 'absolute',
