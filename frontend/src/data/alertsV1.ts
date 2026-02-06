@@ -18,6 +18,10 @@ export interface Alert {
   message: string;
   tournamentId?: string;
   tournamentName?: string;
+  tournamentCity?: string;
+  tournamentCountry?: string;
+  tournamentStartDate?: string;
+  tournamentEndDate?: string;
   eventId?: string;
   createdAt: string;
   dueDate?: string;
