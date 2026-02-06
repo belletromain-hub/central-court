@@ -137,34 +137,6 @@ export default function CalendarScreenV1() {
     return events.filter(e => e.date === date);
   };
   
-  // Get tournament events for calendar marks
-  const tournamentMarks = useMemo(() => {
-    const marks: Record<string, any> = {};
-    
-    weekTournaments.forEach(week => {
-      // Mark tournaments that have registrations
-      week.registrations.forEach(reg => {
-        const tournament = week.tournaments.find(t => t.id === reg.tournamentId);
-        if (tournament) {
-          // Mark all days of the tournament
-          let currentDate = new Date(tournament.startDate);
-          const endDate = new Date(tournament.endDate);
-          
-          while (currentDate <= endDate) {
-            const dateStr = currentDate.toISOString().split('T')[0];
-            marks[dateStr] = {
-              marked: true,
-              dotColor: EVENT_CATEGORIES.tournament.color,
-            };
-            currentDate.setDate(currentDate.getDate() + 1);
-          }
-        }
-      });
-    });
-    
-    return marks;
-  }, [weekTournaments]);
-  
   // Combine all marks for calendar
   const calendarMarks = useMemo(() => {
     const marks: Record<string, any> = {};
