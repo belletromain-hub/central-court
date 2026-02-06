@@ -449,17 +449,33 @@ export default function DocumentsScreen() {
 
       {/* Edit Document Modal */}
       <Modal visible={showEditModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity 
+            style={styles.modalDismiss} 
+            activeOpacity={1} 
+            onPress={() => setShowEditModal(false)}
+          />
+          <View style={styles.editModalContent}>
+            <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Modifier le document</Text>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <Text style={styles.modalTitle}>Modifier</Text>
+              <TouchableOpacity 
+                style={styles.closeBtn}
+                onPress={() => setShowEditModal(false)}
+              >
                 <Ionicons name="close" size={24} color={Colors.text.primary} />
               </TouchableOpacity>
             </View>
 
             {selectedDoc && (
-              <View style={styles.editForm}>
+              <ScrollView 
+                style={styles.editFormScroll}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
                 {/* Category Picker */}
                 <Text style={styles.inputLabel}>Catégorie</Text>
                 <View style={styles.categoryPicker}>
@@ -487,6 +503,25 @@ export default function DocumentsScreen() {
                   ))}
                 </View>
 
+                {/* Amount Input - More prominent */}
+                <Text style={styles.inputLabel}>Montant</Text>
+                <View style={styles.amountInputContainer}>
+                  <TextInput
+                    style={styles.amountInput}
+                    value={editAmount}
+                    onChangeText={(text) => {
+                      // Only allow numbers and decimal point
+                      const cleaned = text.replace(/[^0-9.,]/g, '').replace(',', '.');
+                      setEditAmount(cleaned);
+                    }}
+                    placeholder="0.00"
+                    placeholderTextColor={Colors.text.muted}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                  />
+                  <Text style={styles.amountCurrency}>€</Text>
+                </View>
+
                 {/* Date Input */}
                 <Text style={styles.inputLabel}>Date</Text>
                 <TextInput
@@ -495,35 +530,28 @@ export default function DocumentsScreen() {
                   onChangeText={setEditDate}
                   placeholder="JJ/MM/AAAA"
                   placeholderTextColor={Colors.text.muted}
-                />
-
-                {/* Amount Input */}
-                <Text style={styles.inputLabel}>Montant (€)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editAmount}
-                  onChangeText={setEditAmount}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.text.muted}
-                  keyboardType="decimal-pad"
+                  returnKeyType="done"
                 />
 
                 {/* Info */}
                 <View style={styles.infoBox}>
-                  <Ionicons name="information-circle" size={18} color="#2196F3" />
+                  <Ionicons name="sparkles" size={18} color="#f57c00" />
                   <Text style={styles.infoText}>
-                    Le montant a été détecté automatiquement. Vous pouvez le modifier si nécessaire.
+                    Données extraites automatiquement par IA. Vérifiez et modifiez si besoin.
                   </Text>
                 </View>
 
                 {/* Save Button */}
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}>
+                  <Ionicons name="checkmark-circle" size={22} color="#fff" />
                   <Text style={styles.saveBtnText}>Enregistrer</Text>
                 </TouchableOpacity>
-              </View>
+                
+                <View style={{ height: 40 }} />
+              </ScrollView>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Loading overlay */}
