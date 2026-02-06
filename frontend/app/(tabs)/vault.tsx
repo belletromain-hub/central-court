@@ -843,8 +843,55 @@ const styles = StyleSheet.create({
     backgroundColor: '#f44336',
   },
   // Edit Modal
+  modalDismiss: {
+    flex: 1,
+  },
+  editModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    maxHeight: '85%',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#ddd',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  editFormScroll: {
+    flex: 1,
+  },
   editForm: {
     gap: 12,
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 32,
+    fontWeight: '700',
+    color: Colors.primary,
+    paddingVertical: 16,
+  },
+  amountCurrency: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginLeft: 8,
   },
   inputLabel: {
     fontSize: 13,
