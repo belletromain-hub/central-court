@@ -382,9 +382,8 @@ export default function CalendarScreenV1() {
     
     // Get assigned staff names
     const staffNames = selectedEvent.assignedStaffIds?.length 
-      ? selectedEvent.assignedStaffIds.map(id => {
-          const staff = DEMO_STAFF.find(s => s.id === id);
-          return staff?.name || 'Staff';
+      ? selectedEvent.assignedStaffIds.map((id: string) => {
+          return 'Staff';
         }).join(', ')
       : 'le staff concerné';
     
