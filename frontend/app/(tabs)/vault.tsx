@@ -237,9 +237,12 @@ export default function DocumentsScreen() {
           filteredDocs.map(doc => {
             const cat = CATEGORIES[doc.category];
             return (
-              <TouchableOpacity
+              <Pressable
                 key={doc.id}
-                style={styles.docCard}
+                style={({ pressed }) => [
+                  styles.docCard,
+                  pressed && { opacity: 0.7 }
+                ]}
                 onPress={() => handleViewDoc(doc)}
                 onLongPress={() => handleDelete(doc)}
               >
@@ -258,17 +261,17 @@ export default function DocumentsScreen() {
                   {doc.amount !== undefined && (
                     <Text style={styles.docAmount}>{doc.amount.toFixed(2)} €</Text>
                   )}
-                  <TouchableOpacity 
-                    style={styles.editBtn}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleEditDoc(doc);
-                    }}
+                  <Pressable 
+                    style={({ pressed }) => [
+                      styles.editBtn,
+                      pressed && { backgroundColor: '#eee' }
+                    ]}
+                    onPress={() => handleEditDoc(doc)}
                   >
-                    <Ionicons name="pencil" size={16} color={Colors.text.secondary} />
-                  </TouchableOpacity>
+                    <Ionicons name="create-outline" size={18} color={Colors.text.secondary} />
+                  </Pressable>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             );
           })
         )}
