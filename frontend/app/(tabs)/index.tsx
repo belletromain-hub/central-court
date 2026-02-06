@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,24 +20,27 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useRouter } from 'expo-router';
 import Colors from '../../src/constants/colors';
 import { getOnboardingStatus } from '../../src/utils/progressiveOnboarding';
+import {
+  fetchEvents,
+  fetchTournamentWeeks,
+  fetchAlerts,
+  createEvent as apiCreateEvent,
+  updateEvent as apiUpdateEvent,
+  addObservation as apiAddObservation,
+  registerTournament as apiRegisterTournament,
+  hideTournament as apiHideTournament,
+} from '../../src/services/api';
 import { 
-  ATP_TOURNAMENTS_FEB_2026, 
-  WeekTournaments, 
-  Tournament,
   TournamentStatus,
-  TournamentRegistration,
   TOURNAMENT_STATUS_LABELS,
   SURFACE_COLORS 
 } from '../../src/data/tournamentsV1';
 import { 
   EVENT_CATEGORIES, 
   EventTypeV1, 
-  CalendarEventV1, 
-  DEMO_EVENTS_FEB_2026,
+  CalendarEventV1,
   Observation
 } from '../../src/data/eventsV1';
-import { DEMO_ALERTS } from '../../src/data/alertsV1';
-import { DEMO_STAFF } from '../../src/data/staffV1';
 
 // Configure French locale
 LocaleConfig.locales['fr'] = {
