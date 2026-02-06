@@ -34,6 +34,7 @@ import {
   DEMO_EVENTS_FEB_2026,
   Observation
 } from '../../src/data/eventsV1';
+import { DEMO_ALERTS } from '../../src/data/alertsV1';
 
 // Configure French locale
 LocaleConfig.locales['fr'] = {
