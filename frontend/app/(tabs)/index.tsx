@@ -87,6 +87,23 @@ export default function CalendarScreenV1() {
   const [showEventConfirmation, setShowEventConfirmation] = useState(false);
   const [eventConfirmationMessage, setEventConfirmationMessage] = useState('');
   
+  // Progressive onboarding trigger
+  const [showTravelPrompt, setShowTravelPrompt] = useState(false);
+  const [promptTournamentName, setPromptTournamentName] = useState('');
+  
+  // Check if travel preferences need to be collected
+  const checkTravelPreferences = useCallback(async (tournamentName: string) => {
+    try {
+      const status = await getOnboardingStatus();
+      if (status.voyage.status !== 'completed' && status.voyage.status !== 'dismissed') {
+        setPromptTournamentName(tournamentName);
+        setShowTravelPrompt(true);
+      }
+    } catch (e) {
+      // Silent fail
+    }
+  }, []);
+  
   // Get events for a specific date
   const getEventsForDate = (date: string) => {
     return events.filter(e => e.date === date);
