@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useRouter } from 'expo-router';
 import Colors from '../../src/constants/colors';
+import { getOnboardingStatus } from '../../src/utils/progressiveOnboarding';
 import { 
   ATP_TOURNAMENTS_FEB_2026, 
   WeekTournaments, 
