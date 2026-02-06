@@ -115,10 +115,15 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - ✅ Documents tab - upload modal functional
 - ✅ Documents tab - view document modal with preview
 - ✅ Documents tab - edit modal for date/amount/category
-- ✅ Documents tab - automatic amount detection (simulated OCR)
+- ✅ Documents tab - AI OCR integration with OpenAI Vision (GPT-4o)
+- ✅ Documents tab - automatic detection of amount, date, category
 - ✅ Onboarding welcome screen displays correctly
 - ✅ Onboarding navigation to step1-prenom works
 - ✅ New users redirected to onboarding on first visit
+
+## Third-Party Integrations
+- **Resend** - Email API for transactional emails (test mode)
+- **OpenAI Vision (GPT-4o)** - Document OCR for automatic extraction of amounts, dates, and categorization
 
 ## Priority Backlog
 
