@@ -59,8 +59,31 @@ export default function CalendarScreenV1() {
   // State
   const [currentMonth, setCurrentMonth] = useState('2026-02');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [events, setEvents] = useState<CalendarEventV1[]>(DEMO_EVENTS_FEB_2026);
-  const [weekTournaments, setWeekTournaments] = useState<WeekTournaments[]>(ATP_TOURNAMENTS_FEB_2026);
+  const [events, setEvents] = useState<CalendarEventV1[]>([]);
+  const [weekTournaments, setWeekTournaments] = useState<any[]>([]);
+  const [unreadAlertCount, setUnreadAlertCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Load data from API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [eventsData, weeksData, alertsData] = await Promise.all([
+          fetchEvents(currentMonth),
+          fetchTournamentWeeks('atp'),
+          fetchAlerts(true),
+        ]);
+        setEvents(eventsData);
+        setWeekTournaments(weeksData);
+        setUnreadAlertCount(alertsData.length);
+      } catch (e) {
+        console.error('Failed to load data:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [currentMonth]);
   
   // Modals
   const [showTournamentModal, setShowTournamentModal] = useState(false);
