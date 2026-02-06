@@ -458,7 +458,7 @@ export default function CalendarScreenV1() {
           );
         })}
         
-        {dayEvents.length === 0 && !isTournamentDay && (
+        {dayEvents.length === 0 && tournamentsForDay.length === 0 && (
           <View style={styles.noEventsPlaceholder}>
             <Ionicons name="calendar-outline" size={32} color={Colors.text.muted} />
             <Text style={styles.noEventsText}>Aucun événement</Text>
