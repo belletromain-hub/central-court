@@ -107,25 +107,57 @@ export default function DocumentsScreen() {
     }
   };
 
-  // Process document with simulated OCR
+  // Process document with AI OCR
   const processDocument = async (uri: string, type: 'pdf' | 'image', name: string) => {
     setIsUploading(true);
     setShowUploadModal(false);
 
-    // Simulate OCR processing
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    let detectedAmount: number | undefined;
+    let detectedDate: string | undefined;
+    let detectedCategory: Document['category'] = 'other';
+    let merchantName: string | undefined;
 
-    // Simulate automatic amount detection (random for demo)
-    const detectedAmount = Math.floor(Math.random() * 300) + 20;
+    try {
+      // For images, convert to base64 and call OCR API
+      if (type === 'image') {
+        // Read file as base64
+        const base64 = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        
+        // Call OCR API
+        const response = await api.post('/api/documents/analyze', {
+          image_base64: base64,
+          filename: name,
+        });
+        
+        if (response.data.success) {
+          detectedAmount = response.data.amount;
+          detectedDate = response.data.date;
+          detectedCategory = response.data.category || 'other';
+          merchantName = response.data.merchant;
+          
+          // Update name with merchant if detected
+          if (merchantName) {
+            name = `${merchantName} - ${name}`;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('OCR analysis error:', error);
+      // Continue with fallback values
+    }
+
+    // Fallback to today's date if not detected
     const today = new Date().toLocaleDateString('fr-FR');
 
     const newDoc: Document = {
       id: `doc-${Date.now()}`,
       name,
-      category: 'other',
+      category: detectedCategory,
       type,
       size: `${Math.floor(Math.random() * 2000) + 100} KB`,
-      date: today,
+      date: detectedDate || today,
       amount: detectedAmount,
       uri,
     };
@@ -135,9 +167,9 @@ export default function DocumentsScreen() {
     
     // Open edit modal to confirm/modify details
     setSelectedDoc(newDoc);
-    setEditDate(today);
-    setEditAmount(detectedAmount.toString());
-    setEditCategory('other');
+    setEditDate(newDoc.date);
+    setEditAmount(newDoc.amount?.toString() || '');
+    setEditCategory(newDoc.category);
     setShowEditModal(true);
   };
 
