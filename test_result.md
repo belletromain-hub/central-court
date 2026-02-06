@@ -199,4 +199,4 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Full backend data migration complete. Created 6 route modules (staff, events, tournaments, alerts, preferences, email) with MongoDB CRUD endpoints. Seeded DB with demo data. Tournaments have circuit field (atp/wta/itf/itf_wheelchair) for filtering. Frontend index.tsx migrated from static imports to API calls (fetchEvents, fetchTournamentWeeks, fetchAlerts). All data now persists in MongoDB. Contextual onboarding trigger works when registering for tournaments."
+    message: "Admin dashboard complete. Backend: admin auth (JWT), metrics aggregation, users CRUD with pagination/search/filters, staff management, activity feed. Frontend: login page, dashboard with Recharts charts (line + pie), users list with table/filters/actions, user detail with staff toggle and bar chart. All seeded with 10 demo users, 14 staff, 30 activity logs. Admin credentials: admin@lecourtcentral.com / admin123"
