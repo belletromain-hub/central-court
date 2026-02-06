@@ -116,7 +116,18 @@ export default function NotificationsScreen() {
   const [alerts, setAlerts] = useState<Alert[]>(DEMO_ALERTS);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+  const [bookingInfo, setBookingInfo] = useState<{
+    type: 'flight' | 'hotel';
+    url: string;
+    details: {
+      destination: string;
+      dates: string;
+      nights?: number;
+      tournamentName: string;
+    };
+  } | null>(null);
   
   // Filtrer les alertes
   const filteredAlerts = useMemo(() => {
