@@ -16,6 +16,10 @@ export default function RootLayout() {
             <Stack.Screen name="invite" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="preferences" options={{ headerShown: false, presentation: 'modal' }} />
+            <Stack.Screen name="profile-edit" options={{ headerShown: false }} />
+            <Stack.Screen name="notifications" options={{ headerShown: false }} />
           </Stack>
         </AppProvider>
       </AuthProvider>
