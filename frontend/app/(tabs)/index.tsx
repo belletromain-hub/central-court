@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { useRouter } from 'expo-router';
 import Colors from '../../src/constants/colors';
 import { 
   ATP_TOURNAMENTS_FEB_2026, 
