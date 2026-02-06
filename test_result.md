@@ -199,4 +199,4 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Implemented 3 features: (1) Contextual trigger modal in index.tsx that shows travel preferences prompt when registering for a tournament with participating/accepted status. (2) Resend email service with 3 endpoints: /api/email/send, /api/email/tournament-alert, /api/email/observation-notification. (3) Backend refactoring with routes/, services/, models/ folders. All endpoints tested via curl and confirmed working. Frontend screenshot verified."
+    message: "Full backend data migration complete. Created 6 route modules (staff, events, tournaments, alerts, preferences, email) with MongoDB CRUD endpoints. Seeded DB with demo data. Tournaments have circuit field (atp/wta/itf/itf_wheelchair) for filtering. Frontend index.tsx migrated from static imports to API calls (fetchEvents, fetchTournamentWeeks, fetchAlerts). All data now persists in MongoDB. Contextual onboarding trigger works when registering for tournaments."
