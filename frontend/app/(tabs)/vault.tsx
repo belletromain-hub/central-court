@@ -238,11 +238,12 @@ export default function DocumentsScreen() {
           filteredDocs.map(doc => {
             const cat = CATEGORIES[doc.category];
             return (
-              <View
+              <TouchableOpacity
                 key={doc.id}
                 style={styles.docCard}
-                // @ts-ignore - for web compatibility
-                onClick={() => handleViewDoc(doc)}
+                onPress={() => handleViewDoc(doc)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
               >
                 <View style={[styles.docIcon, { backgroundColor: cat.color + '15' }]}>
                   <Ionicons 
@@ -259,18 +260,17 @@ export default function DocumentsScreen() {
                   {doc.amount !== undefined && (
                     <Text style={styles.docAmount}>{doc.amount.toFixed(2)} €</Text>
                   )}
-                  <View
+                  <TouchableOpacity 
                     style={styles.editBtn}
-                    // @ts-ignore - for web compatibility
-                    onClick={(e: any) => {
-                      e.stopPropagation();
-                      handleEditDoc(doc);
-                    }}
+                    onPress={() => handleEditDoc(doc)}
+                    activeOpacity={0.6}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons name="create-outline" size={18} color={Colors.text.secondary} />
-                  </View>
+                  </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
