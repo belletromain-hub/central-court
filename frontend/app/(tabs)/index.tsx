@@ -305,6 +305,78 @@ export default function CalendarScreenV1() {
     setNewObservationText('');
   };
   
+  // Open edit event modal
+  const openEditEvent = () => {
+    if (!selectedEvent) return;
+    setEditedEvent({
+      title: selectedEvent.title,
+      date: selectedEvent.date,
+      time: selectedEvent.time || '',
+      endTime: selectedEvent.endTime || '',
+      location: selectedEvent.location || '',
+    });
+    setShowEventDetailModal(false);
+    setShowEditEventModal(true);
+  };
+  
+  // Save event modifications
+  const saveEventModifications = () => {
+    if (!selectedEvent || !editedEvent.title) return;
+    
+    setEvents(prev => prev.map(event => {
+      if (event.id === selectedEvent.id) {
+        return {
+          ...event,
+          title: editedEvent.title || event.title,
+          date: editedEvent.date || event.date,
+          time: editedEvent.time || event.time,
+          endTime: editedEvent.endTime || event.endTime,
+          location: editedEvent.location || event.location,
+        };
+      }
+      return event;
+    }));
+    
+    setShowEditEventModal(false);
+    setEventConfirmationMessage('✅ Événement modifié\n\nVos modifications ont été enregistrées.');
+    setShowEventConfirmation(true);
+  };
+  
+  // Open suggest change modal
+  const openSuggestChange = () => {
+    if (!selectedEvent) return;
+    setEditedEvent({
+      date: selectedEvent.date,
+      time: selectedEvent.time || '',
+      endTime: selectedEvent.endTime || '',
+    });
+    setSuggestionMessage('');
+    setShowEventDetailModal(false);
+    setShowSuggestChangeModal(true);
+  };
+  
+  // Send suggestion to staff
+  const sendSuggestion = () => {
+    if (!selectedEvent) return;
+    
+    // Get assigned staff names
+    const staffNames = selectedEvent.assignedStaffIds?.length 
+      ? selectedEvent.assignedStaffIds.map(id => {
+          const staff = DEMO_STAFF.find(s => s.id === id);
+          return staff?.name || 'Staff';
+        }).join(', ')
+      : 'le staff concerné';
+    
+    setShowSuggestChangeModal(false);
+    setEventConfirmationMessage(
+      `🔄 Suggestion envoyée\n\n` +
+      `${staffNames} recevra votre proposition de modification` +
+      (suggestionMessage ? ` avec votre message.` : '.')
+    );
+    setShowEventConfirmation(true);
+    setSuggestionMessage('');
+  };
+  
   // Get week number for a date
   const getWeekForDate = (date: string) => {
     return weekTournaments.find(week => {
