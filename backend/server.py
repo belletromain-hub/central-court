@@ -42,6 +42,7 @@ from routes.tournament_routes import router as tournament_router, init_db as ini
 from routes.alert_routes import router as alert_router, init_db as init_alert_db
 from routes.preference_routes import router as preference_router, init_db as init_preference_db
 from routes.admin_routes import router as admin_router, init_db as init_admin_db
+from routes.documents import router as documents_router
 
 # Initialize DB in all routes
 init_staff_db(db)
@@ -58,6 +59,7 @@ app.include_router(tournament_router)
 app.include_router(alert_router)
 app.include_router(preference_router)
 app.include_router(admin_router)
+app.include_router(documents_router)
 
 # ============ MODELS ============
 
