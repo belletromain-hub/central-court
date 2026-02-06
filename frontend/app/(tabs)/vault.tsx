@@ -20,7 +20,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import Colors from '../../src/constants/colors';
-import api from '../../src/lib/api';
+import api from '../../src/services/api';
 
 // Types
 interface Document {
