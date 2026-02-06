@@ -794,30 +794,21 @@ export default function CalendarScreenV1() {
             </View>
             
             <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-              {/* Event Type Selector */}
-              <Text style={styles.inputLabel}>Type d'événement</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeSelector}>
-                {(Object.entries(EVENT_CATEGORIES) as [EventTypeV1, typeof EVENT_CATEGORIES[EventTypeV1]][])
-                  .filter(([key]) => key !== 'tournament')
-                  .map(([key, category]) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[
-                      styles.typeOption,
-                      newEvent.type === key && { backgroundColor: category.color }
-                    ]}
-                    onPress={() => setNewEvent({ ...newEvent, type: key })}
-                  >
-                    <Text style={styles.typeOptionEmoji}>{category.icon}</Text>
-                    <Text style={[
-                      styles.typeOptionText,
-                      newEvent.type === key && { color: '#fff' }
-                    ]}>
-                      {category.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              {/* Event Type Selector - Apple Wheel Picker */}
+              <View style={styles.pickerSection}>
+                <AppleOptionPicker
+                  label="Type d'événement"
+                  options={(Object.entries(EVENT_CATEGORIES) as [EventTypeV1, typeof EVENT_CATEGORIES[EventTypeV1]][])
+                    .filter(([key]) => key !== 'tournament')
+                    .map(([key, category]) => ({
+                      label: category.label,
+                      value: key,
+                      icon: category.icon,
+                    }))}
+                  selectedValue={newEvent.type || 'training_tennis'}
+                  onValueChange={(value) => setNewEvent({ ...newEvent, type: value as EventTypeV1 })}
+                />
+              </View>
               
               {/* Title */}
               <Text style={styles.inputLabel}>Titre *</Text>
@@ -829,25 +820,26 @@ export default function CalendarScreenV1() {
                 placeholderTextColor={Colors.text.muted}
               />
               
-              {/* Date */}
-              <Text style={styles.inputLabel}>Date *</Text>
-              <TextInput
-                style={styles.input}
-                value={newEvent.date}
-                onChangeText={date => setNewEvent({ ...newEvent, date })}
-                placeholder="2026-02-15"
-                placeholderTextColor={Colors.text.muted}
-              />
+              {/* Date - Apple Wheel Picker */}
+              <View style={styles.pickerSection}>
+                <AppleDatePicker
+                  label="Date *"
+                  value={newEvent.date || selectedDate || new Date().toISOString().split('T')[0]}
+                  onChange={(date) => setNewEvent({ ...newEvent, date })}
+                  minYear={2024}
+                  maxYear={2030}
+                />
+              </View>
               
-              {/* Time */}
-              <Text style={styles.inputLabel}>Heure</Text>
-              <TextInput
-                style={styles.input}
-                value={newEvent.time}
-                onChangeText={time => setNewEvent({ ...newEvent, time })}
-                placeholder="09:00"
-                placeholderTextColor={Colors.text.muted}
-              />
+              {/* Time - Apple Wheel Picker */}
+              <View style={styles.pickerSection}>
+                <AppleTimePicker
+                  label="Heure"
+                  value={newEvent.time || '09:00'}
+                  onChange={(time) => setNewEvent({ ...newEvent, time })}
+                  minuteStep={5}
+                />
+              </View>
               
               {/* Location */}
               <Text style={styles.inputLabel}>Lieu</Text>
