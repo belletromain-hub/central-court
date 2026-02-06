@@ -57,6 +57,7 @@ app.include_router(event_router)
 app.include_router(tournament_router)
 app.include_router(alert_router)
 app.include_router(preference_router)
+app.include_router(admin_router)
 
 # ============ MODELS ============
 
