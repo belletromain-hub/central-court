@@ -132,6 +132,8 @@ export default function DocumentsScreen() {
           filename: name,
         });
         
+        console.log('OCR Response:', response.data);
+        
         if (response.data.success) {
           detectedAmount = response.data.amount;
           detectedDate = response.data.date;
@@ -139,9 +141,42 @@ export default function DocumentsScreen() {
           merchantName = response.data.merchant;
           
           // Update name with merchant if detected
-          if (merchantName) {
+          if (merchantName && !name.includes(merchantName)) {
             name = `${merchantName} - ${name}`;
           }
+        }
+      } else {
+        // For PDFs, try to extract info from filename
+        // Example: "Invoice - UDM - January 26.pdf"
+        const dateMatch = name.match(/(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})/i);
+        if (dateMatch) {
+          const monthNames: { [key: string]: string } = {
+            'january': '01', 'janvier': '01',
+            'february': '02', 'février': '02',
+            'march': '03', 'mars': '03',
+            'april': '04', 'avril': '04',
+            'may': '05', 'mai': '05',
+            'june': '06', 'juin': '06',
+            'july': '07', 'juillet': '07',
+            'august': '08', 'août': '08',
+            'september': '09', 'septembre': '09',
+            'october': '10', 'octobre': '10',
+            'november': '11', 'novembre': '11',
+            'december': '12', 'décembre': '12',
+          };
+          const month = monthNames[dateMatch[1].toLowerCase()];
+          const day = dateMatch[2].padStart(2, '0');
+          detectedDate = `${day}/${month}/2026`;
+        }
+        
+        // Try to categorize from filename
+        const lowerName = name.toLowerCase();
+        if (lowerName.includes('invoice') || lowerName.includes('facture')) {
+          detectedCategory = 'invoices';
+        } else if (lowerName.includes('hotel') || lowerName.includes('flight') || lowerName.includes('billet') || lowerName.includes('avion')) {
+          detectedCategory = 'travel';
+        } else if (lowerName.includes('medical') || lowerName.includes('pharma') || lowerName.includes('kiné')) {
+          detectedCategory = 'medical';
         }
       }
     } catch (error) {
@@ -166,12 +201,16 @@ export default function DocumentsScreen() {
     setDocuments(prev => [newDoc, ...prev]);
     setIsUploading(false);
     
-    // Open edit modal to confirm/modify details
+    // ALWAYS open edit modal to confirm/modify details
     setSelectedDoc(newDoc);
     setEditDate(newDoc.date);
     setEditAmount(newDoc.amount?.toString() || '');
     setEditCategory(newDoc.category);
-    setShowEditModal(true);
+    
+    // Small delay to ensure state is updated
+    setTimeout(() => {
+      setShowEditModal(true);
+    }, 100);
   };
 
   // View document
