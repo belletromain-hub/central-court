@@ -166,10 +166,17 @@ export default function CalendarScreenV1() {
   
   // Handle tournament registration (add or update)
   const handleRegisterTournament = (weekNumber: number, tournamentId: string, status: TournamentStatus) => {
+    // Find the tournament name for potential travel prompt
+    let tournamentName = '';
+    
     setWeekTournaments(prev => prev.map(week => {
       if (week.weekNumber === weekNumber) {
         let newRegistrations = [...week.registrations];
         let newHiddenIds = [...(week.hiddenTournamentIds || [])];
+        
+        // Get tournament name
+        const tournament = week.tournaments.find(t => t.id === tournamentId);
+        if (tournament) tournamentName = tournament.name;
         
         // Si "Participe" est sélectionné, masquer tous les autres tournois
         if (status === 'participating') {
@@ -202,6 +209,11 @@ export default function CalendarScreenV1() {
       }
       return week;
     }));
+    
+    // Trigger progressive onboarding for travel when registering as participating/accepted
+    if ((status === 'participating' || status === 'accepted') && tournamentName) {
+      checkTravelPreferences(tournamentName);
+    }
   };
   
   // Handle removing registration (pas intéressé - hide tournament)
