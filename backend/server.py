@@ -49,6 +49,7 @@ init_event_db(db)
 init_tournament_db(db)
 init_alert_db(db)
 init_preference_db(db)
+init_admin_db(db)
 
 app.include_router(email_router)
 app.include_router(staff_router)
