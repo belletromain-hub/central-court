@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import asyncio
 from services.ocr_service import analyze_document_with_ai, suggest_category_from_text
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 class AnalyzeDocumentRequest(BaseModel):
     image_base64: str
