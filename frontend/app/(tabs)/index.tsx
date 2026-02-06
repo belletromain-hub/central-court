@@ -253,8 +253,8 @@ export default function CalendarScreenV1() {
   };
   
   // Check if player has a "participating" or "accepted" status for any tournament this week
-  const hasConfirmedParticipation = (week: WeekTournaments): boolean => {
-    return week.registrations.some(r => r.status === 'participating' || r.status === 'accepted');
+  const hasConfirmedParticipation = (week: any): boolean => {
+    return (week.registrations || []).some((r: any) => r.status === 'participating' || r.status === 'accepted');
   };
   
   // Get visible tournaments for a week (filter out hidden ones)
