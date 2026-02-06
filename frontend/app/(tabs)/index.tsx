@@ -77,6 +77,14 @@ export default function CalendarScreenV1() {
   // Observation input
   const [newObservationText, setNewObservationText] = useState('');
   
+  // Event modification
+  const [showEditEventModal, setShowEditEventModal] = useState(false);
+  const [showSuggestChangeModal, setShowSuggestChangeModal] = useState(false);
+  const [editedEvent, setEditedEvent] = useState<Partial<CalendarEventV1>>({});
+  const [suggestionMessage, setSuggestionMessage] = useState('');
+  const [showEventConfirmation, setShowEventConfirmation] = useState(false);
+  const [eventConfirmationMessage, setEventConfirmationMessage] = useState('');
+  
   // Get events for a specific date
   const getEventsForDate = (date: string) => {
     return events.filter(e => e.date === date);
