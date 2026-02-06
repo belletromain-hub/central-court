@@ -35,6 +35,7 @@ import {
   Observation
 } from '../../src/data/eventsV1';
 import { DEMO_ALERTS } from '../../src/data/alertsV1';
+import { DEMO_STAFF } from '../../src/data/staffV1';
 
 // Configure French locale
 LocaleConfig.locales['fr'] = {
