@@ -1182,6 +1182,35 @@ export default function CalendarScreenV1() {
           </View>
         </View>
       </Modal>
+      
+      {/* Travel Preferences Prompt Modal */}
+      <Modal visible={showTravelPrompt} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.travelPromptContent}>
+            <Text style={styles.travelPromptEmoji}>✈️</Text>
+            <Text style={styles.travelPromptTitle}>Préparer ton voyage ?</Text>
+            <Text style={styles.travelPromptText}>
+              Tu participes à <Text style={{ fontWeight: '700' }}>{promptTournamentName}</Text>. Configure tes préférences de voyage pour recevoir des recommandations personnalisées.
+            </Text>
+            <TouchableOpacity
+              style={styles.travelPromptBtn}
+              onPress={() => {
+                setShowTravelPrompt(false);
+                router.push('/preferences/voyage');
+              }}
+            >
+              <Ionicons name="airplane" size={18} color="#fff" />
+              <Text style={styles.travelPromptBtnText}>Configurer mes préférences</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.travelPromptSkip}
+              onPress={() => setShowTravelPrompt(false)}
+            >
+              <Text style={styles.travelPromptSkipText}>Plus tard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
