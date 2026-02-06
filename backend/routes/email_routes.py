@@ -40,6 +40,8 @@ class ObservationNotificationRequest(BaseModel):
 @router.post("/send")
 async def send_generic_email(req: SendEmailRequest):
     """Send a generic email"""
+    if not req.html_content.strip():
+        raise HTTPException(status_code=400, detail="html_content cannot be empty")
     result = await send_email(req.recipient_email, req.subject, req.html_content)
     if result["status"] == "error":
         raise HTTPException(status_code=500, detail=result["error"])
