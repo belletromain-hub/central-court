@@ -47,6 +47,7 @@ LocaleConfig.defaultLocale = 'fr';
 
 export default function CalendarScreenV1() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   
   // State
   const [currentMonth, setCurrentMonth] = useState('2026-02');
