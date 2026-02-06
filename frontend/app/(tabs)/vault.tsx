@@ -351,7 +351,6 @@ export default function DocumentsScreen() {
             );
           })
         )}
-        )}
         <View style={{ height: 100 }} />
       </ScrollView>
 
