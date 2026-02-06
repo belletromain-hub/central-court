@@ -209,13 +209,15 @@ export default function DocumentsScreen() {
       </ScrollView>
 
       {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
+      <Pressable
+        style={({ pressed }) => [
+          styles.fab,
+          pressed && { opacity: 0.8 }
+        ]}
         onPress={() => setShowUploadModal(true)}
-        data-testid="add-document-btn"
       >
         <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+      </Pressable>
 
       {/* Upload Modal */}
       <Modal visible={showUploadModal} animationType="slide" transparent>
