@@ -992,7 +992,7 @@ export default function DocumentsScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.verificationSaveBtn} 
-                  onPress={() => handleVerificationSave(ocrData)}
+                  onPress={handleVerificationSave}
                   testID="btn-save"
                 >
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
@@ -1002,7 +1002,7 @@ export default function DocumentsScreen() {
               
               <View style={{ height: 40 }} />
             </ScrollView>
-          </View>
+          </KeyboardAvoidingView>
         )}
       </Modal>
 
