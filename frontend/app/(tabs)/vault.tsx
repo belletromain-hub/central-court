@@ -114,6 +114,25 @@ export default function DocumentsScreen() {
   const [pendingDocUri, setPendingDocUri] = useState<string | null>(null);
   const [pendingDocType, setPendingDocType] = useState<'pdf' | 'image'>('image');
   const [pendingDocName, setPendingDocName] = useState<string>('');
+  
+  // Inline edit state for verification
+  const [editedMontant, setEditedMontant] = useState<string>('');
+  const [editedDate, setEditedDate] = useState<string>('');
+  const [editedFournisseur, setEditedFournisseur] = useState<string>('');
+  const [editedCategorie, setEditedCategorie] = useState<string>('Autre');
+  const [editedMontantHT, setEditedMontantHT] = useState<string>('');
+  const [editedMontantTVA, setEditedMontantTVA] = useState<string>('');
+  
+  // OCR Categories for inline editing
+  const OCR_CATEGORIES = [
+    { id: 'Transport', label: 'Transport', icon: 'airplane' as const, color: '#00796b' },
+    { id: 'Hébergement', label: 'Hébergement', icon: 'bed' as const, color: '#1976d2' },
+    { id: 'Restauration', label: 'Restauration', icon: 'restaurant' as const, color: '#e64a19' },
+    { id: 'Médical', label: 'Médical', icon: 'medkit' as const, color: '#c2185b' },
+    { id: 'Matériel', label: 'Matériel', icon: 'tennisball' as const, color: '#7b1fa2' },
+    { id: 'Services', label: 'Services', icon: 'briefcase' as const, color: '#0097a7' },
+    { id: 'Autre', label: 'Autre', icon: 'document' as const, color: '#757575' },
+  ];
 
   // Filter documents
   const filteredDocs = selectedCategory 
