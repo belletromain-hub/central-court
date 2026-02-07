@@ -12,7 +12,7 @@ Construire une application professionnelle de tennis pour les joueurs profession
 
 ### Implemented Features
 
-#### 1. Backend API (Flask + MongoDB)
+#### 1. Backend API (FastAPI + MongoDB)
 - ✅ API REST avec routes modulaires
 - ✅ Base de données MongoDB avec seed data
 - ✅ Endpoints pour tournois, utilisateurs, alertes
@@ -41,7 +41,7 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - ✅ NotesInput - Zone de notes avec templates
 - ✅ RecurrencePicker - Sélecteur de récurrence
 
-#### 5. Apple-Style Wheel Pickers (NEW - Février 2026)
+#### 5. Apple-Style Wheel Pickers
 - ✅ WheelPicker - Composant wheel picker de base style Apple iOS
 - ✅ AppleTimePicker - Sélecteur d'heure avec minutes toutes les 5 min
 - ✅ AppleDatePicker - Sélecteur de date sans saisie manuelle
@@ -62,88 +62,118 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - ✅ Module Hôtel - Équipements essentiels
 - ✅ Module Alimentation - Cuisines et restrictions alimentaires
 
+#### 8. Système OCR Ultra-Performant (NEW - Février 2026)
+- ✅ Support images (JPG, PNG, WEBP) et PDF
+- ✅ Conversion PDF → Image avec pdf2image
+- ✅ Prétraitement d'image avancé avec Pillow
+- ✅ Extraction via OpenAI Vision (GPT-4o)
+- ✅ Données extraites:
+  - Montant Total TTC (priorité absolue)
+  - Montant HT et TVA
+  - Date de facture (format JJ/MM/AAAA)
+  - Fournisseur et adresse
+  - N° de facture
+  - Lignes de facture (description, quantité, prix unitaire, montant)
+  - Catégorie auto-détectée (Transport, Hébergement, Restauration, Médical, Matériel, Services)
+  - Score de confiance (0-1)
+- ✅ Validation des données:
+  - Vérification HT + TVA = TTC (tolérance 0.10€)
+  - Détection montants hors plage (< 0.50€ ou > 50 000€)
+  - Avertissement dates futures ou > 2 ans
+- ✅ Retry logic pour appels OpenAI
+- ✅ Frontend avec écran de vérification inline
+
 ## Technical Architecture
 
 ```
 /app
 ├── backend/
-│   ├── server.py           # Main Flask app
-│   ├── routes/             # API route modules
+│   ├── server.py           # Main FastAPI app
+│   ├── routes/
 │   │   ├── admin.py
+│   │   ├── documents.py    # OCR endpoints
 │   │   ├── email_routes.py
 │   │   ├── tournaments.py
 │   │   └── users.py
-│   ├── services/           # Business logic
-│   └── seed.py             # Database seeder
+│   ├── services/
+│   │   └── ocr_service.py  # OCR avec OpenAI Vision
+│   └── tests/
+│       └── test_ocr_endpoints.py
 └── frontend/
     ├── app/                # Expo Router pages
-    │   ├── (tabs)/         # Main app tabs
-    │   ├── admin/          # Admin dashboard
-    │   ├── onboarding/     # 7-step onboarding
-    │   └── preferences/    # Progressive modules
+    │   ├── (tabs)/
+    │   │   ├── vault.tsx   # Documents tab avec OCR
+    │   │   └── index.tsx
+    │   ├── admin/
+    │   ├── onboarding/
+    │   └── preferences/
     └── src/
         ├── components/
-        │   ├── admin/      # Admin components
-        │   └── inputs/     # Fluid input + Apple wheel pickers
+        │   ├── admin/
+        │   ├── documents/  # OCR components
+        │   │   ├── EditableField.tsx
+        │   │   ├── InvoiceVerification.tsx
+        │   │   └── index.ts
+        │   └── inputs/     # Apple wheel pickers
         ├── utils/
-        │   ├── onboardingStorage.ts
-        │   └── progressiveOnboarding.ts
-        └── context/        # React contexts
+        └── context/
 ```
 
-## Tech Stack (Updated Février 2026)
+## API Endpoints - OCR System
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/invoices/analyze-base64` | POST | Analyse OCR avec base64 (images & PDF) |
+| `/api/invoices/upload` | POST | Upload multipart (FormData) |
+| `/api/documents/analyze` | POST | Endpoint legacy (images uniquement) |
+| `/api/documents/categories` | GET | Liste des catégories disponibles |
+
+## Tech Stack (Février 2026)
 - **Frontend:** React Native, Expo SDK 54, Expo Router v6.0.23, React 19.1.0, TypeScript
-- **Backend:** Python, Flask, Uvicorn
+- **Backend:** Python, FastAPI, Uvicorn
 - **Database:** MongoDB
+- **OCR:** OpenAI Vision (GPT-4o) via emergentintegrations
+- **PDF Processing:** pdf2image, Pillow
 - **Email:** Resend API (test mode)
-- **UI:** Custom Fluid components + Apple Wheel Pickers + LinearGradient
 
 ## Credentials
 - **Admin Dashboard:** admin@lecourtcentral.com / admin123
 - **Preview URL:** https://smart-receipt-26.preview.emergentagent.com
 
 ## Testing Results (Février 2026)
-- ✅ Application loads correctly
-- ✅ Calendar day selection works
-- ✅ Calendar dots bug FIXED - no more duplication when clicking dates
-- ✅ FAB button opens add event modal
-- ✅ Apple-style wheel pickers functional
-- ✅ Time picker shows 5-minute increments
-- ✅ Date picker is wheel-based (no manual input)
-- ✅ Documents tab - minimalist design with category filters
-- ✅ Documents tab - total expenses updates correctly
-- ✅ Documents tab - upload modal functional
-- ✅ Documents tab - view document modal with preview
-- ✅ Documents tab - edit modal for date/amount/category
-- ✅ Documents tab - AI OCR integration with OpenAI Vision (GPT-4o)
-- ✅ Documents tab - automatic detection of amount, date, category
-- ✅ Onboarding welcome screen displays correctly
-- ✅ Onboarding navigation to step1-prenom works
-- ✅ New users redirected to onboarding on first visit
+- ✅ Backend OCR: 13/13 tests passés (100%)
+- ✅ Frontend Documents: Toutes fonctionnalités vérifiées
+- ✅ OCR extrait montantTotal, dateFacture, fournisseur, categorie correctement
+- ✅ OCR détecte les lignes de facture avec détails
+- ✅ Validation HT + TVA = TTC fonctionne
+- ✅ Upload modal affiche options photo/fichier avec info PDF
+- ✅ Filtres par catégorie fonctionnent correctement
 
 ## Third-Party Integrations
 - **Resend** - Email API for transactional emails (test mode)
-- **OpenAI Vision (GPT-4o)** - Document OCR for automatic extraction of amounts, dates, and categorization
+- **OpenAI Vision (GPT-4o)** - Document OCR via emergentintegrations library
 
 ## Priority Backlog
 
 ### P2 - Upcoming Tasks
 - Connecter l'onboarding au backend pour sauvegarder les données utilisateur
 - Intégrer les Apple wheel pickers dans d'autres formulaires de l'app
+- Édition inline des champs dans l'écran de vérification OCR
 
 ### P3 - Future Tasks
-- Amélioration des core features (Calendar, Staff Management, Document Vault)
+- Export des dépenses en PDF
+- Notifications push
+- Synchronisation calendrier externe
+
+### P4 - Backlog
+- Mode hors ligne
+- Multi-langue
 - Animations et haptic feedback sur les pickers
 - Tests E2E complets sur Expo Go (iPhone/Android)
 - Préparation pour publication app stores
-
-### P4 - Backlog
-- Notifications push
-- Synchronisation calendrier externe
-- Mode hors ligne
-- Multi-langue
 
 ## Notes
 - Email Resend en mode test (emails limités à l'adresse vérifiée)
 - Application optimisée pour web, compatible mobile via Expo Go
 - Les wheel pickers utilisent un design inspiré d'iOS avec 3 options visibles
+- L'OCR utilise l'API OpenAI Vision (GPT-4o) - pas mocké, vraie intégration
