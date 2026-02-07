@@ -163,12 +163,10 @@ Construire une application professionnelle de tennis pour les joueurs profession
 ## Priority Backlog
 
 ### P2 - Upcoming Tasks
-- Connecter l'onboarding au backend pour sauvegarder les données utilisateur
 - Intégrer les Apple wheel pickers dans d'autres formulaires de l'app
-- Édition inline des champs dans l'écran de vérification OCR
+- Corriger le conflit de route `/api/documents/stats` (placer avant `/{document_id}`)
 
 ### P3 - Future Tasks
-- Export des dépenses en PDF
 - Notifications push
 - Synchronisation calendrier externe
 
