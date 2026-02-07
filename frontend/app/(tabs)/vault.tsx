@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import Colors from '../../src/constants/colors';
 import api from '../../src/services/api';
+import InvoiceVerification, { InvoiceData } from '../../src/components/documents/InvoiceVerification';
 
 // Types
 interface Document {
@@ -33,9 +34,26 @@ interface Document {
   date: string;
   amount?: number;
   uri?: string;
+  fournisseur?: string;
+  description?: string;
 }
 
-// Categories
+// Categories mapping entre nouveau et ancien format
+const CATEGORY_MAP: Record<string, Document['category']> = {
+  'Transport': 'travel',
+  'Hébergement': 'travel',
+  'Restauration': 'invoices',
+  'Médical': 'medical',
+  'Matériel': 'other',
+  'Services': 'invoices',
+  'Autre': 'other',
+  'travel': 'travel',
+  'invoices': 'invoices',
+  'medical': 'medical',
+  'other': 'other',
+};
+
+// Categories for display
 const CATEGORIES = {
   travel: { label: 'Voyages', icon: 'airplane', color: '#00796b' },
   invoices: { label: 'Factures', icon: 'receipt', color: '#f57c00' },
@@ -59,11 +77,18 @@ export default function DocumentsScreen() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [editDate, setEditDate] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editCategory, setEditCategory] = useState<string>('other');
+  
+  // OCR state
+  const [ocrData, setOcrData] = useState<InvoiceData | null>(null);
+  const [pendingDocUri, setPendingDocUri] = useState<string | null>(null);
+  const [pendingDocType, setPendingDocType] = useState<'pdf' | 'image'>('image');
+  const [pendingDocName, setPendingDocName] = useState<string>('');
 
   // Filter documents
   const filteredDocs = selectedCategory 
@@ -75,6 +100,8 @@ export default function DocumentsScreen() {
 
   // Handle photo capture
   const handleTakePhoto = async () => {
+    setShowUploadModal(false);
+    
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission requise', 'Accès à la caméra nécessaire.');
@@ -86,12 +113,14 @@ export default function DocumentsScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      await processDocument(result.assets[0].uri, 'image', `Photo_${Date.now()}.jpg`);
+      await processDocumentWithOCR(result.assets[0].uri, 'image', `Photo_${Date.now()}.jpg`);
     }
   };
 
   // Handle file selection
   const handleSelectFile = async () => {
+    setShowUploadModal(false);
+    
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
@@ -101,116 +130,136 @@ export default function DocumentsScreen() {
       if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
         const type = file.mimeType?.includes('pdf') ? 'pdf' : 'image';
-        await processDocument(file.uri, type, file.name || `Document_${Date.now()}`);
+        await processDocumentWithOCR(file.uri, type, file.name || `Document_${Date.now()}`);
       }
     } catch (error) {
       console.error('Error:', error);
+      Alert.alert('Erreur', 'Impossible de sélectionner le fichier');
     }
   };
 
-  // Process document with AI OCR
-  const processDocument = async (uri: string, type: 'pdf' | 'image', name: string) => {
+  // Process document with new OCR system
+  const processDocumentWithOCR = async (uri: string, type: 'pdf' | 'image', name: string) => {
     setIsUploading(true);
-    setShowUploadModal(false);
-
-    let detectedAmount: number | undefined;
-    let detectedDate: string | undefined;
-    let detectedCategory: Document['category'] = 'other';
-    let merchantName: string | undefined;
+    setPendingDocUri(uri);
+    setPendingDocType(type);
+    setPendingDocName(name);
 
     try {
-      // For images, convert to base64 and call OCR API
-      if (type === 'image') {
-        // Read file as base64
-        const base64 = await FileSystem.readAsStringAsync(uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        
-        // Call OCR API
-        const response = await api.post('/api/documents/analyze', {
-          image_base64: base64,
-          filename: name,
-        });
-        
-        console.log('OCR Response:', response.data);
-        
-        if (response.data.success) {
-          detectedAmount = response.data.amount;
-          detectedDate = response.data.date;
-          detectedCategory = response.data.category || 'other';
-          merchantName = response.data.merchant;
-          
-          // Update name with merchant if detected
-          if (merchantName && !name.includes(merchantName)) {
-            name = `${merchantName} - ${name}`;
-          }
-        }
+      // Read file as base64
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      // Call the new OCR API that supports both images and PDFs
+      const response = await api.post('/api/invoices/analyze-base64', {
+        image_base64: base64,
+        filename: name,
+      });
+      
+      console.log('OCR Response:', response.data);
+      
+      if (response.data.success && response.data.data) {
+        // Store OCR data and show verification screen
+        setOcrData(response.data.data);
+        setIsUploading(false);
+        setShowVerificationModal(true);
       } else {
-        // For PDFs, try to extract info from filename
-        // Example: "Invoice - UDM - January 26.pdf"
-        const dateMatch = name.match(/(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})/i);
-        if (dateMatch) {
-          const monthNames: { [key: string]: string } = {
-            'january': '01', 'janvier': '01',
-            'february': '02', 'février': '02',
-            'march': '03', 'mars': '03',
-            'april': '04', 'avril': '04',
-            'may': '05', 'mai': '05',
-            'june': '06', 'juin': '06',
-            'july': '07', 'juillet': '07',
-            'august': '08', 'août': '08',
-            'september': '09', 'septembre': '09',
-            'october': '10', 'octobre': '10',
-            'november': '11', 'novembre': '11',
-            'december': '12', 'décembre': '12',
-          };
-          const month = monthNames[dateMatch[1].toLowerCase()];
-          const day = dateMatch[2].padStart(2, '0');
-          detectedDate = `${day}/${month}/2026`;
-        }
+        // OCR failed, show basic edit modal
+        setIsUploading(false);
         
-        // Try to categorize from filename
-        const lowerName = name.toLowerCase();
-        if (lowerName.includes('invoice') || lowerName.includes('facture')) {
-          detectedCategory = 'invoices';
-        } else if (lowerName.includes('hotel') || lowerName.includes('flight') || lowerName.includes('billet') || lowerName.includes('avion')) {
-          detectedCategory = 'travel';
-        } else if (lowerName.includes('medical') || lowerName.includes('pharma') || lowerName.includes('kiné')) {
-          detectedCategory = 'medical';
-        }
+        const newDoc: Document = {
+          id: `doc-${Date.now()}`,
+          name,
+          category: 'other',
+          type,
+          size: `${Math.floor(Math.random() * 2000) + 100} KB`,
+          date: new Date().toLocaleDateString('fr-FR'),
+          amount: undefined,
+          uri,
+        };
+        
+        setDocuments(prev => [newDoc, ...prev]);
+        setSelectedDoc(newDoc);
+        setEditDate(newDoc.date);
+        setEditAmount('');
+        setEditCategory(newDoc.category);
+        setShowEditModal(true);
+        
+        Alert.alert(
+          'Extraction limitée',
+          response.data.error || 'Impossible d\'extraire les données automatiquement. Veuillez saisir les informations manuellement.',
+          [{ text: 'OK' }]
+        );
       }
-    } catch (error) {
-      console.log('OCR analysis error:', error);
-      // Continue with fallback values
+    } catch (error: any) {
+      console.error('OCR Error:', error);
+      setIsUploading(false);
+      
+      // Create document anyway and let user edit manually
+      const newDoc: Document = {
+        id: `doc-${Date.now()}`,
+        name,
+        category: 'other',
+        type,
+        size: `${Math.floor(Math.random() * 2000) + 100} KB`,
+        date: new Date().toLocaleDateString('fr-FR'),
+        amount: undefined,
+        uri,
+      };
+      
+      setDocuments(prev => [newDoc, ...prev]);
+      setSelectedDoc(newDoc);
+      setEditDate(newDoc.date);
+      setEditAmount('');
+      setEditCategory(newDoc.category);
+      setShowEditModal(true);
+      
+      Alert.alert(
+        'Erreur OCR',
+        'Le service d\'extraction n\'est pas disponible. Veuillez saisir les informations manuellement.',
+        [{ text: 'OK' }]
+      );
     }
+  };
 
-    // Fallback to today's date if not detected
-    const today = new Date().toLocaleDateString('fr-FR');
-
+  // Handle verification save
+  const handleVerificationSave = (data: InvoiceData) => {
+    const mappedCategory = CATEGORY_MAP[data.categorie || 'Autre'] || 'other';
+    
     const newDoc: Document = {
       id: `doc-${Date.now()}`,
-      name,
-      category: detectedCategory,
-      type,
+      name: data.fournisseur ? `${data.fournisseur} - ${pendingDocName}` : pendingDocName,
+      category: mappedCategory,
+      type: pendingDocType,
       size: `${Math.floor(Math.random() * 2000) + 100} KB`,
-      date: detectedDate || today,
-      amount: detectedAmount,
-      uri,
+      date: data.dateFacture || new Date().toLocaleDateString('fr-FR'),
+      amount: data.montantTotal || undefined,
+      uri: pendingDocUri || undefined,
+      fournisseur: data.fournisseur || undefined,
+      description: data.description || undefined,
     };
-
+    
     setDocuments(prev => [newDoc, ...prev]);
-    setIsUploading(false);
+    setShowVerificationModal(false);
+    setOcrData(null);
+    setPendingDocUri(null);
+    setPendingDocName('');
     
-    // ALWAYS open edit modal to confirm/modify details
-    setSelectedDoc(newDoc);
-    setEditDate(newDoc.date);
-    setEditAmount(newDoc.amount?.toString() || '');
-    setEditCategory(newDoc.category);
-    
-    // Small delay to ensure state is updated
-    setTimeout(() => {
-      setShowEditModal(true);
-    }, 100);
+    // Show success message
+    Alert.alert(
+      'Document enregistré',
+      `${newDoc.name}\nMontant: ${newDoc.amount?.toFixed(2) || '--'} €`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  // Handle verification cancel
+  const handleVerificationCancel = () => {
+    setShowVerificationModal(false);
+    setOcrData(null);
+    setPendingDocUri(null);
+    setPendingDocName('');
   };
 
   // View document
@@ -280,6 +329,7 @@ export default function DocumentsScreen() {
         <TouchableOpacity
           style={[styles.filterChip, !selectedCategory && styles.filterChipActive]}
           onPress={() => setSelectedCategory(null)}
+          testID="filter-all"
         >
           <Text style={[styles.filterText, !selectedCategory && styles.filterTextActive]}>Tous</Text>
         </TouchableOpacity>
@@ -288,6 +338,7 @@ export default function DocumentsScreen() {
             key={key}
             style={[styles.filterChip, selectedCategory === key && styles.filterChipActive]}
             onPress={() => setSelectedCategory(selectedCategory === key ? null : key)}
+            testID={`filter-${key}`}
           >
             <Ionicons name={cat.icon as any} size={14} color={selectedCategory === key ? '#fff' : Colors.text.secondary} />
             <Text style={[styles.filterText, selectedCategory === key && styles.filterTextActive]}>{cat.label}</Text>
@@ -312,11 +363,12 @@ export default function DocumentsScreen() {
           filteredDocs.map(doc => {
             const cat = CATEGORIES[doc.category];
             return (
-              <View key={doc.id} style={styles.docCard}>
+              <View key={doc.id} style={styles.docCard} testID={`doc-${doc.id}`}>
                 <TouchableOpacity 
                   style={styles.docCardContent}
                   onPress={() => handleViewDoc(doc)}
                   activeOpacity={0.7}
+                  testID={`doc-view-${doc.id}`}
                 >
                   <View style={[styles.docIcon, { backgroundColor: cat.color + '15' }]}>
                     <Ionicons 
@@ -338,11 +390,9 @@ export default function DocumentsScreen() {
                   )}
                   <TouchableOpacity 
                     style={styles.editBtn}
-                    onPress={() => {
-                      console.log('Edit pressed for:', doc.name);
-                      handleEditDoc(doc);
-                    }}
+                    onPress={() => handleEditDoc(doc)}
                     activeOpacity={0.5}
+                    testID={`doc-edit-${doc.id}`}
                   >
                     <Ionicons name="create-outline" size={20} color="#f57c00" />
                   </TouchableOpacity>
@@ -361,6 +411,7 @@ export default function DocumentsScreen() {
           pressed && { opacity: 0.8 }
         ]}
         onPress={() => setShowUploadModal(true)}
+        testID="fab-add-document"
       >
         <Ionicons name="add" size={28} color="#fff" />
       </Pressable>
@@ -371,12 +422,12 @@ export default function DocumentsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Ajouter un document</Text>
-              <TouchableOpacity onPress={() => setShowUploadModal(false)}>
+              <TouchableOpacity onPress={() => setShowUploadModal(false)} testID="close-upload-modal">
                 <Ionicons name="close" size={24} color={Colors.text.primary} />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.uploadOption} onPress={handleTakePhoto}>
+            <TouchableOpacity style={styles.uploadOption} onPress={handleTakePhoto} testID="btn-take-photo">
               <View style={[styles.uploadIcon, { backgroundColor: '#4CAF5015' }]}>
                 <Ionicons name="camera" size={28} color="#4CAF50" />
               </View>
@@ -386,7 +437,7 @@ export default function DocumentsScreen() {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.uploadOption} onPress={handleSelectFile}>
+            <TouchableOpacity style={styles.uploadOption} onPress={handleSelectFile} testID="btn-select-file">
               <View style={[styles.uploadIcon, { backgroundColor: Colors.primary + '15' }]}>
                 <Ionicons name="document" size={28} color={Colors.primary} />
               </View>
@@ -395,6 +446,14 @@ export default function DocumentsScreen() {
                 <Text style={styles.uploadDesc}>PDF ou image depuis vos fichiers</Text>
               </View>
             </TouchableOpacity>
+            
+            {/* New: Info about PDF support */}
+            <View style={styles.infoBox}>
+              <Ionicons name="sparkles" size={18} color="#f57c00" />
+              <Text style={styles.infoText}>
+                Nouveau ! Les PDF sont maintenant analysés automatiquement.
+              </Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -405,7 +464,7 @@ export default function DocumentsScreen() {
           <View style={[styles.modalContent, { maxHeight: '80%' }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle} numberOfLines={1}>{selectedDoc?.name}</Text>
-              <TouchableOpacity onPress={() => setShowViewModal(false)}>
+              <TouchableOpacity onPress={() => setShowViewModal(false)} testID="close-view-modal">
                 <Ionicons name="close" size={24} color={Colors.text.primary} />
               </TouchableOpacity>
             </View>
@@ -469,6 +528,7 @@ export default function DocumentsScreen() {
                       setShowViewModal(false);
                       handleEditDoc(selectedDoc);
                     }}
+                    testID="btn-edit-from-view"
                   >
                     <Ionicons name="pencil" size={20} color="#fff" />
                     <Text style={styles.actionBtnText}>Modifier</Text>
@@ -479,6 +539,7 @@ export default function DocumentsScreen() {
                       setShowViewModal(false);
                       handleDelete(selectedDoc);
                     }}
+                    testID="btn-delete-from-view"
                   >
                     <Ionicons name="trash" size={20} color="#fff" />
                     <Text style={styles.actionBtnText}>Supprimer</Text>
@@ -508,6 +569,7 @@ export default function DocumentsScreen() {
               <TouchableOpacity 
                 style={styles.closeBtn}
                 onPress={() => setShowEditModal(false)}
+                testID="close-edit-modal"
               >
                 <Ionicons name="close" size={24} color={Colors.text.primary} />
               </TouchableOpacity>
@@ -530,6 +592,7 @@ export default function DocumentsScreen() {
                         editCategory === key && { backgroundColor: cat.color + '20', borderColor: cat.color }
                       ]}
                       onPress={() => setEditCategory(key)}
+                      testID={`edit-category-${key}`}
                     >
                       <Ionicons 
                         name={cat.icon as any} 
@@ -546,14 +609,13 @@ export default function DocumentsScreen() {
                   ))}
                 </View>
 
-                {/* Amount Input - More prominent */}
+                {/* Amount Input */}
                 <Text style={styles.inputLabel}>Montant</Text>
                 <View style={styles.amountInputContainer}>
                   <TextInput
                     style={styles.amountInput}
                     value={editAmount}
                     onChangeText={(text) => {
-                      // Only allow numbers and decimal point
                       const cleaned = text.replace(/[^0-9.,]/g, '').replace(',', '.');
                       setEditAmount(cleaned);
                     }}
@@ -561,6 +623,7 @@ export default function DocumentsScreen() {
                     placeholderTextColor={Colors.text.muted}
                     keyboardType="decimal-pad"
                     returnKeyType="done"
+                    testID="edit-amount-input"
                   />
                   <Text style={styles.amountCurrency}>€</Text>
                 </View>
@@ -574,6 +637,7 @@ export default function DocumentsScreen() {
                   placeholder="JJ/MM/AAAA"
                   placeholderTextColor={Colors.text.muted}
                   returnKeyType="done"
+                  testID="edit-date-input"
                 />
 
                 {/* Info */}
@@ -585,7 +649,7 @@ export default function DocumentsScreen() {
                 </View>
 
                 {/* Save Button */}
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit} testID="btn-save-edit">
                   <Ionicons name="checkmark-circle" size={22} color="#fff" />
                   <Text style={styles.saveBtnText}>Enregistrer</Text>
                 </TouchableOpacity>
@@ -597,12 +661,25 @@ export default function DocumentsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Invoice Verification Modal */}
+      <Modal visible={showVerificationModal} animationType="slide">
+        {ocrData && (
+          <InvoiceVerification
+            data={ocrData}
+            imageUri={pendingDocUri || undefined}
+            fileType={pendingDocType}
+            onSave={handleVerificationSave}
+            onCancel={handleVerificationCancel}
+          />
+        )}
+      </Modal>
+
       {/* Loading overlay */}
       {isUploading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#fff" />
           <Text style={styles.loadingText}>Analyse du document...</Text>
-          <Text style={styles.loadingSubtext}>Détection du montant en cours</Text>
+          <Text style={styles.loadingSubtext}>Extraction des données en cours</Text>
         </View>
       )}
     </View>
@@ -814,6 +891,22 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: 2,
   },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FFF3E0',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#E65100',
+    lineHeight: 18,
+  },
   // View Modal
   viewContent: {
     gap: 16,
@@ -922,9 +1015,6 @@ const styles = StyleSheet.create({
   editFormScroll: {
     flexGrow: 1,
   },
-  editForm: {
-    gap: 12,
-  },
   amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -963,6 +1053,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 16,
   },
   categoryOption: {
     flexDirection: 'row',
@@ -980,22 +1071,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.text.secondary,
   },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#FFF3E0',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#E65100',
-    lineHeight: 18,
-  },
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1004,7 +1079,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
-    alignItems: 'center',
     marginTop: 8,
   },
   saveBtnText: {
