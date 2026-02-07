@@ -43,6 +43,7 @@ from routes.alert_routes import router as alert_router, init_db as init_alert_db
 from routes.preference_routes import router as preference_router, init_db as init_preference_db
 from routes.admin_routes import router as admin_router, init_db as init_admin_db
 from routes.documents import router as documents_router, init_db as init_documents_db
+from routes.user_routes import router as user_router, init_db as init_user_db
 
 # Initialize DB in all routes
 init_staff_db(db)
@@ -52,6 +53,7 @@ init_alert_db(db)
 init_preference_db(db)
 init_admin_db(db)
 init_documents_db(db)
+init_user_db(db)
 
 app.include_router(email_router)
 app.include_router(staff_router)
