@@ -689,13 +689,173 @@ export default function DocumentsScreen() {
       {/* Invoice Verification Modal */}
       <Modal visible={showVerificationModal} animationType="slide">
         {ocrData && (
-          <InvoiceVerification
-            data={ocrData}
-            imageUri={pendingDocUri || undefined}
-            fileType={pendingDocType}
-            onSave={handleVerificationSave}
-            onCancel={handleVerificationCancel}
-          />
+          <View style={styles.verificationContainer}>
+            <View style={styles.verificationHeader}>
+              <TouchableOpacity onPress={handleVerificationCancel} style={styles.verificationCloseBtn} testID="verification-cancel-btn">
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+              <View style={styles.verificationHeaderCenter}>
+                <Text style={styles.verificationTitle}>Vérifier les données</Text>
+                {ocrData.needsReview && (
+                  <View style={styles.reviewBadge}>
+                    <Ionicons name="alert-circle" size={14} color="#F44336" />
+                    <Text style={styles.reviewText}>Vérification requise</Text>
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity 
+                onPress={() => handleVerificationSave(ocrData)} 
+                style={[styles.verificationCloseBtn, styles.verificationSaveHeaderBtn]}
+                testID="verification-save-btn"
+              >
+                <Ionicons name="checkmark" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.verificationContent} showsVerticalScrollIndicator={false}>
+              {/* Confidence Score */}
+              <View style={styles.confidenceCard}>
+                <View style={styles.confidenceHeader}>
+                  <Ionicons 
+                    name={(ocrData.confidence || 0) >= 0.7 ? 'sparkles' : 'warning'} 
+                    size={20} 
+                    color={(ocrData.confidence || 0) >= 0.7 ? '#4CAF50' : '#FF9800'} 
+                  />
+                  <Text style={styles.confidenceTitle}>
+                    {(ocrData.confidence || 0) >= 0.9 ? 'Extraction excellente' :
+                     (ocrData.confidence || 0) >= 0.7 ? 'Extraction réussie' :
+                     'Vérification nécessaire'}
+                  </Text>
+                </View>
+                <View style={styles.confidenceBar}>
+                  <View 
+                    style={[
+                      styles.confidenceFill, 
+                      { 
+                        width: `${Math.round((ocrData.confidence || 0) * 100)}%`,
+                        backgroundColor: (ocrData.confidence || 0) >= 0.7 ? '#4CAF50' : '#FF9800'
+                      }
+                    ]} 
+                  />
+                </View>
+                <Text style={styles.confidencePercent}>
+                  Confiance: {Math.round((ocrData.confidence || 0) * 100)}%
+                </Text>
+              </View>
+              
+              {/* Main Amount Card */}
+              <View style={styles.mainAmountCard}>
+                <Text style={styles.mainAmountLabel}>Montant Total TTC</Text>
+                <View style={styles.mainAmountRow}>
+                  <Text style={styles.mainAmountValue}>
+                    {ocrData.montantTotal?.toFixed(2) || '0.00'}
+                  </Text>
+                  <Text style={styles.mainAmountCurrency}>€</Text>
+                </View>
+              </View>
+              
+              {/* Category */}
+              <View style={styles.verificationSection}>
+                <Text style={styles.verificationSectionTitle}>Catégorie</Text>
+                <View style={[styles.verificationCategoryBadge, { backgroundColor: '#f57c00' + '20' }]}>
+                  <Ionicons name="pricetag" size={16} color="#f57c00" />
+                  <Text style={[styles.verificationCategoryText, { color: '#f57c00' }]}>
+                    {ocrData.categorie || 'Autre'}
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Basic Info */}
+              <View style={styles.verificationSection}>
+                <Text style={styles.verificationSectionTitle}>Informations</Text>
+                
+                <View style={styles.verificationInfoRow}>
+                  <Ionicons name="calendar" size={18} color={Colors.text.secondary} />
+                  <Text style={styles.verificationInfoLabel}>Date</Text>
+                  <Text style={styles.verificationInfoValue}>{ocrData.dateFacture || '--'}</Text>
+                </View>
+                
+                <View style={styles.verificationInfoRow}>
+                  <Ionicons name="business" size={18} color={Colors.text.secondary} />
+                  <Text style={styles.verificationInfoLabel}>Fournisseur</Text>
+                  <Text style={styles.verificationInfoValue}>{ocrData.fournisseur || '--'}</Text>
+                </View>
+                
+                {ocrData.numeroFacture && (
+                  <View style={styles.verificationInfoRow}>
+                    <Ionicons name="document-text" size={18} color={Colors.text.secondary} />
+                    <Text style={styles.verificationInfoLabel}>N° Facture</Text>
+                    <Text style={styles.verificationInfoValue}>{ocrData.numeroFacture}</Text>
+                  </View>
+                )}
+              </View>
+              
+              {/* Detailed Amounts */}
+              {(ocrData.montantHT || ocrData.montantTVA) && (
+                <View style={styles.verificationSection}>
+                  <Text style={styles.verificationSectionTitle}>Détail des montants</Text>
+                  <View style={styles.amountsGrid}>
+                    <View style={styles.amountBox}>
+                      <Text style={styles.amountBoxLabel}>HT</Text>
+                      <Text style={styles.amountBoxValue}>{ocrData.montantHT?.toFixed(2) || '--'} €</Text>
+                    </View>
+                    <View style={styles.amountBox}>
+                      <Text style={styles.amountBoxLabel}>TVA</Text>
+                      <Text style={styles.amountBoxValue}>{ocrData.montantTVA?.toFixed(2) || '--'} €</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+              
+              {/* Line Items */}
+              {ocrData.lignes && ocrData.lignes.length > 0 && (
+                <View style={styles.verificationSection}>
+                  <Text style={styles.verificationSectionTitle}>
+                    Lignes de facture ({ocrData.lignes.length})
+                  </Text>
+                  {ocrData.lignes.map((ligne, index) => (
+                    <View key={index} style={styles.lineItem}>
+                      <Text style={styles.lineDescription} numberOfLines={2}>
+                        {ligne.description || 'Article'}
+                      </Text>
+                      {ligne.montant && (
+                        <Text style={styles.lineMontant}>{ligne.montant.toFixed(2)} €</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+              
+              {/* Description */}
+              {ocrData.description && (
+                <View style={styles.verificationSection}>
+                  <Text style={styles.verificationSectionTitle}>Description</Text>
+                  <Text style={styles.descriptionText}>{ocrData.description}</Text>
+                </View>
+              )}
+              
+              {/* Action Buttons */}
+              <View style={styles.verificationActions}>
+                <TouchableOpacity 
+                  style={styles.verificationCancelBtn} 
+                  onPress={handleVerificationCancel}
+                  testID="btn-cancel"
+                >
+                  <Text style={styles.verificationCancelBtnText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.verificationSaveBtn} 
+                  onPress={() => handleVerificationSave(ocrData)}
+                  testID="btn-save"
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                  <Text style={styles.verificationSaveBtnText}>Enregistrer</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
         )}
       </Modal>
 
