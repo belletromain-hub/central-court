@@ -277,21 +277,22 @@ export default function DocumentsScreen() {
     }
   };
 
-  // Handle verification save
-  const handleVerificationSave = (data: InvoiceData) => {
-    const mappedCategory = CATEGORY_MAP[data.categorie || 'Autre'] || 'other';
+  // Handle verification save - uses edited inline values
+  const handleVerificationSave = () => {
+    const mappedCategory = CATEGORY_MAP[editedCategorie || 'Autre'] || 'other';
+    const parsedMontant = parseFloat(editedMontant.replace(',', '.')) || undefined;
     
     const newDoc: Document = {
       id: `doc-${Date.now()}`,
-      name: data.fournisseur ? `${data.fournisseur} - ${pendingDocName}` : pendingDocName,
+      name: editedFournisseur ? `${editedFournisseur} - ${pendingDocName}` : pendingDocName,
       category: mappedCategory,
       type: pendingDocType,
       size: `${Math.floor(Math.random() * 2000) + 100} KB`,
-      date: data.dateFacture || new Date().toLocaleDateString('fr-FR'),
-      amount: data.montantTotal || undefined,
+      date: editedDate || new Date().toLocaleDateString('fr-FR'),
+      amount: parsedMontant,
       uri: pendingDocUri || undefined,
-      fournisseur: data.fournisseur || undefined,
-      description: data.description || undefined,
+      fournisseur: editedFournisseur || undefined,
+      description: ocrData?.description || undefined,
     };
     
     setDocuments(prev => [newDoc, ...prev]);
@@ -299,6 +300,14 @@ export default function DocumentsScreen() {
     setOcrData(null);
     setPendingDocUri(null);
     setPendingDocName('');
+    
+    // Reset edit states
+    setEditedMontant('');
+    setEditedDate('');
+    setEditedFournisseur('');
+    setEditedCategorie('Autre');
+    setEditedMontantHT('');
+    setEditedMontantTVA('');
     
     // Show success message
     Alert.alert(
