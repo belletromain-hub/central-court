@@ -1,93 +1,221 @@
+"""
+OCR Service Ultra-Performant pour Factures et Notes de Frais
+Utilise OpenAI Vision (GPT-4o) pour extraction haute précision
+Taux de réussite cible: >95%
+"""
+
 import os
 import json
 import asyncio
 import re
+import base64
+import tempfile
+from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from PIL import Image
+import io
 
 load_dotenv()
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
-# Category mapping for French receipts
-CATEGORY_KEYWORDS = {
-    'travel': ['avion', 'billet', 'vol', 'airport', 'aéroport', 'train', 'sncf', 'eurostar', 'taxi', 'uber', 'vtc', 'location voiture', 'hertz', 'avis', 'europcar', 'hotel', 'hôtel', 'hilton', 'ibis', 'novotel', 'booking'],
-    'invoices': ['restaurant', 'repas', 'déjeuner', 'dîner', 'café', 'bar', 'brasserie', 'pizzeria', 'sushi', 'burger', 'mcdonalds', 'starbucks', 'supermarché', 'carrefour', 'leclerc', 'auchan', 'monoprix'],
-    'medical': ['pharmacie', 'médecin', 'docteur', 'kiné', 'kinésithérapeute', 'ostéopathe', 'hôpital', 'clinique', 'dentiste', 'opticien', 'lunettes', 'santé', 'mutuelle', 'ordonnance'],
-    'other': []
+# Structure de données pour facture
+class InvoiceData:
+    def __init__(self):
+        self.montant_total: Optional[float] = None
+        self.montant_ht: Optional[float] = None
+        self.montant_tva: Optional[float] = None
+        self.currency: str = "EUR"
+        self.numero_facture: Optional[str] = None
+        self.date_facture: Optional[str] = None
+        self.date_echeance: Optional[str] = None
+        self.fournisseur_nom: Optional[str] = None
+        self.fournisseur_adresse: Optional[str] = None
+        self.categorie: str = "Autre"
+        self.confidence: float = 0.0
+        self.needs_review: bool = True
+        self.lignes: List[Dict] = []
+
+
+# Catégories disponibles
+CATEGORIES = {
+    'travel': {
+        'label': 'Transport',
+        'keywords': ['avion', 'billet', 'vol', 'flight', 'train', 'sncf', 'taxi', 'uber', 'vtc', 'parking', 'péage', 'essence', 'carburant']
+    },
+    'accommodation': {
+        'label': 'Hébergement', 
+        'keywords': ['hotel', 'hôtel', 'hilton', 'ibis', 'novotel', 'airbnb', 'booking', 'chambre', 'nuit', 'séjour']
+    },
+    'restaurant': {
+        'label': 'Restauration',
+        'keywords': ['restaurant', 'repas', 'déjeuner', 'dîner', 'café', 'bar', 'brasserie', 'pizzeria', 'menu', 'addition']
+    },
+    'medical': {
+        'label': 'Médical',
+        'keywords': ['pharmacie', 'médecin', 'kiné', 'ostéo', 'hôpital', 'clinique', 'dentiste', 'santé', 'ordonnance']
+    },
+    'equipment': {
+        'label': 'Matériel',
+        'keywords': ['raquette', 'cordage', 'chaussure', 'vêtement', 'équipement', 'sport', 'tennis', 'matériel']
+    },
+    'services': {
+        'label': 'Services',
+        'keywords': ['coaching', 'entraînement', 'cours', 'formation', 'consulting', 'service']
+    },
+    'other': {
+        'label': 'Autre',
+        'keywords': []
+    }
 }
 
-def extract_amount_from_text(text: str) -> float | None:
-    """Extract numeric amount from text using regex patterns"""
-    if not text:
-        return None
-    
-    # Common patterns for amounts in French/European format
-    patterns = [
-        r'total[:\s]*(\d+[.,]\d{2})\s*€?',  # Total: 123.45
-        r'montant[:\s]*(\d+[.,]\d{2})\s*€?',  # Montant: 123.45
-        r'(\d+[.,]\d{2})\s*€',  # 123.45 €
-        r'€\s*(\d+[.,]\d{2})',  # € 123.45
-        r'ttc[:\s]*(\d+[.,]\d{2})',  # TTC: 123.45
-        r'(\d+[.,]\d{2})\s*eur',  # 123.45 EUR
-    ]
-    
-    text_lower = text.lower()
-    for pattern in patterns:
-        match = re.search(pattern, text_lower, re.IGNORECASE)
-        if match:
-            amount_str = match.group(1).replace(',', '.')
-            try:
-                return float(amount_str)
-            except ValueError:
-                continue
-    
-    return None
 
-def extract_date_from_text(text: str) -> str | None:
-    """Extract date from text using regex patterns"""
-    if not text:
-        return None
-    
-    # Common date patterns
-    patterns = [
-        r'(\d{2})/(\d{2})/(\d{4})',  # DD/MM/YYYY
-        r'(\d{2})-(\d{2})-(\d{4})',  # DD-MM-YYYY
-        r'(\d{2})\.(\d{2})\.(\d{4})',  # DD.MM.YYYY
-        r'(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})',  # 15 janvier 2026
-    ]
-    
-    months_fr = {
-        'janvier': '01', 'février': '02', 'mars': '03', 'avril': '04',
-        'mai': '05', 'juin': '06', 'juillet': '07', 'août': '08',
-        'septembre': '09', 'octobre': '10', 'novembre': '11', 'décembre': '12'
-    }
-    
-    for pattern in patterns:
-        match = re.search(pattern, text.lower())
-        if match:
-            groups = match.groups()
-            if len(groups) == 3:
-                if groups[1] in months_fr:
-                    # French month format
-                    day = groups[0].zfill(2)
-                    month = months_fr[groups[1]]
-                    year = groups[2]
-                    return f"{day}/{month}/{year}"
-                else:
-                    # Numeric format
-                    return f"{groups[0]}/{groups[1]}/{groups[2]}"
-    
-    return None
-
-
-async def analyze_document_with_ai(image_base64: str) -> dict:
+def optimize_image_for_ocr(image_base64: str) -> str:
     """
-    Analyze a document image using OpenAI Vision to extract:
-    - Amount (montant)
-    - Date
-    - Category suggestion
-    - Merchant name
+    Optimise l'image pour une meilleure reconnaissance OCR
+    - Redimensionne si trop grande
+    - Améliore le contraste
+    - Convertit en PNG
+    """
+    try:
+        # Décoder l'image base64
+        image_data = base64.b64decode(image_base64)
+        img = Image.open(io.BytesIO(image_data))
+        
+        # Convertir en RGB si nécessaire
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        
+        # Redimensionner si trop grande (max 2000px de large)
+        max_width = 2000
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_size = (max_width, int(img.height * ratio))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        
+        # Sauvegarder en PNG haute qualité
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG', optimize=True)
+        buffer.seek(0)
+        
+        return base64.b64encode(buffer.read()).decode('utf-8')
+        
+    except Exception as e:
+        print(f"Image optimization error: {e}")
+        return image_base64  # Retourner l'original en cas d'erreur
+
+
+def detect_category_from_text(text: str) -> str:
+    """Détecte la catégorie basée sur les mots-clés"""
+    text_lower = text.lower()
+    
+    for cat_id, cat_info in CATEGORIES.items():
+        for keyword in cat_info['keywords']:
+            if keyword in text_lower:
+                return cat_info['label']
+    
+    return 'Autre'
+
+
+def validate_extracted_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validation et nettoyage des données extraites
+    Applique les règles métier
+    """
+    warnings = []
+    
+    # 1. Validation montant total (CRITIQUE)
+    if data.get('montantTotal') is not None:
+        try:
+            amount = float(data['montantTotal'])
+            if amount <= 0:
+                warnings.append("Montant négatif ou nul")
+                data['needsReview'] = True
+            elif amount < 0.5:
+                warnings.append("Montant très faible (<0.50€)")
+                data['needsReview'] = True
+            elif amount > 50000:
+                warnings.append("Montant très élevé (>50 000€)")
+                data['needsReview'] = True
+            data['montantTotal'] = round(amount, 2)
+        except (ValueError, TypeError):
+            data['montantTotal'] = None
+            data['needsReview'] = True
+    
+    # 2. Validation et conversion de la date
+    if data.get('dateFacture'):
+        date_str = str(data['dateFacture'])
+        # Convertir différents formats vers JJ/MM/AAAA
+        date_patterns = [
+            (r'(\d{4})-(\d{2})-(\d{2})', lambda m: f"{m.group(3)}/{m.group(2)}/{m.group(1)}"),
+            (r'(\d{2})/(\d{2})/(\d{4})', lambda m: f"{m.group(1)}/{m.group(2)}/{m.group(3)}"),
+            (r'(\d{2})-(\d{2})-(\d{4})', lambda m: f"{m.group(1)}/{m.group(2)}/{m.group(3)}"),
+            (r'(\d{2})\.(\d{2})\.(\d{4})', lambda m: f"{m.group(1)}/{m.group(2)}/{m.group(3)}"),
+        ]
+        
+        for pattern, converter in date_patterns:
+            match = re.match(pattern, date_str)
+            if match:
+                data['dateFacture'] = converter(match)
+                break
+        
+        # Vérifier si la date est valide
+        try:
+            parts = data['dateFacture'].split('/')
+            if len(parts) == 3:
+                day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+                parsed_date = datetime(year, month, day)
+                
+                # Date dans le futur?
+                if parsed_date > datetime.now():
+                    warnings.append("Date dans le futur")
+                    data['needsReview'] = True
+                
+                # Date trop ancienne (> 2 ans)?
+                two_years_ago = datetime.now() - timedelta(days=730)
+                if parsed_date < two_years_ago:
+                    warnings.append("Date de plus de 2 ans")
+        except:
+            pass
+    
+    # 3. Cohérence HT + TVA = TTC
+    if data.get('montantHT') and data.get('montantTVA') and data.get('montantTotal'):
+        try:
+            ht = float(data['montantHT'])
+            tva = float(data['montantTVA'])
+            total = float(data['montantTotal'])
+            
+            calculated = ht + tva
+            diff = abs(calculated - total)
+            
+            if diff > 0.05:  # Tolérance de 5 centimes
+                warnings.append(f"Incohérence: HT({ht}) + TVA({tva}) ≠ TTC({total})")
+                data['needsReview'] = True
+            
+            # Vérifier taux TVA standard
+            if ht > 0:
+                taux = (tva / ht) * 100
+                taux_standards = [5.5, 10, 20]
+                if not any(abs(taux - t) < 1 for t in taux_standards):
+                    warnings.append(f"Taux TVA inhabituel: {taux:.1f}%")
+        except:
+            pass
+    
+    # 4. Confiance faible
+    if data.get('confidence', 0) < 0.7:
+        data['needsReview'] = True
+    
+    if warnings:
+        print(f"Validation warnings: {warnings}")
+    
+    return data
+
+
+async def extract_invoice_data_with_ai(image_base64: str, filename: str = "") -> Dict[str, Any]:
+    """
+    Extraction haute précision via OpenAI Vision (GPT-4o)
+    Prompt optimisé pour taux de réussite >95%
     """
     if not OPENAI_API_KEY:
         return {
@@ -95,83 +223,121 @@ async def analyze_document_with_ai(image_base64: str) -> dict:
             'error': 'OpenAI API key not configured'
         }
     
-    try:
-        # Initialize the chat with OpenAI Vision
-        chat = LlmChat(
-            api_key=OPENAI_API_KEY,
-            session_id=f"ocr-{asyncio.get_event_loop().time()}",
-            system_message="""Tu es un assistant expert en extraction de données depuis des reçus, factures et tickets de caisse.
+    # Importer emergentintegrations
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+    
+    # Optimiser l'image
+    optimized_base64 = optimize_image_for_ocr(image_base64)
+    
+    # Prompt système ultra-optimisé
+    system_prompt = """Tu es un EXPERT en extraction de données de factures et notes de frais avec une précision de 99%.
 
-MISSION CRITIQUE: Tu dois extraire avec précision:
-1. Le MONTANT TOTAL à payer (le plus grand montant visible, généralement en bas du ticket)
-2. La DATE du document (cherche des formats comme JJ/MM/AAAA ou "15 janvier 2026")
-3. Le nom du MARCHAND ou de l'entreprise
-4. Une CATÉGORIE parmi: travel (voyages, hôtels, transports), invoices (restaurants, commerces), medical (santé, pharmacie), other (autre)
+🎯 MISSION CRITIQUE: Extraire TOUTES les informations financières avec PRÉCISION ABSOLUE.
 
-RÈGLES IMPORTANTES pour le montant:
-- Cherche "TOTAL", "MONTANT", "A PAYER", "TTC", "NET A PAYER"
-- Le montant est TOUJOURS un nombre décimal (ex: 45.90, 123.50)
-- Ignore les sous-totaux, TVA, remises - prends le TOTAL FINAL
-- Si plusieurs montants, prends le plus élevé en bas du document
+📋 RÈGLES IMPÉRATIVES:
 
-RÈGLES pour la date:
-- Cherche en haut du document ou près du numéro de ticket
-- Formats courants: JJ/MM/AAAA, JJ-MM-AAAA, JJ.MM.AAAA
+1. MONTANT TOTAL (TTC) = PRIORITÉ #1
+   - Cherche: "TOTAL", "MONTANT", "NET À PAYER", "TTC", "TOTAL TTC", "À PAYER"
+   - C'est généralement le PLUS GRAND montant en bas du document
+   - Format: nombre décimal avec point (ex: 125.50 PAS 125,50)
+   - VÉRIFIE 3 FOIS avant de répondre
 
-Tu DOIS répondre UNIQUEMENT en JSON valide avec ce format:
+2. DATE DE FACTURE
+   - Cherche en haut du document ou près du numéro
+   - Convertis TOUJOURS en format: JJ/MM/AAAA
+   - Exemples: "15 janvier 2026" → "15/01/2026"
+
+3. FOURNISSEUR
+   - Nom de l'entreprise/commerce (en-tête ou tampon)
+   - Ignore les mentions "client" ou "destinataire"
+
+4. TVA & HT
+   - Montant HT (Hors Taxes) si visible
+   - Montant TVA si visible
+   - Vérifie: HT + TVA ≈ TTC
+
+5. CATÉGORIE
+   - Hébergement: hôtel, airbnb
+   - Transport: avion, train, taxi, uber, parking
+   - Restauration: restaurant, café, repas
+   - Médical: pharmacie, médecin, kiné
+   - Matériel: équipement, sport
+   - Services: coaching, formation
+   - Autre: si aucune catégorie
+
+6. CONFIANCE
+   - 0.95+ : Données parfaitement lisibles
+   - 0.80-0.94 : Quelques doutes mineurs
+   - 0.60-0.79 : Révision recommandée
+   - <0.60 : Données incertaines
+
+⚠️ Si une information N'EST PAS visible, mets null (pas d'invention!)"""
+
+    user_prompt = """ANALYSE cette facture/ticket et extrais les données en JSON STRICT.
+
+RÉPONDS UNIQUEMENT avec ce JSON (sans texte avant/après):
+
 {
-    "amount": 45.90,
-    "date": "15/02/2026",
-    "merchant": "Nom exact du marchand",
-    "category": "invoices",
-    "confidence": 0.95,
-    "raw_text": "Texte visible pertinent",
-    "description": "Type de document détecté"
+  "montantTotal": <nombre décimal du TOTAL TTC - VÉRIFIE 3 FOIS>,
+  "montantHT": <nombre décimal HT ou null>,
+  "montantTVA": <nombre décimal TVA ou null>,
+  "currency": "EUR",
+  "numeroFacture": "<numéro facture ou null>",
+  "dateFacture": "<JJ/MM/AAAA>",
+  "fournisseur": "<nom du vendeur/fournisseur>",
+  "adresse": "<adresse complète ou null>",
+  "categorie": "<Hébergement|Transport|Restauration|Médical|Matériel|Services|Autre>",
+  "confidence": <0.0 à 1.0>,
+  "needsReview": <true si doutes, false si certain>,
+  "description": "<description courte du document>"
 }
 
-Si tu ne trouves pas une valeur, utilise null mais ESSAIE TOUJOURS de trouver le montant."""
+🔴 ATTENTION: Le montantTotal est CRITIQUE. Vérifie-le 3 FOIS!"""
+
+    try:
+        # Initialiser le chat
+        chat = LlmChat(
+            api_key=OPENAI_API_KEY,
+            session_id=f"ocr-invoice-{datetime.now().timestamp()}",
+            system_message=system_prompt
         ).with_model("openai", "gpt-4o")
         
-        # Create image content
-        image_content = ImageContent(image_base64=image_base64)
+        # Créer le contenu image
+        image_content = ImageContent(image_base64=optimized_base64)
         
-        # Send message with image
+        # Envoyer le message
         user_message = UserMessage(
-            text="Analyse ce document et extrait les informations. TROUVE le montant total et la date. Réponds UNIQUEMENT en JSON.",
+            text=user_prompt,
             file_contents=[image_content]
         )
         
         response = await chat.send_message(user_message)
         
-        # Parse the JSON response
-        cleaned_response = response.strip()
-        if cleaned_response.startswith('```json'):
-            cleaned_response = cleaned_response[7:]
-        if cleaned_response.startswith('```'):
-            cleaned_response = cleaned_response[3:]
-        if cleaned_response.endswith('```'):
-            cleaned_response = cleaned_response[:-3]
-        cleaned_response = cleaned_response.strip()
+        # Parser la réponse JSON
+        cleaned = response.strip()
         
-        result = json.loads(cleaned_response)
+        # Nettoyer les blocs markdown
+        if '```json' in cleaned:
+            cleaned = cleaned.split('```json')[1].split('```')[0]
+        elif '```' in cleaned:
+            cleaned = cleaned.split('```')[1].split('```')[0]
         
-        # Validate and clean the amount
-        if result.get('amount') is not None:
-            try:
-                result['amount'] = float(result['amount'])
-            except (ValueError, TypeError):
-                # Try to extract from raw_text as fallback
-                if result.get('raw_text'):
-                    extracted = extract_amount_from_text(result['raw_text'])
-                    result['amount'] = extracted
+        cleaned = cleaned.strip()
         
-        # Validate date format
-        if result.get('date') and not re.match(r'\d{2}/\d{2}/\d{4}', result['date']):
-            # Try to extract from raw_text as fallback
-            if result.get('raw_text'):
-                extracted = extract_date_from_text(result['raw_text'])
-                if extracted:
-                    result['date'] = extracted
+        # Extraire le JSON
+        json_match = re.search(r'\{[\s\S]*\}', cleaned)
+        if json_match:
+            cleaned = json_match.group(0)
+        
+        result = json.loads(cleaned)
+        
+        # Valider et nettoyer les données
+        result = validate_extracted_data(result)
+        
+        # Détecter catégorie si non fournie
+        if not result.get('categorie') or result.get('categorie') == 'Autre':
+            text_to_analyze = f"{result.get('fournisseur', '')} {result.get('description', '')} {filename}"
+            result['categorie'] = detect_category_from_text(text_to_analyze)
         
         return {
             'success': True,
@@ -179,32 +345,114 @@ Si tu ne trouves pas une valeur, utilise null mais ESSAIE TOUJOURS de trouver le
         }
         
     except json.JSONDecodeError as e:
-        # Try to extract values using regex from the raw response
-        amount = extract_amount_from_text(response if 'response' in dir() else '')
-        date = extract_date_from_text(response if 'response' in dir() else '')
+        print(f"JSON Parse Error: {e}")
+        print(f"Raw response: {response if 'response' in dir() else 'N/A'}")
         
-        return {
-            'success': False,
-            'error': f'Failed to parse AI response: {str(e)}',
-            'fallback_amount': amount,
-            'fallback_date': date
-        }
+        # Tentative d'extraction de secours avec regex
+        fallback = extract_fallback_data(response if 'response' in dir() else '', filename)
+        return fallback
+        
     except Exception as e:
+        print(f"OCR Error: {e}")
         return {
             'success': False,
             'error': str(e)
         }
 
 
-def suggest_category_from_text(text: str) -> str:
+def extract_fallback_data(text: str, filename: str = "") -> Dict[str, Any]:
     """
-    Suggest a category based on text content (fallback if AI fails)
+    Extraction de secours avec regex si le JSON parsing échoue
     """
-    text_lower = text.lower()
+    result = {
+        'success': False,
+        'data': {
+            'montantTotal': None,
+            'dateFacture': None,
+            'fournisseur': None,
+            'categorie': 'Autre',
+            'confidence': 0.3,
+            'needsReview': True
+        }
+    }
     
-    for category, keywords in CATEGORY_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in text_lower:
-                return category
+    # Chercher montant
+    amount_patterns = [
+        r'montantTotal["\s:]+(\d+[.,]\d{2})',
+        r'total["\s:]+(\d+[.,]\d{2})',
+        r'(\d+[.,]\d{2})\s*€',
+        r'€\s*(\d+[.,]\d{2})',
+    ]
     
-    return 'other'
+    for pattern in amount_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            try:
+                amount = float(match.group(1).replace(',', '.'))
+                result['data']['montantTotal'] = amount
+                result['success'] = True
+                break
+            except:
+                pass
+    
+    # Chercher date
+    date_patterns = [
+        r'(\d{2})/(\d{2})/(\d{4})',
+        r'(\d{2})-(\d{2})-(\d{4})',
+        r'(\d{4})-(\d{2})-(\d{2})',
+    ]
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, text)
+        if match:
+            groups = match.groups()
+            if len(groups[0]) == 4:  # YYYY-MM-DD
+                result['data']['dateFacture'] = f"{groups[2]}/{groups[1]}/{groups[0]}"
+            else:  # DD/MM/YYYY
+                result['data']['dateFacture'] = f"{groups[0]}/{groups[1]}/{groups[2]}"
+            break
+    
+    # Catégorie depuis filename
+    result['data']['categorie'] = detect_category_from_text(filename)
+    
+    return result
+
+
+async def analyze_document(image_base64: str, filename: str = "") -> Dict[str, Any]:
+    """
+    Point d'entrée principal pour l'analyse de document
+    Gère les retries et la validation
+    """
+    max_retries = 2
+    last_error = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            result = await extract_invoice_data_with_ai(image_base64, filename)
+            
+            if result.get('success'):
+                return result
+            
+            # Si échec mais pas d'exception, continuer
+            if attempt < max_retries:
+                await asyncio.sleep(1)  # Attendre avant retry
+                
+        except Exception as e:
+            last_error = e
+            print(f"Attempt {attempt + 1} failed: {e}")
+            
+            if attempt < max_retries:
+                await asyncio.sleep(1)
+    
+    # Retourner le dernier résultat ou l'erreur
+    return {
+        'success': False,
+        'error': str(last_error) if last_error else 'Extraction failed after retries',
+        'data': {
+            'montantTotal': None,
+            'dateFacture': datetime.now().strftime('%d/%m/%Y'),
+            'categorie': detect_category_from_text(filename),
+            'confidence': 0.1,
+            'needsReview': True
+        }
+    }
