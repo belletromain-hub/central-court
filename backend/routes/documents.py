@@ -635,7 +635,7 @@ async def export_documents_pdf(
         elements.append(detail_table)
     
     # Build PDF
-    doc.build(elements)
+    pdf_doc.build(elements)
     buffer.seek(0)
     
     filename = f"depenses_{today.strftime('%Y%m%d')}.pdf"
