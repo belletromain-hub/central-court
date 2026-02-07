@@ -63,6 +63,7 @@ app.include_router(alert_router)
 app.include_router(preference_router)
 app.include_router(admin_router)
 app.include_router(documents_router)
+app.include_router(user_router)
 
 # ============ MODELS ============
 
