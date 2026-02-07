@@ -22,8 +22,32 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import Colors from '../../src/constants/colors';
 import api from '../../src/services/api';
-import InvoiceVerification from '../../src/components/documents/InvoiceVerification';
-import type { InvoiceData } from '../../src/components/documents/InvoiceVerification';
+// Types for OCR data
+interface InvoiceLineItem {
+  description: string;
+  quantite?: number;
+  prixUnitaire?: number | null;
+  montant?: number | null;
+}
+
+interface InvoiceData {
+  montantTotal?: number | null;
+  montantHT?: number | null;
+  montantTVA?: number | null;
+  currency?: string;
+  numeroFacture?: string | null;
+  dateFacture?: string | null;
+  fournisseur?: string | null;
+  adresse?: string | null;
+  categorie?: string;
+  lignes?: InvoiceLineItem[];
+  confidence?: number;
+  needsReview?: boolean;
+  description?: string | null;
+  fileType?: string;
+  pageCount?: number;
+  warnings?: string[];
+}
 
 // Types
 interface Document {
