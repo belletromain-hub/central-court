@@ -86,18 +86,13 @@ const CATEGORIES = {
   other: { label: 'Autres', icon: 'document', color: '#757575' },
 };
 
-// Sample data
-const SAMPLE_DOCUMENTS: Document[] = [
-  { id: '1', name: 'Billet avion Rotterdam.pdf', category: 'travel', type: 'pdf', size: '245 KB', date: '01/02/2026', amount: 285 },
-  { id: '2', name: 'Hotel Hilton.pdf', category: 'travel', type: 'pdf', size: '180 KB', date: '01/02/2026', amount: 920 },
-  { id: '3', name: 'Facture kinésithérapeute.jpg', category: 'medical', type: 'image', size: '1.2 MB', date: '04/02/2026', amount: 80 },
-  { id: '4', name: 'Restaurant équipe.jpg', category: 'invoices', type: 'image', size: '890 KB', date: '05/02/2026', amount: 125 },
-  { id: '5', name: 'Taxi aéroport.pdf', category: 'invoices', type: 'pdf', size: '95 KB', date: '08/02/2026', amount: 45 },
-];
+// Sample data (fallback if API fails)
+const SAMPLE_DOCUMENTS: Document[] = [];
 
 export default function DocumentsScreen() {
   const insets = useSafeAreaInsets();
-  const [documents, setDocuments] = useState<Document[]>(SAMPLE_DOCUMENTS);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -108,6 +103,36 @@ export default function DocumentsScreen() {
   const [editDate, setEditDate] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editCategory, setEditCategory] = useState<string>('other');
+  
+  // Load documents from MongoDB on mount
+  React.useEffect(() => {
+    loadDocuments();
+  }, []);
+  
+  const loadDocuments = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get('/api/documents');
+      const docs = response.data.map((doc: any) => ({
+        id: doc.id,
+        name: doc.name || doc.fournisseur || 'Document',
+        category: doc.category || 'other',
+        type: doc.fileType === 'pdf' ? 'pdf' : 'image',
+        size: doc.hasFile ? 'Fichier' : '--',
+        date: doc.dateFacture || '--',
+        amount: doc.montantTotal,
+        uri: doc.hasFile ? `/api/documents/${doc.id}/file` : undefined,
+        fournisseur: doc.fournisseur,
+        description: doc.description,
+      }));
+      setDocuments(docs);
+    } catch (error) {
+      console.error('Error loading documents:', error);
+      // Keep empty array if API fails
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // OCR state
   const [ocrData, setOcrData] = useState<InvoiceData | null>(null);
