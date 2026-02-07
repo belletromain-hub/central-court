@@ -100,7 +100,7 @@ Construire une application professionnelle de tennis pour les joueurs profession
 
 ## Credentials
 - **Admin Dashboard:** admin@lecourtcentral.com / admin123
-- **Preview URL:** https://matchpoint-39.preview.emergentagent.com
+- **Preview URL:** https://smart-receipt-26.preview.emergentagent.com
 
 ## Testing Results (Février 2026)
 - ✅ Application loads correctly

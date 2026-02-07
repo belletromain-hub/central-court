@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 # Base URL from environment
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://matchpoint-39.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://smart-receipt-26.preview.emergentagent.com')
 
 # Test emails (Resend test mode only allows verified email)
 VERIFIED_EMAIL = "romainbasket77@gmail.com"

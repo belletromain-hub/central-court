@@ -1,150 +1,145 @@
 <analysis>**original_problem_statement:**
-The user wants to build a professional tennis application. The work has been highly iterative, guided by several detailed product requirement documents (PRDs) provided by the user in French.
-
-The initial requests included:
-1.  Refactoring the backend.
-2.  Integrating a free email service for system notifications (Resend was chosen).
-3.  Migrating backend data from static files to a database (MongoDB).
-4.  Adding a  field to tournaments to filter them based on user preferences.
-
-Later, the user provided two large markdown documents detailing new features:
-1.  **Admin Dashboard:** A complete web-based dashboard for administrators to monitor users and app metrics. This has been fully implemented.
-2.  **Fluid UX & Onboarding:** A complete redesign of the user experience focusing on fluid inputs to minimize friction, including a new 7-step initial onboarding flow and a 3-module progressive onboarding system. The current task is to build the foundational UI components for this new UX.
+The user wants to build a professional tennis application. The project has evolved significantly through several phases:
+1.  **Initial Setup:** Refactored the backend to a modular FastAPI structure, migrated data to MongoDB, and integrated the Resend email service.
+2.  **Admin Dashboard:** A full-stack admin dashboard was built for user and metrics management.
+3.  **Fluid UX:** A complete Fluid Onboarding flow (7 initial steps, 3 progressive modules) was implemented using custom Fluid Input components.
+4.  **UI/UX Enhancements:** The user requested and the agent implemented Apple-style wheel picker components for date, time, and option selection in the Add Event modal. The agent also redesigned the Documents tab and fixed a calendar display bug.
+5.  **Onboarding & OCR (Initial Pass):** The agent configured the app to route new users to the onboarding flow. A basic OpenAI OCR feature was added to the Documents tab to extract data from uploaded images.
+6.  **High-Performance OCR System (Current Task):** The user provided a detailed, multi-page product requirements document (PRD) to build an ultra-performant OCR system. This new system must handle both images and PDFs, use advanced image preprocessing, leverage  for highly structured data extraction (including line items), and feature a robust frontend for user verification and editing.
 
 **User's preferred language**: French. The next agent MUST respond in French.
 
 **what currently exists?**
-The project consists of a React Native (Expo) mobile application and a Python (Flask) backend connected to a MongoDB database.
-- The backend has been refactored into a modular structure with separate route and service files.
-- Resend is integrated for sending emails.
-- All application data (tournaments, users, alerts) is served from a MongoDB database via API endpoints.
-- The frontend has been updated to consume data from these APIs instead of static files.
-- A complete, functional admin dashboard is available at the  route, with features for user management and metric visualization.
-- The agent has started creating the new Fluid Input components required for the next phase of development.
+A full-stack application with a React Native (Expo) frontend, a Python (FastAPI) backend, and a MongoDB database. Key features include a functional admin dashboard, a complete multi-step user onboarding flow, a redesigned documents tab with basic image-only OCR, and custom UI components like Apple-style wheel pickers. The backend has a modular structure, and the agent has just installed the Python libraries (, ) needed to begin the advanced OCR backend implementation.
 
 **Last working item**:
-*   **Last item agent was working:** The agent was in the middle of creating nine Fluid Input UI components as specified in the user's PRD for the new Fluid UX. It successfully created the first five components.
+*   **Last item agent was working:** The agent was at the very beginning of implementing the ultra-performant OCR system as specified in the user's detailed PRD. The agent has installed the required backend dependencies (, ) to handle PDF-to-image conversion and image processing. The user has prioritized the work as P0 (Backend) and P1 (Frontend).
 *   **Status:** IN PROGRESS
-*   **Agent Testing Done:** N (Components have been created but not yet integrated or tested).
-*   **Which testing method agent to use?** Frontend testing agent. The agent should first create a temporary screen to render and test all 9 components before integrating them into the onboarding flow.
+*   **Agent Testing Done:** N
+*   **Which testing method agent to use?** both. The backend requires testing via  with both image and PDF files to validate the new OCR pipeline. The frontend requires the  to test the new file upload UI, the data verification screen, and the inline editing functionality.
 *   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
-There are no outstanding bugs or issues. All pending work relates to new feature implementation.
+There are no outstanding bugs. All work is focused on the new feature implementation.
 
 **In progress Task List**:
-*   **Task 1: Create the remaining Fluid Input components (P0)**
-    *   **Where to resume:** The agent has created 5 of 9 components in . It needs to create the following four files based on the specifications in the user-provided  document:
-        1.  
-        2.  
-        3.  
-        4.  
-    *   **What will be achieved with this?** This will complete the set of foundational UI components required to build the new fluid onboarding experience.
+*   **Task 1: Implement High-Performance OCR System (P0 & P1)**
+    *   **Where to resume:** The agent has installed backend dependencies. The next step is to implement the backend logic according to the user's PRD.
+    *   **What will be achieved with this?** A production-quality OCR system that can accurately extract detailed, structured data from both invoices and receipts (images and PDFs), significantly improving the user experience in the Documents tab.
     *   **Status:** IN PROGRESS
-    *   **Should Test frontend/backend/both after fix?** Frontend
+    *   **Should Test frontend/backend/both after fix?** Both
     *   **Blocked on something:** No.
 
 **Upcoming and Future Tasks**
 *   **Upcoming Tasks:**
-    *   **P0: Implement the 7-Step Initial Onboarding Flow.** This is the immediate next task after creating the fluid components. It involves creating 7 new screens for user registration (, , , etc.) using the newly created fluid input components, as detailed in the  file (Phase 2).
-    *   **P1: Implement the 3 Progressive Onboarding Modules.** This involves creating contextually triggered bottom sheets for gathering user preferences on  (Travel),  (Accommodation), and  (Food) (Phase 3 of ).
-    *   **P2: Integrate Fluid Inputs into Core App.** Refactor existing forms and inputs throughout the application (e.g., event creation) to use the new fluid components, improving the overall UX (Phase 4 of ).
+    *   **P0: Backend OCR Implementation:**
+        *   Refactor  to include PDF-to-image conversion () and advanced image pre-processing ().
+        *   Implement the detailed  system and user prompts from the PRD to extract a structured JSON, including line items.
+        *   Create a new API endpoint, , to handle the entire pipeline (file validation, conversion, OCR, and response).
+        *   Implement the specified data validation and business rules on the backend to check the consistency of extracted data (e.g., HT + TVA = TTC).
+        *   Implement a retry logic for OpenAI API calls to improve reliability.
+    *   **P1: Frontend OCR UI Implementation:**
+        *   Create new, separate components for the OCR flow as described in the PRD: , , and . **Do not** add all this logic to the already large  file.
+        *   Integrate the new components into the Documents tab () to create the two-step flow: 1. Upload file -> 2. Verify/edit extracted data.
+        *   The verification screen must show a preview of the original document (image or PDF) alongside the editable fields for the extracted data.
 
 *   **Future Tasks:**
-    *   **Core Feature Refinement:** Improve core features like Calendar, Staff Management, and the Document Vault using the new fluid design principles (Phase 5 of ).
-    *   **UI/UX Polish:** Add animations, haptic feedback, loading states, and error handling across the app (Phase 6 of ).
-    *   **Testing & Deployment:** Conduct comprehensive testing and prepare the application for submission to app stores (Phase 7 of ).
+    *   Export expenses to PDF.
+    *   Implement push notifications.
 
 **Completed work in this session**
-- **Backend Data Migration:** Migrated application data from static JSON files to a live MongoDB database. Created all necessary API endpoints and a  script.
-- **Backend Refactoring:** Re-architected the Flask backend from a monolithic  to a modular structure with  and .
-- **Resend Email Integration:** Integrated the Resend API for sending transactional emails and created corresponding backend endpoints.
-- **Frontend API Integration:** Rewrote the main application screen () to fetch data dynamically from the new backend APIs.
-- **Admin Dashboard (Full Stack):** Designed and built a complete admin dashboard from scratch, including all backend APIs () and a full React frontend with multiple pages and components under .
-- **Fluid Input Component Creation (Partial):** Created the first 5 of 9 requested Fluid Input components in .
+- **Critical Dependency Fixes:** Resolved complex dependency conflicts between Expo SDK 54, React 19, and , making the app stable and operational again.
+- **UI/UX Feature Implementation:**
+    - Created and integrated Apple-style wheel pickers for the Add Event modal.
+    - Completely redesigned the Documents tab () for a cleaner UI.
+    - Implemented a mobile-friendly edit modal for documents using .
+- **Bug Fixes:**
+    - Fixed a calendar bug causing event indicator dots to duplicate on selection.
+    - Corrected multiple React Native Web clickability issues using  and fixing component nesting.
+    - Resolved a critical module not found error on Expo Go by correcting an import path.
+- **Core Functionality:**
+    - Implemented the logic to redirect new users to the onboarding flow upon first launch.
+    - Deployed a basic version of an OpenAI OCR for images in the Documents tab.
 
 **Earlier issues found/mentioned but not fixed**
-There are no unfixed issues.
+None.
 
 **Known issue recurrence from previous fork**
-N/A
+N/A.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Frontend:** React Native, Expo, Expo Router, TypeScript
-- **Backend:** Python, Flask, Pymongo
+- **Frontend:** React Native, Expo (SDK 54), Expo Router, TypeScript
+- **Backend:** Python, FastAPI, Pydantic
 - **Database:** MongoDB
-- **3rd Party Services:** Resend (for email)
-- **Architecture:** Modular REST API, Component-based frontend
+- **AI/ML:** OpenAI Vision API () for OCR.
+- **3rd Party Services:** Resend (email),  &  (PDF/Image processing).
 
 **key DB schema**
 - ****: 
-- ****:  (Note: The user's PRD outlines a more detailed target schema to be implemented).
 - ****: 
-- ****: 
+- ****: The user's new PRD implies a new, detailed schema is required: 
 
 **changes in tech stack**
-- **Data Source:** Migrated from static JSON files to a live MongoDB database.
-- **Email Service:** Added Resend for transactional emails.
+- **Backend OCR:** Added  and  for server-side PDF-to-image conversion and advanced image processing.
 
 **All files of reference**
-- : PRD for the (completed) Admin Dashboard.
-- : PRD for the Fluid UX, Onboarding, and Fluid Input components. This is the primary reference for all current and upcoming tasks.
-- : Directory where the new Fluid Input components are being created.
-- : Directory containing all backend API route definitions.
-- : Directory containing all frontend files for the Admin Dashboard.
+- **User PRD:** The long message from the user detailing the ultra-performant OCR system is the primary source of truth for the current task.
+- : The main frontend file to be modified.
+- : The backend service to be completely rewritten.
+- : The backend router to be updated.
+
+**Areas that need refactoring**:
+- **/app/frontend/app/(tabs)/index.tsx**: This file is over 1600 lines and should be broken down into smaller, manageable components.
+- **/app/frontend/app/(tabs)/vault.tsx**: To avoid making this file too large, the new UI components for the OCR flow (, , ) should be created as separate files in a new directory like .
 
 **key api endpoints**
-- 
-- 
-- 
-- 
-- 
-- 
+- ****: This new endpoint needs to be created to handle the advanced OCR pipeline, as per the user's PRD. It will replace or augment the old .
 
 **Critical Info for New Agent**
-- The user's primary instructions are now contained within two large markdown files ( and ). **The agent must strictly follow the specifications in  for all new work.**
-- The immediate task is to **finish creating the 4 remaining Fluid Input components** in .
-- The very next task after that is to **begin implementing the 7-step initial onboarding flow** as described in .
-- All communication with the user must be in **French**.
+- **Follow the PRD:** The user has provided an extremely detailed, technical PRD for the new OCR system. You must follow it precisely, including the JSON structure, backend logic (PDF conversion, image processing), and frontend UI flow.
+- **Backend Stack:** The PRD mentions Javascript libraries (, ), but you must use the Python equivalents (, ) that have already been installed for the FastAPI backend.
+- **Frontend Components:** Create the new UI components (, , ) in separate files for better organization. Do not add all the code directly into .
+- **API Key:** The user's OpenAI API key is located in .
 
 **documents and test reports created in this job**
 - 
 - 
 - 
 - 
-- 
-- 
-- 
-- 
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **Donne moi le lien vers le Dashboard admin:** User asked for the Admin Dashboard link. (Completed)
-2.  **User sent a large PRD for the new Fluid UX:** This defined the next major set of tasks. (Acknowledged)
-3.  **Les 9 composant d’un coup:** User requested the creation of all 9 fluid components. (In Progress)
-4.  **Qu’attend tu de moi ?:** User asked what the agent was waiting for. (Agent was confirming its plan).
-5.  **Continue:** The user's last message, giving the agent the go-ahead to continue with the component creation. This is the active instruction.
+1.  **User's latest command**: Provided a highly detailed PRD for an ultra-performant OCR system and confirmed the priority is P0 (Backend) and P1 (Frontend). (This is the active task).
+2.  **User reported edit modal is empty & OCR fails on PDF**: The user provided screenshots showing the edit modal not populating with data and noted that their PDF invoice wasn't processed. (This is being addressed by the new OCR system).
+3.  **User reported bad mobile UX for edit modal**: The keyboard was covering the input fields. (Agent implemented a fix using ).
+4.  **User provided OpenAI key and requested OCR**: Asked for auto-detection of amount, date, and category. (Agent implemented a basic version).
+5.  **User reported app not working on Expo Go**: An module not found error. (Agent fixed the import path).
+6.  **User reported calendar bug and requested document features**: Calendar dots were duplicating, and user wanted to view/edit uploaded documents. (Agent fixed the bug and added view/edit functionality).
+7.  **User requested to fix documents tab & change initial route**: Wanted a minimalist, functional documents tab and for new users to start at the onboarding screen. (Agent implemented both).
+8.  **User reported Expo Go black screen and requested UI changes**: Asked for Apple-style pickers in the Add Event form. (Agent fixed dependency issues and built the pickers).
 
 **Project Health Check:**
-- **Broken:** Nothing is currently broken.
-- **Mocked:** The Resend integration is in test mode, which only allows sending emails to the account owner's verified address. This is expected behavior and not a bug.
+- **Broken:** The previous document editing flow was buggy (modal appeared empty). The old OCR did not support PDFs. Both issues are being superseded by the implementation of the new, comprehensive OCR system.
+- **Mocked:** The document list in  is still populated with static data. The new OCR work will replace this with dynamically processed documents.
 
 **3rd Party Integrations**
-- **Resend:** Email API. Requires a User API Key.
-- **MongoDB:** NoSQL Database.
+- **OpenAI GPT-4o**: Uses a User-provided API Key for OCR.
+- **Resend**: Email API, requires User API Key.
+- **MongoDB**: NoSQL Database.
 
 **Testing status**
-- **Testing agent used after significant changes:** YES. The agent was used successfully after the backend migration and after the admin dashboard was built.
-- **Troubleshoot agent used after agent stuck in loop:** NO
-- **Test files created:** Multiple test reports exist in .
+- **Testing agent used after significant changes:** YES.
+- **Test files created:** , , 
 - **Known regressions:** None.
 
 **Credentials to test flow:**
-- **Admin Dashboard Credentials:**
+- **Admin Dashboard:**
     - **Email:** 
     - **Password:** 
+- **OpenAI Key:** Available in .
 
 **What agent forgot to execute**
-The agent has been diligent in following the user's detailed instructions and has not forgotten any tasks. The current work is a direct continuation of the user's last command.</analysis>
+- The previous agent correctly identified the need for Python libraries on the backend despite the PRD mentioning JS ones. The next agent must continue this path.
+- The PRD specifies creating several new frontend components. For better code quality and maintainability, these **must** be created in separate files under , not inline within .</analysis>
