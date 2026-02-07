@@ -302,44 +302,87 @@ export default function DocumentsScreen() {
     }
   };
 
-  // Handle verification save - uses edited inline values
-  const handleVerificationSave = () => {
+  // Handle verification save - uses edited inline values and saves to MongoDB
+  const handleVerificationSave = async () => {
     const mappedCategory = CATEGORY_MAP[editedCategorie || 'Autre'] || 'other';
     const parsedMontant = parseFloat(editedMontant.replace(',', '.')) || undefined;
+    const parsedHT = parseFloat(editedMontantHT.replace(',', '.')) || undefined;
+    const parsedTVA = parseFloat(editedMontantTVA.replace(',', '.')) || undefined;
     
-    const newDoc: Document = {
-      id: `doc-${Date.now()}`,
-      name: editedFournisseur ? `${editedFournisseur} - ${pendingDocName}` : pendingDocName,
-      category: mappedCategory,
-      type: pendingDocType,
-      size: `${Math.floor(Math.random() * 2000) + 100} KB`,
-      date: editedDate || new Date().toLocaleDateString('fr-FR'),
-      amount: parsedMontant,
-      uri: pendingDocUri || undefined,
-      fournisseur: editedFournisseur || undefined,
-      description: ocrData?.description || undefined,
-    };
+    setIsUploading(true);
     
-    setDocuments(prev => [newDoc, ...prev]);
-    setShowVerificationModal(false);
-    setOcrData(null);
-    setPendingDocUri(null);
-    setPendingDocName('');
-    
-    // Reset edit states
-    setEditedMontant('');
-    setEditedDate('');
-    setEditedFournisseur('');
-    setEditedCategorie('Autre');
-    setEditedMontantHT('');
-    setEditedMontantTVA('');
-    
-    // Show success message
-    Alert.alert(
-      'Document enregistré',
-      `${newDoc.name}\nMontant: ${newDoc.amount?.toFixed(2) || '--'} €`,
-      [{ text: 'OK' }]
-    );
+    try {
+      // Read the file as base64 for storage
+      let fileBase64: string | undefined;
+      if (pendingDocUri) {
+        try {
+          fileBase64 = await FileSystem.readAsStringAsync(pendingDocUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        } catch (e) {
+          console.log('Could not read file for storage');
+        }
+      }
+      
+      // Save to MongoDB via API
+      const response = await api.post('/api/documents', {
+        name: editedFournisseur ? `${editedFournisseur} - ${pendingDocName}` : pendingDocName,
+        category: mappedCategory,
+        montantTotal: parsedMontant,
+        montantHT: parsedHT,
+        montantTVA: parsedTVA,
+        dateFacture: editedDate || new Date().toLocaleDateString('fr-FR'),
+        fournisseur: editedFournisseur || null,
+        numeroFacture: ocrData?.numeroFacture || null,
+        adresse: ocrData?.adresse || null,
+        lignes: ocrData?.lignes || [],
+        confidence: ocrData?.confidence || 0.5,
+        description: ocrData?.description || null,
+        fileType: pendingDocType,
+        fileBase64: fileBase64,
+      });
+      
+      const savedDoc = response.data;
+      
+      const newDoc: Document = {
+        id: savedDoc.id,
+        name: savedDoc.name,
+        category: savedDoc.category,
+        type: savedDoc.fileType === 'pdf' ? 'pdf' : 'image',
+        size: savedDoc.hasFile ? 'Fichier' : '--',
+        date: savedDoc.dateFacture || '--',
+        amount: savedDoc.montantTotal,
+        uri: savedDoc.hasFile ? `/api/documents/${savedDoc.id}/file` : undefined,
+        fournisseur: savedDoc.fournisseur,
+        description: savedDoc.description,
+      };
+      
+      setDocuments(prev => [newDoc, ...prev]);
+      setShowVerificationModal(false);
+      setOcrData(null);
+      setPendingDocUri(null);
+      setPendingDocName('');
+      
+      // Reset edit states
+      setEditedMontant('');
+      setEditedDate('');
+      setEditedFournisseur('');
+      setEditedCategorie('Autre');
+      setEditedMontantHT('');
+      setEditedMontantTVA('');
+      
+      // Show success message
+      Alert.alert(
+        'Document enregistré',
+        `${newDoc.name}\nMontant: ${newDoc.amount?.toFixed(2) || '--'} €`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error saving document:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder le document. Réessayez.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Handle verification cancel
