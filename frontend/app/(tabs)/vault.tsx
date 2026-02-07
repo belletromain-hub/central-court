@@ -727,7 +727,10 @@ export default function DocumentsScreen() {
       {/* Invoice Verification Modal */}
       <Modal visible={showVerificationModal} animationType="slide">
         {ocrData && (
-          <View style={styles.verificationContainer}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.verificationContainer}
+          >
             <View style={styles.verificationHeader}>
               <TouchableOpacity onPress={handleVerificationCancel} style={styles.verificationCloseBtn} testID="verification-cancel-btn">
                 <Ionicons name="close" size={24} color={Colors.text.primary} />
@@ -742,7 +745,7 @@ export default function DocumentsScreen() {
                 )}
               </View>
               <TouchableOpacity 
-                onPress={() => handleVerificationSave(ocrData)} 
+                onPress={handleVerificationSave} 
                 style={[styles.verificationCloseBtn, styles.verificationSaveHeaderBtn]}
                 testID="verification-save-btn"
               >
@@ -750,7 +753,11 @@ export default function DocumentsScreen() {
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.verificationContent} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.verificationContent} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               {/* Confidence Score */}
               <View style={styles.confidenceCard}>
                 <View style={styles.confidenceHeader}>
@@ -781,44 +788,120 @@ export default function DocumentsScreen() {
                 </Text>
               </View>
               
-              {/* Main Amount Card */}
+              {/* Main Amount Card - EDITABLE */}
               <View style={styles.mainAmountCard}>
                 <Text style={styles.mainAmountLabel}>Montant Total TTC</Text>
-                <View style={styles.mainAmountRow}>
-                  <Text style={styles.mainAmountValue}>
-                    {ocrData.montantTotal?.toFixed(2) || '0.00'}
-                  </Text>
-                  <Text style={styles.mainAmountCurrency}>€</Text>
+                <View style={styles.editableAmountContainer}>
+                  <TextInput
+                    style={styles.editableAmountInput}
+                    value={editedMontant}
+                    onChangeText={(text) => {
+                      const cleaned = text.replace(/[^0-9.,]/g, '').replace(',', '.');
+                      setEditedMontant(cleaned);
+                    }}
+                    placeholder="0.00"
+                    placeholderTextColor={Colors.text.muted}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    testID="edit-montant-total"
+                  />
+                  <Text style={styles.editableAmountCurrency}>€</Text>
                 </View>
+                {(ocrData.confidence || 0) < 0.7 && (
+                  <View style={styles.lowConfidenceWarning}>
+                    <Ionicons name="alert-circle" size={14} color="#F44336" />
+                    <Text style={styles.lowConfidenceText}>Vérifiez ce montant</Text>
+                  </View>
+                )}
               </View>
               
-              {/* Category */}
+              {/* Category - EDITABLE */}
               <View style={styles.verificationSection}>
                 <Text style={styles.verificationSectionTitle}>Catégorie</Text>
-                <View style={[styles.verificationCategoryBadge, { backgroundColor: '#f57c00' + '20' }]}>
-                  <Ionicons name="pricetag" size={16} color="#f57c00" />
-                  <Text style={[styles.verificationCategoryText, { color: '#f57c00' }]}>
-                    {ocrData.categorie || 'Autre'}
-                  </Text>
-                </View>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.categoriesScrollView}
+                >
+                  {OCR_CATEGORIES.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[
+                        styles.categoryChipEditable,
+                        editedCategorie === cat.id && { 
+                          backgroundColor: cat.color + '20', 
+                          borderColor: cat.color 
+                        }
+                      ]}
+                      onPress={() => setEditedCategorie(cat.id)}
+                      testID={`edit-category-${cat.id}`}
+                    >
+                      <Ionicons 
+                        name={cat.icon} 
+                        size={16} 
+                        color={editedCategorie === cat.id ? cat.color : Colors.text.secondary} 
+                      />
+                      <Text style={[
+                        styles.categoryChipLabel,
+                        editedCategorie === cat.id && { color: cat.color }
+                      ]}>
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
               
-              {/* Basic Info */}
+              {/* Basic Info - EDITABLE */}
               <View style={styles.verificationSection}>
                 <Text style={styles.verificationSectionTitle}>Informations</Text>
                 
-                <View style={styles.verificationInfoRow}>
-                  <Ionicons name="calendar" size={18} color={Colors.text.secondary} />
-                  <Text style={styles.verificationInfoLabel}>Date</Text>
-                  <Text style={styles.verificationInfoValue}>{ocrData.dateFacture || '--'}</Text>
+                {/* Date Field */}
+                <View style={styles.editableFieldContainer}>
+                  <View style={styles.editableFieldIcon}>
+                    <Ionicons name="calendar" size={18} color={Colors.text.secondary} />
+                  </View>
+                  <View style={styles.editableFieldContent}>
+                    <Text style={styles.editableFieldLabel}>Date</Text>
+                    <TextInput
+                      style={styles.editableFieldInput}
+                      value={editedDate}
+                      onChangeText={(text) => {
+                        // Auto-format date as JJ/MM/AAAA
+                        let cleaned = text.replace(/[^0-9]/g, '');
+                        if (cleaned.length >= 2) cleaned = cleaned.slice(0, 2) + '/' + cleaned.slice(2);
+                        if (cleaned.length >= 5) cleaned = cleaned.slice(0, 5) + '/' + cleaned.slice(5);
+                        if (cleaned.length > 10) cleaned = cleaned.slice(0, 10);
+                        setEditedDate(cleaned);
+                      }}
+                      placeholder="JJ/MM/AAAA"
+                      placeholderTextColor={Colors.text.muted}
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      testID="edit-date"
+                    />
+                  </View>
                 </View>
                 
-                <View style={styles.verificationInfoRow}>
-                  <Ionicons name="business" size={18} color={Colors.text.secondary} />
-                  <Text style={styles.verificationInfoLabel}>Fournisseur</Text>
-                  <Text style={styles.verificationInfoValue}>{ocrData.fournisseur || '--'}</Text>
+                {/* Fournisseur Field */}
+                <View style={styles.editableFieldContainer}>
+                  <View style={styles.editableFieldIcon}>
+                    <Ionicons name="business" size={18} color={Colors.text.secondary} />
+                  </View>
+                  <View style={styles.editableFieldContent}>
+                    <Text style={styles.editableFieldLabel}>Fournisseur</Text>
+                    <TextInput
+                      style={styles.editableFieldInput}
+                      value={editedFournisseur}
+                      onChangeText={setEditedFournisseur}
+                      placeholder="Nom du fournisseur"
+                      placeholderTextColor={Colors.text.muted}
+                      testID="edit-fournisseur"
+                    />
+                  </View>
                 </View>
                 
+                {/* N° Facture (read-only) */}
                 {ocrData.numeroFacture && (
                   <View style={styles.verificationInfoRow}>
                     <Ionicons name="document-text" size={18} color={Colors.text.secondary} />
