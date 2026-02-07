@@ -22,7 +22,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import Colors from '../../src/constants/colors';
 import api from '../../src/services/api';
-import InvoiceVerification, { InvoiceData } from '../../src/components/documents/InvoiceVerification';
+import InvoiceVerification from '../../src/components/documents/InvoiceVerification';
+import type { InvoiceData } from '../../src/components/documents/InvoiceVerification';
 
 // Types
 interface Document {
