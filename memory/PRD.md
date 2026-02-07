@@ -90,6 +90,46 @@ Construire une application professionnelle de tennis pour les joueurs profession
   - Montants HT et TVA éditables
   - Indicateur visuel pour les champs à faible confiance
 
+#### 9. Sauvegarde MongoDB des Documents (NEW - Février 2026)
+- ✅ Collection `documents` avec schéma complet
+- ✅ Stockage du fichier original en base64 (image/PDF)
+- ✅ CRUD complet via API:
+  - `POST /api/documents` - Créer un document
+  - `GET /api/documents` - Lister avec filtres (catégorie, période)
+  - `GET /api/documents/{id}` - Obtenir un document
+  - `GET /api/documents/{id}/file` - Télécharger le fichier original
+  - `PUT /api/documents/{id}` - Modifier un document
+  - `DELETE /api/documents/{id}` - Supprimer un document
+- ✅ Frontend connecté à MongoDB (plus de données statiques)
+
+#### 10. Onboarding Backend (NEW - Février 2026)
+- ✅ Endpoint `POST /api/users/onboarding` pour sauvegarder les données
+- ✅ Schéma utilisateur complet:
+  - Infos de base: prénom, dateNaissance, email
+  - Tennis: circuits, niveaux, classement
+  - Préférences voyage: classe vol, compagnies préférées
+  - Préférences hôtel: équipements essentiels
+  - Préférences alimentation: cuisines, restrictions, allergies
+- ✅ Endpoints supplémentaires:
+  - `GET /api/users/profile/{id}` - Profil par ID
+  - `GET /api/users/profile/email/{email}` - Profil par email
+  - `PUT /api/users/onboarding/{id}` - Mise à jour partielle
+  - `POST /api/users/onboarding/complete/{id}` - Marquer terminé
+
+#### 11. Export PDF des Dépenses (NEW - Février 2026)
+- ✅ Endpoint `GET /api/documents/export/pdf`
+- ✅ Filtres disponibles:
+  - `period=month` - Mois en cours
+  - `period=year` - Année en cours
+  - `period=all` ou aucun - Toutes les dépenses
+  - `startDate` et `endDate` - Période personnalisée
+  - `category` - Filtrer par catégorie
+- ✅ Contenu du PDF:
+  - Résumé par catégorie avec totaux
+  - Liste détaillée des dépenses
+  - Total général
+  - Date de génération
+
 ## Technical Architecture
 
 ```
