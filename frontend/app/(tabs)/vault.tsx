@@ -428,7 +428,7 @@ export default function DocumentsScreen() {
     setSelectedDoc(null);
   };
 
-  // Delete document
+  // Delete document - calls MongoDB API
   const handleDelete = (doc: Document) => {
     Alert.alert(
       'Supprimer',
@@ -438,7 +438,16 @@ export default function DocumentsScreen() {
         { 
           text: 'Supprimer', 
           style: 'destructive',
-          onPress: () => setDocuments(prev => prev.filter(d => d.id !== doc.id))
+          onPress: async () => {
+            try {
+              await api.delete(`/api/documents/${doc.id}`);
+              setDocuments(prev => prev.filter(d => d.id !== doc.id));
+            } catch (error) {
+              console.error('Delete error:', error);
+              // Still remove from local state even if API fails
+              setDocuments(prev => prev.filter(d => d.id !== doc.id));
+            }
+          }
         }
       ]
     );
