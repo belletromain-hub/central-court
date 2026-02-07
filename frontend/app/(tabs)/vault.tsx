@@ -204,8 +204,18 @@ export default function DocumentsScreen() {
       console.log('OCR Response:', response.data);
       
       if (response.data.success && response.data.data) {
-        // Store OCR data and show verification screen
-        setOcrData(response.data.data);
+        // Store OCR data and initialize edit states
+        const data = response.data.data;
+        setOcrData(data);
+        
+        // Initialize inline edit states with OCR values
+        setEditedMontant(data.montantTotal?.toString() || '');
+        setEditedDate(data.dateFacture || '');
+        setEditedFournisseur(data.fournisseur || '');
+        setEditedCategorie(data.categorie || 'Autre');
+        setEditedMontantHT(data.montantHT?.toString() || '');
+        setEditedMontantTVA(data.montantTVA?.toString() || '');
+        
         setIsUploading(false);
         setShowVerificationModal(true);
       } else {
