@@ -1,221 +1,657 @@
+diff --git a/backend/tests/test_ocr_endpoints.py b/backend/tests/test_ocr_endpoints.py
+new file mode 100644
+index 00000000..9e210d86
+--- /dev/null
++++ b/backend/tests/test_ocr_endpoints.py
+@@ -0,0 +1,417 @@
++"""
++OCR Endpoints Test Suite
++Tests for invoice/document analysis endpoints:
++- POST /api/invoices/analyze-base64 - Base64 encoded image/PDF analysis
++- POST /api/documents/analyze - Legacy endpoint for image analysis
++- GET /api/documents/categories - Returns available categories
++- POST /api/invoices/upload - Multipart form upload endpoint
++"""
++
++import pytest
++import requests
++import os
++import base64
++from PIL import Image, ImageDraw
++import io
++
++# Get BASE_URL from environment
++BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
++if not BASE_URL:
++    BASE_URL = "https://smart-receipt-26.preview.emergentagent.com"
++
++
++def create_test_receipt_image(text_content: str) -> bytes:
++    """Create a test receipt image with given text content"""
++    img = Image.new('RGB', (400, 500), color='white')
++    draw = ImageDraw.Draw(img)
++    
++    y_position = 20
++    for line in text_content.strip().split('\n'):
++        draw.text((20, y_position), line, fill='black')
++        y_position += 20
++    
++    buffer = io.BytesIO()
++    img.save(buffer, format='PNG')
++    buffer.seek(0)
++    return buffer.read()
++
++
++def create_test_receipt_base64(text_content: str) -> str:
++    """Create a test receipt image and return as base64"""
++    image_bytes = create_test_receipt_image(text_content)
++    return base64.b64encode(image_bytes).decode('utf-8')
++
++
++class TestHealthEndpoint:
++    """Health check endpoint tests"""
++    
++    def test_health_check(self):
++        """Test that health endpoint returns healthy status"""
++        response = requests.get(f"{BASE_URL}/api/health")
++        assert response.status_code == 200
++        data = response.json()
++        assert data["status"] == "healthy"
++        assert "service" in data
++
++
++class TestCategoriesEndpoint:
++    """Categories endpoint tests"""
++    
++    def test_get_categories(self):
++        """Test GET /api/documents/categories returns all categories"""
++        response = requests.get(f"{BASE_URL}/api/documents/categories")
++        assert response.status_code == 200
++        
++        data = response.json()
++        assert "categories" in data
++        categories = data["categories"]
++        
++        # Verify expected categories exist
++        category_ids = [c["id"] for c in categories]
++        expected_ids = ["travel", "accommodation", "restaurant", "medical", "equipment", "services", "other"]
++        
++        for expected_id in expected_ids:
++            assert expected_id in category_ids, f"Missing category: {expected_id}"
++        
++        # Verify each category has required fields
++        for cat in categories:
++            assert "id" in cat
++            assert "label" in cat
++            assert "icon" in cat
++
++
++class TestInvoiceAnalyzeBase64Endpoint:
++    """Tests for POST /api/invoices/analyze-base64 endpoint"""
++    
++    def test_analyze_restaurant_receipt(self):
++        """Test OCR extraction from restaurant receipt"""
++        receipt_text = """
++RESTAURANT LE TENNIS
++123 Rue du Sport
++75001 Paris
++
++Date: 15/01/2026
++
++Menu du jour         15.00 EUR
++Boisson              3.50 EUR
++Dessert              6.00 EUR
++
++------------------------
++TOTAL TTC           24.50 EUR
++------------------------
++"""
++        base64_image = create_test_receipt_base64(receipt_text)
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/analyze-base64",
++            json={"image_base64": base64_image, "filename": "restaurant_receipt.png"}
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        # Verify success
++        assert data["success"] == True
++        assert data["data"] is not None
++        
++        # Verify extracted data
++        invoice_data = data["data"]
++        assert invoice_data["montantTotal"] == 24.5
++        assert invoice_data["dateFacture"] == "15/01/2026"
++        assert invoice_data["fournisseur"] == "RESTAURANT LE TENNIS"
++        assert invoice_data["categorie"] == "Restauration"
++        assert invoice_data["confidence"] >= 0.7
++        
++        # Verify line items
++        assert invoice_data["lignes"] is not None
++        assert len(invoice_data["lignes"]) >= 1
++    
++    def test_analyze_hotel_receipt_with_ht_tva(self):
++        """Test OCR extraction with HT/TVA breakdown"""
++        receipt_text = """
++HOTEL HILTON PARIS
++Avenue des Champs-Elysees
++75008 Paris
++
++Date: 20/01/2026
++Facture N: HTL-2026-001
++
++Chambre Double      180.00 EUR
++Petit-dejeuner       25.00 EUR
++Parking              15.00 EUR
++
++------------------------
++Sous-total HT       183.33 EUR
++TVA (20%)            36.67 EUR
++------------------------
++TOTAL TTC           220.00 EUR
++------------------------
++"""
++        base64_image = create_test_receipt_base64(receipt_text)
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/analyze-base64",
++            json={"image_base64": base64_image, "filename": "hotel_receipt.png"}
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        assert data["success"] == True
++        invoice_data = data["data"]
++        
++        # Verify amounts
++        assert invoice_data["montantTotal"] == 220.0
++        assert invoice_data["montantHT"] == 183.33
++        assert invoice_data["montantTVA"] == 36.67
++        
++        # Verify HT + TVA = TTC (within tolerance)
++        if invoice_data["montantHT"] and invoice_data["montantTVA"]:
++            calculated = invoice_data["montantHT"] + invoice_data["montantTVA"]
++            assert abs(calculated - invoice_data["montantTotal"]) < 0.10
++        
++        # Verify category detection
++        assert invoice_data["categorie"] == "Hébergement"
++        
++        # Verify invoice number
++        assert invoice_data["numeroFacture"] == "HTL-2026-001"
++    
++    def test_analyze_medical_receipt(self):
++        """Test OCR extraction from medical receipt"""
++        receipt_text = """
++PHARMACIE CENTRALE
++45 Boulevard de la Sante
++75013 Paris
++
++Date: 10/01/2026
++
++Medicament A         12.50 EUR
++Medicament B          8.00 EUR
++Pansements            4.50 EUR
++
++------------------------
++TOTAL                25.00 EUR
++------------------------
++"""
++        base64_image = create_test_receipt_base64(receipt_text)
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/analyze-base64",
++            json={"image_base64": base64_image, "filename": "pharmacy_receipt.png"}
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        assert data["success"] == True
++        invoice_data = data["data"]
++        
++        # Verify medical category detection
++        assert invoice_data["categorie"] == "Médical"
++        assert invoice_data["montantTotal"] == 25.0
++    
++    def test_analyze_travel_receipt(self):
++        """Test OCR extraction from travel receipt"""
++        receipt_text = """
++AIR FRANCE
++Billet Electronique
++
++Date: 05/01/2026
++Vol: AF1234
++
++Paris CDG -> Rotterdam
++Classe Economique
++
++------------------------
++TOTAL TTC           285.00 EUR
++------------------------
++"""
++        base64_image = create_test_receipt_base64(receipt_text)
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/analyze-base64",
++            json={"image_base64": base64_image, "filename": "flight_ticket.png"}
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        assert data["success"] == True
++        invoice_data = data["data"]
++        
++        # Verify transport category detection
++        assert invoice_data["categorie"] == "Transport"
++        assert invoice_data["montantTotal"] == 285.0
++    
++    def test_invalid_base64(self):
++        """Test error handling for invalid base64"""
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/analyze-base64",
++            json={"image_base64": "invalid_base64_data!!!", "filename": "test.png"}
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        assert data["success"] == False
++        assert data["error"] is not None
++
++
++class TestDocumentsAnalyzeEndpoint:
++    """Tests for legacy POST /api/documents/analyze endpoint"""
++    
++    def test_legacy_analyze_endpoint(self):
++        """Test legacy endpoint returns old format"""
++        receipt_text = """
++RESTAURANT TEST
++Date: 01/01/2026
++TOTAL: 50.00 EUR
++"""
++        base64_image = create_test_receipt_base64(receipt_text)
++        
++        response = requests.post(
++            f"{BASE_URL}/api/documents/analyze",
++            json={"image_base64": base64_image, "filename": "test.png"}
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        # Verify legacy format fields
++        assert "success" in data
++        assert "amount" in data
++        assert "date" in data
++        assert "category" in data
++        assert "merchant" in data
++        assert "confidence" in data
++        assert "needsReview" in data
++
++
++class TestInvoiceUploadEndpoint:
++    """Tests for POST /api/invoices/upload multipart endpoint"""
++    
++    def test_upload_png_image(self):
++        """Test multipart upload with PNG image"""
++        receipt_text = """
++TEST STORE
++Date: 25/01/2026
++TOTAL: 99.99 EUR
++"""
++        image_bytes = create_test_receipt_image(receipt_text)
++        
++        files = {
++            'file': ('test_receipt.png', image_bytes, 'image/png')
++        }
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/upload",
++            files=files
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        assert data["success"] == True
++        assert data["data"] is not None
++        assert data["data"]["montantTotal"] == 99.99
++        assert data["data"]["fileType"] == "image"
++    
++    def test_upload_jpeg_image(self):
++        """Test multipart upload with JPEG image"""
++        receipt_text = """
++JPEG TEST STORE
++Date: 26/01/2026
++TOTAL: 75.50 EUR
++"""
++        # Create JPEG image
++        img = Image.new('RGB', (400, 300), color='white')
++        draw = ImageDraw.Draw(img)
++        y_position = 20
++        for line in receipt_text.strip().split('\n'):
++            draw.text((20, y_position), line, fill='black')
++            y_position += 20
++        
++        buffer = io.BytesIO()
++        img.save(buffer, format='JPEG', quality=90)
++        buffer.seek(0)
++        image_bytes = buffer.read()
++        
++        files = {
++            'file': ('test_receipt.jpg', image_bytes, 'image/jpeg')
++        }
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/upload",
++            files=files
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        assert data["success"] == True
++        assert data["data"]["montantTotal"] == 75.5
++    
++    def test_upload_empty_file(self):
++        """Test error handling for empty file"""
++        files = {
++            'file': ('empty.png', b'', 'image/png')
++        }
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/upload",
++            files=files
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        assert data["success"] == False
++        assert "vide" in data["error"].lower() or "empty" in data["error"].lower()
++
++
++class TestOCRDataValidation:
++    """Tests for OCR data validation rules"""
++    
++    def test_confidence_score_range(self):
++        """Test that confidence score is between 0 and 1"""
++        receipt_text = """
++CLEAR RECEIPT
++Date: 01/01/2026
++TOTAL: 100.00 EUR
++"""
++        base64_image = create_test_receipt_base64(receipt_text)
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/analyze-base64",
++            json={"image_base64": base64_image, "filename": "test.png"}
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        if data["success"]:
++            confidence = data["data"]["confidence"]
++            assert 0 <= confidence <= 1
++    
++    def test_needs_review_flag(self):
++        """Test that needsReview flag is set appropriately"""
++        receipt_text = """
++CLEAR RECEIPT
++Date: 01/01/2026
++TOTAL: 100.00 EUR
++"""
++        base64_image = create_test_receipt_base64(receipt_text)
++        
++        response = requests.post(
++            f"{BASE_URL}/api/invoices/analyze-base64",
++            json={"image_base64": base64_image, "filename": "test.png"}
++        )
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        if data["success"]:
++            assert "needsReview" in data["data"]
++            assert isinstance(data["data"]["needsReview"], bool)
++
++
++if __name__ == "__main__":
++    pytest.main([__file__, "-v", "--tb=short"])
 diff --git a/model.patch b/model.patch
-index 35c5e30..e69de29 100644
+index d320bdda..55c66a54 100644
 --- a/model.patch
 +++ b/model.patch
-@@ -1,216 +0,0 @@
--diff --git a/frontend/app/(tabs)/index.tsx b/frontend/app/(tabs)/index.tsx
--index d991aed..d68a36c 100644
----- a/frontend/app/(tabs)/index.tsx
--+++ b/frontend/app/(tabs)/index.tsx
--@@ -137,34 +137,6 @@ export default function CalendarScreenV1() {
--     return events.filter(e => e.date === date);
--   };
--   
---  // Get tournament events for calendar marks
---  const tournamentMarks = useMemo(() => {
---    const marks: Record<string, any> = {};
---    
---    weekTournaments.forEach(week => {
---      // Mark tournaments that have registrations
---      week.registrations.forEach(reg => {
---        const tournament = week.tournaments.find(t => t.id === reg.tournamentId);
---        if (tournament) {
---          // Mark all days of the tournament
---          let currentDate = new Date(tournament.startDate);
---          const endDate = new Date(tournament.endDate);
---          
---          while (currentDate <= endDate) {
---            const dateStr = currentDate.toISOString().split('T')[0];
---            marks[dateStr] = {
---              marked: true,
---              dotColor: EVENT_CATEGORIES.tournament.color,
---            };
---            currentDate.setDate(currentDate.getDate() + 1);
---          }
---        }
---      });
---    });
---    
---    return marks;
---  }, [weekTournaments]);
---  
--   // Combine all marks for calendar
--   const calendarMarks = useMemo(() => {
--     const marks: Record<string, any> = {};
+@@ -1,221 +0,0 @@
 -diff --git a/model.patch b/model.patch
--index 4a7a74b..e69de29 100644
+-index 35c5e30..e69de29 100644
 ---- a/model.patch
 -+++ b/model.patch
--@@ -1,172 +0,0 @@
+-@@ -1,216 +0,0 @@
+--diff --git a/frontend/app/(tabs)/index.tsx b/frontend/app/(tabs)/index.tsx
+--index d991aed..d68a36c 100644
+----- a/frontend/app/(tabs)/index.tsx
+--+++ b/frontend/app/(tabs)/index.tsx
+--@@ -137,34 +137,6 @@ export default function CalendarScreenV1() {
+--     return events.filter(e => e.date === date);
+--   };
+--   
+---  // Get tournament events for calendar marks
+---  const tournamentMarks = useMemo(() => {
+---    const marks: Record<string, any> = {};
+---    
+---    weekTournaments.forEach(week => {
+---      // Mark tournaments that have registrations
+---      week.registrations.forEach(reg => {
+---        const tournament = week.tournaments.find(t => t.id === reg.tournamentId);
+---        if (tournament) {
+---          // Mark all days of the tournament
+---          let currentDate = new Date(tournament.startDate);
+---          const endDate = new Date(tournament.endDate);
+---          
+---          while (currentDate <= endDate) {
+---            const dateStr = currentDate.toISOString().split('T')[0];
+---            marks[dateStr] = {
+---              marked: true,
+---              dotColor: EVENT_CATEGORIES.tournament.color,
+---            };
+---            currentDate.setDate(currentDate.getDate() + 1);
+---          }
+---        }
+---      });
+---    });
+---    
+---    return marks;
+---  }, [weekTournaments]);
+---  
+--   // Combine all marks for calendar
+--   const calendarMarks = useMemo(() => {
+--     const marks: Record<string, any> = {};
 --diff --git a/model.patch b/model.patch
---index 0fd24bc..e69de29 100644
+--index 4a7a74b..e69de29 100644
 ----- a/model.patch
 --+++ b/model.patch
---@@ -1,167 +0,0 @@
+--@@ -1,172 +0,0 @@
 ---diff --git a/model.patch b/model.patch
----index 99cd841..e69de29 100644
+---index 0fd24bc..e69de29 100644
 ------ a/model.patch
 ---+++ b/model.patch
----@@ -1,162 +0,0 @@
-----diff --git a/frontend/src/data/tournamentsV1.ts b/frontend/src/data/tournamentsV1.ts
-----index d26dc58..05952f3 100644
-------- a/frontend/src/data/tournamentsV1.ts
-----+++ b/frontend/src/data/tournamentsV1.ts
-----@@ -111,8 +111,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
-----         endDate: '2026-02-15'
-----       }
-----     ],
------    selectedTournamentId: null,
------    status: 'none',
-----+    registrations: [],
-----     hiddenTournamentIds: []
-----   },
-----   {
-----@@ -150,8 +149,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
-----         endDate: '2026-02-22'
-----       }
-----     ],
------    selectedTournamentId: null,
------    status: 'none',
-----+    registrations: [],
-----     hiddenTournamentIds: []
-----   },
-----   {
-----@@ -203,8 +201,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
-----         endDate: '2026-03-01'
-----       }
-----     ],
------    selectedTournamentId: null,
------    status: 'none',
-----+    registrations: [],
-----     hiddenTournamentIds: []
-----   }
----- ];
+---@@ -1,167 +0,0 @@
 ----diff --git a/model.patch b/model.patch
-----index 6854bbc..e69de29 100644
+----index 99cd841..e69de29 100644
 ------- a/model.patch
 ----+++ b/model.patch
-----@@ -1,123 +0,0 @@
+----@@ -1,162 +0,0 @@
 -----diff --git a/frontend/src/data/tournamentsV1.ts b/frontend/src/data/tournamentsV1.ts
------index deb4eb5..d44e8a8 100644
+-----index d26dc58..05952f3 100644
 -------- a/frontend/src/data/tournamentsV1.ts
 -----+++ b/frontend/src/data/tournamentsV1.ts
------@@ -107,7 +107,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+-----@@ -111,8 +111,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+-----         endDate: '2026-02-15'
 -----       }
 -----     ],
------     selectedTournamentId: null,
-------    status: 'none'
------+    status: 'none',
------+    hiddenTournamentIds: []
+------    selectedTournamentId: null,
+------    status: 'none',
+-----+    registrations: [],
+-----     hiddenTournamentIds: []
 -----   },
 -----   {
------     weekNumber: 8,
------@@ -145,7 +146,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+-----@@ -150,8 +149,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+-----         endDate: '2026-02-22'
 -----       }
 -----     ],
------     selectedTournamentId: null,
-------    status: 'none'
------+    status: 'none',
------+    hiddenTournamentIds: []
+------    selectedTournamentId: null,
+------    status: 'none',
+-----+    registrations: [],
+-----     hiddenTournamentIds: []
 -----   },
 -----   {
------     weekNumber: 9,
------@@ -197,7 +199,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+-----@@ -203,8 +201,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+-----         endDate: '2026-03-01'
 -----       }
 -----     ],
------     selectedTournamentId: null,
-------    status: 'none'
------+    status: 'none',
------+    hiddenTournamentIds: []
+------    selectedTournamentId: null,
+------    status: 'none',
+-----+    registrations: [],
+-----     hiddenTournamentIds: []
 -----   }
 ----- ];
------ 
 -----diff --git a/model.patch b/model.patch
------index 6835f28..e69de29 100644
+-----index 6854bbc..e69de29 100644
 -------- a/model.patch
 -----+++ b/model.patch
------@@ -1,84 +0,0 @@
-------diff --git a/frontend/app/(tabs)/index.tsx b/frontend/app/(tabs)/index.tsx
-------index 0cd8d99..eb92923 100644
---------- a/frontend/app/(tabs)/index.tsx
-------+++ b/frontend/app/(tabs)/index.tsx
-------@@ -204,21 +204,65 @@ export default function CalendarScreen() {
-------   };
+-----@@ -1,123 +0,0 @@
+------diff --git a/frontend/src/data/tournamentsV1.ts b/frontend/src/data/tournamentsV1.ts
+------index deb4eb5..d44e8a8 100644
+--------- a/frontend/src/data/tournamentsV1.ts
+------+++ b/frontend/src/data/tournamentsV1.ts
+------@@ -107,7 +107,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+------       }
+------     ],
+------     selectedTournamentId: null,
+-------    status: 'none'
+------+    status: 'none',
+------+    hiddenTournamentIds: []
+------   },
+------   {
+------     weekNumber: 8,
+------@@ -145,7 +146,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+------       }
+------     ],
+------     selectedTournamentId: null,
+-------    status: 'none'
+------+    status: 'none',
+------+    hiddenTournamentIds: []
+------   },
+------   {
+------     weekNumber: 9,
+------@@ -197,7 +199,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+------       }
+------     ],
+------     selectedTournamentId: null,
+-------    status: 'none'
+------+    status: 'none',
+------+    hiddenTournamentIds: []
+------   }
+------ ];
 ------ 
-------   const handleAddEvent = () => {
--------    if (!newEvent.title || !newEvent.date) return;
--------    const event: CalendarEvent = {
--------      id: `new-${Date.now()}`,
--------      type: newEvent.type as EventType,
--------      title: newEvent.title,
--------      date: newEvent.date,
--------      time: newEvent.time,
--------      location: newEvent.location,
--------      status: newEvent.status as 'pending' | 'confirmed' | 'cancelled',
--------      priority: newEvent.priority as 'high' | 'medium' | 'low',
--------      description: newEvent.description,
--------    };
--------    addEvent(event);
-------+    if (!newEvent.title || !newEvent.date) {
-------+      Alert.alert('Erreur', 'Veuillez remplir le titre et la date');
-------+      return;
-------+    }
-------+
-------+    addEvent({
-------+      ...newEvent,
-------+      id: `event-${Date.now()}`,
-------+    } as CalendarEvent);
-------+
-------     setShowAddModal(false);
--------    setNewEvent({ type: 'training', title: '', date: '', time: '', location: '', status: 'pending', priority: 'medium' });
-------+    setNewEvent({
-------+      type: 'training',
-------+      title: '',
-------+      date: '',
-------+      time: '',
-------+      location: '',
-------+      status: 'pending',
-------+      priority: 'medium',
-------+    });
-------+    setLocationSearch('');
-------+  };
-------+
-------+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
-------+    if (Platform.OS === 'android') {
-------+      setShowDatePicker(false);
-------+    }
-------+    if (date) {
-------+      setSelectedDateObj(date);
-------+      const dateStr = date.toISOString().split('T')[0];
-------+      setNewEvent({ ...newEvent, date: dateStr });
-------+    }
-------+  };
-------+
-------+  const handleTimeChange = (event: DateTimePickerEvent, time?: Date) => {
-------+    if (Platform.OS === 'android') {
-------+      setShowTimePicker(false);
-------+    }
-------+    if (time) {
-------+      setSelectedTimeObj(time);
-------+      const hours = time.getHours().toString().padStart(2, '0');
-------+      const minutes = time.getMinutes().toString().padStart(2, '0');
-------+      setNewEvent({ ...newEvent, time: `${hours}:${minutes}` });
-------+    }
-------+  };
-------+
-------+  const filteredLocations = useMemo(() => {
-------+    if (!locationSearch || locationSearch.length < 2) return [];
-------+    const search = locationSearch.toLowerCase();
-------+    return popularLocations.filter(
-------+      loc => loc.name.toLowerCase().includes(search) || 
-------+             loc.address.toLowerCase().includes(search)
-------+    ).slice(0, 5);
-------+  }, [locationSearch]);
-------+
-------+  const selectLocation = (loc: typeof popularLocations[0]) => {
-------+    setNewEvent({ ...newEvent, location: loc.name });
-------+    setLocationSearch(loc.name);
-------+    setShowLocationSuggestions(false);
-------   };
------- 
-------   const navigateWeek = (direction: number) => {
+------diff --git a/model.patch b/model.patch
+------index 6835f28..e69de29 100644
+--------- a/model.patch
+------+++ b/model.patch
+------@@ -1,84 +0,0 @@
+-------diff --git a/frontend/app/(tabs)/index.tsx b/frontend/app/(tabs)/index.tsx
+-------index 0cd8d99..eb92923 100644
+---------- a/frontend/app/(tabs)/index.tsx
+-------+++ b/frontend/app/(tabs)/index.tsx
+-------@@ -204,21 +204,65 @@ export default function CalendarScreen() {
+-------   };
+------- 
+-------   const handleAddEvent = () => {
+--------    if (!newEvent.title || !newEvent.date) return;
+--------    const event: CalendarEvent = {
+--------      id: `new-${Date.now()}`,
+--------      type: newEvent.type as EventType,
+--------      title: newEvent.title,
+--------      date: newEvent.date,
+--------      time: newEvent.time,
+--------      location: newEvent.location,
+--------      status: newEvent.status as 'pending' | 'confirmed' | 'cancelled',
+--------      priority: newEvent.priority as 'high' | 'medium' | 'low',
+--------      description: newEvent.description,
+--------    };
+--------    addEvent(event);
+-------+    if (!newEvent.title || !newEvent.date) {
+-------+      Alert.alert('Erreur', 'Veuillez remplir le titre et la date');
+-------+      return;
+-------+    }
+-------+
+-------+    addEvent({
+-------+      ...newEvent,
+-------+      id: `event-${Date.now()}`,
+-------+    } as CalendarEvent);
+-------+
+-------     setShowAddModal(false);
+--------    setNewEvent({ type: 'training', title: '', date: '', time: '', location: '', status: 'pending', priority: 'medium' });
+-------+    setNewEvent({
+-------+      type: 'training',
+-------+      title: '',
+-------+      date: '',
+-------+      time: '',
+-------+      location: '',
+-------+      status: 'pending',
+-------+      priority: 'medium',
+-------+    });
+-------+    setLocationSearch('');
+-------+  };
+-------+
+-------+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+-------+    if (Platform.OS === 'android') {
+-------+      setShowDatePicker(false);
+-------+    }
+-------+    if (date) {
+-------+      setSelectedDateObj(date);
+-------+      const dateStr = date.toISOString().split('T')[0];
+-------+      setNewEvent({ ...newEvent, date: dateStr });
+-------+    }
+-------+  };
+-------+
+-------+  const handleTimeChange = (event: DateTimePickerEvent, time?: Date) => {
+-------+    if (Platform.OS === 'android') {
+-------+      setShowTimePicker(false);
+-------+    }
+-------+    if (time) {
+-------+      setSelectedTimeObj(time);
+-------+      const hours = time.getHours().toString().padStart(2, '0');
+-------+      const minutes = time.getMinutes().toString().padStart(2, '0');
+-------+      setNewEvent({ ...newEvent, time: `${hours}:${minutes}` });
+-------+    }
+-------+  };
+-------+
+-------+  const filteredLocations = useMemo(() => {
+-------+    if (!locationSearch || locationSearch.length < 2) return [];
+-------+    const search = locationSearch.toLowerCase();
+-------+    return popularLocations.filter(
+-------+      loc => loc.name.toLowerCase().includes(search) || 
+-------+             loc.address.toLowerCase().includes(search)
+-------+    ).slice(0, 5);
+-------+  }, [locationSearch]);
+-------+
+-------+  const selectLocation = (loc: typeof popularLocations[0]) => {
+-------+    setNewEvent({ ...newEvent, location: loc.name });
+-------+    setLocationSearch(loc.name);
+-------+    setShowLocationSuggestions(false);
+-------   };
+------- 
+-------   const navigateWeek = (direction: number) => {
+diff --git a/test_reports/pytest/pytest_ocr_results.xml b/test_reports/pytest/pytest_ocr_results.xml
+new file mode 100644
+index 00000000..1752be50
+--- /dev/null
++++ b/test_reports/pytest/pytest_ocr_results.xml
+@@ -0,0 +1 @@
++<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="13" time="90.269" timestamp="2026-02-07T01:00:41.043110+00:00" hostname="agent-env-24a390a2-c85b-4aae-bc11-cc703c705b78"><testcase classname="tests.test_ocr_endpoints.TestHealthEndpoint" name="test_health_check" time="0.475" /><testcase classname="tests.test_ocr_endpoints.TestCategoriesEndpoint" name="test_get_categories" time="0.445" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_restaurant_receipt" time="15.286" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_hotel_receipt_with_ht_tva" time="16.429" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_medical_receipt" time="13.692" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_travel_receipt" time="8.300" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_invalid_base64" time="0.460" /><testcase classname="tests.test_ocr_endpoints.TestDocumentsAnalyzeEndpoint" name="test_legacy_analyze_endpoint" time="7.364" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_png_image" time="7.056" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_jpeg_image" time="6.149" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_empty_file" time="0.471" /><testcase classname="tests.test_ocr_endpoints.TestOCRDataValidation" name="test_confidence_score_range" time="7.220" /><testcase classname="tests.test_ocr_endpoints.TestOCRDataValidation" name="test_needs_review_flag" time="6.837" /></testsuite></testsuites>
+\ No newline at end of file
