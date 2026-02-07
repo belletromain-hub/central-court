@@ -82,6 +82,13 @@ Construire une application professionnelle de tennis pour les joueurs profession
   - Avertissement dates futures ou > 2 ans
 - ✅ Retry logic pour appels OpenAI
 - ✅ Frontend avec écran de vérification inline
+- ✅ **Édition inline des champs OCR**:
+  - Montant TTC éditable avec formatage automatique
+  - Date avec auto-format JJ/MM/AAAA
+  - Fournisseur modifiable
+  - Sélecteur de catégorie (7 catégories)
+  - Montants HT et TVA éditables
+  - Indicateur visuel pour les champs à faible confiance
 
 ## Technical Architecture
 
