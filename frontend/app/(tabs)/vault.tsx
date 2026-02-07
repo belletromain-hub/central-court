@@ -911,22 +911,48 @@ export default function DocumentsScreen() {
                 )}
               </View>
               
-              {/* Detailed Amounts */}
-              {(ocrData.montantHT || ocrData.montantTVA) && (
-                <View style={styles.verificationSection}>
-                  <Text style={styles.verificationSectionTitle}>Détail des montants</Text>
-                  <View style={styles.amountsGrid}>
-                    <View style={styles.amountBox}>
-                      <Text style={styles.amountBoxLabel}>HT</Text>
-                      <Text style={styles.amountBoxValue}>{ocrData.montantHT?.toFixed(2) || '--'} €</Text>
+              {/* Detailed Amounts - EDITABLE */}
+              <View style={styles.verificationSection}>
+                <Text style={styles.verificationSectionTitle}>Détail des montants</Text>
+                <View style={styles.amountsGrid}>
+                  <View style={styles.amountBoxEditable}>
+                    <Text style={styles.amountBoxLabel}>HT</Text>
+                    <View style={styles.amountBoxInputRow}>
+                      <TextInput
+                        style={styles.amountBoxInput}
+                        value={editedMontantHT}
+                        onChangeText={(text) => {
+                          const cleaned = text.replace(/[^0-9.,]/g, '').replace(',', '.');
+                          setEditedMontantHT(cleaned);
+                        }}
+                        placeholder="--"
+                        placeholderTextColor={Colors.text.muted}
+                        keyboardType="decimal-pad"
+                        testID="edit-montant-ht"
+                      />
+                      <Text style={styles.amountBoxCurrency}>€</Text>
                     </View>
-                    <View style={styles.amountBox}>
-                      <Text style={styles.amountBoxLabel}>TVA</Text>
-                      <Text style={styles.amountBoxValue}>{ocrData.montantTVA?.toFixed(2) || '--'} €</Text>
+                  </View>
+                  <View style={styles.amountBoxEditable}>
+                    <Text style={styles.amountBoxLabel}>TVA</Text>
+                    <View style={styles.amountBoxInputRow}>
+                      <TextInput
+                        style={styles.amountBoxInput}
+                        value={editedMontantTVA}
+                        onChangeText={(text) => {
+                          const cleaned = text.replace(/[^0-9.,]/g, '').replace(',', '.');
+                          setEditedMontantTVA(cleaned);
+                        }}
+                        placeholder="--"
+                        placeholderTextColor={Colors.text.muted}
+                        keyboardType="decimal-pad"
+                        testID="edit-montant-tva"
+                      />
+                      <Text style={styles.amountBoxCurrency}>€</Text>
                     </View>
                   </View>
                 </View>
-              )}
+              </View>
               
               {/* Line Items */}
               {ocrData.lignes && ocrData.lignes.length > 0 && (
