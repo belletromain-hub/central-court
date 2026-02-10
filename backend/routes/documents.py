@@ -230,6 +230,57 @@ async def get_documents(
     return [serialize_document(doc) for doc in documents]
 
 
+@router.get("/documents/stats")
+async def get_documents_stats(
+    userId: Optional[str] = None,
+    startDate: Optional[str] = None,
+    endDate: Optional[str] = None
+):
+    """Get documents statistics"""
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not initialized")
+    
+    query = {}
+    if userId:
+        query["userId"] = userId
+    if startDate or endDate:
+        date_query = {}
+        if startDate:
+            date_query["$gte"] = startDate
+        if endDate:
+            date_query["$lte"] = endDate
+        if date_query:
+            query["dateFacture"] = date_query
+    
+    pipeline = [
+        {"$match": query},
+        {"$group": {
+            "_id": "$category",
+            "count": {"$sum": 1},
+            "total": {"$sum": {"$ifNull": ["$montantTotal", 0]}}
+        }}
+    ]
+    
+    cursor = db.documents.aggregate(pipeline)
+    results = await cursor.to_list(length=100)
+    
+    total_count = 0
+    total_amount = 0
+    by_category = {}
+    
+    for r in results:
+        cat = r["_id"] or "other"
+        by_category[cat] = {"count": r["count"], "total": r["total"]}
+        total_count += r["count"]
+        total_amount += r["total"]
+    
+    return {
+        "totalCount": total_count,
+        "totalAmount": total_amount,
+        "byCategory": by_category
+    }
+
+
 @router.get("/documents/{document_id}", response_model=DocumentResponse)
 async def get_document(document_id: str):
     """Get a single document by ID"""
