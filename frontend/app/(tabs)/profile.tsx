@@ -248,40 +248,66 @@ export default function ProfileScreen() {
       return;
     }
     
+    if (!userProfile?.id) {
+      Alert.alert('Erreur', 'Veuillez d\'abord configurer votre profil');
+      return;
+    }
+    
     setIsLoading(true);
     
-    const newMember: TeamMember = {
-      id: `member-${Date.now()}`,
-      name: inviteName,
-      email: inviteEmail,
-      role: selectedRole,
-      addedAt: new Date().toISOString(),
-    };
-    
-    await saveTeam([...team, newMember]);
-    
-    const inviteUrl = `centralcourt://invite?role=${selectedRole}`;
-    const roleInfo = STAFF_ROLES.find(r => r.id === selectedRole);
-    
     try {
+      // Create invitation via backend API
+      const response = await api.post('/api/invitations/create', {
+        playerId: userProfile.id,
+        inviteeEmail: inviteEmail,
+        inviteeName: inviteName,
+        role: selectedRole,
+      });
+      
+      const invitation = response.data;
+      const roleInfo = STAFF_ROLES.find(r => r.id === selectedRole);
+      
+      // Generate invitation link
+      const inviteUrl = `tennispro://join/${invitation.token}`;
+      const webUrl = `https://tennis-nexus.preview.emergentagent.com/join/${invitation.token}`;
+      
+      // Add to local team display as pending
+      const newMember: TeamMember = {
+        id: invitation.id,
+        name: inviteName,
+        email: inviteEmail,
+        role: selectedRole,
+        addedAt: new Date().toISOString(),
+      };
+      
+      setTeam(prev => [...prev, newMember]);
+      
+      // Share the invitation
       if (Platform.OS === 'web') {
-        await navigator.clipboard.writeText(inviteUrl);
-        Alert.alert('Invitation créée', `${inviteName} a été ajouté(e) comme ${roleInfo?.label}`);
+        await navigator.clipboard.writeText(webUrl);
+        Alert.alert(
+          'Invitation créée ! ✉️', 
+          `Lien copié dans le presse-papier.\n\n${inviteName} recevra un email d'invitation pour rejoindre votre équipe en tant que ${roleInfo?.label}.`
+        );
       } else {
         await Share.share({
-          message: `${userProfile?.prenom || 'Un joueur'} vous invite à rejoindre son équipe sur Le Court Central en tant que ${roleInfo?.label}!\n\nTéléchargez l'app et utilisez ce lien: ${inviteUrl}`,
+          message: `${userProfile?.prenom || 'Un joueur'} vous invite à rejoindre son équipe sur Le Court Central en tant que ${roleInfo?.label}!\n\nCliquez sur ce lien pour vous inscrire:\n${webUrl}`,
           title: 'Invitation Le Court Central'
         });
       }
-    } catch (error) {
-      console.error('Share error:', error);
+      
+      setShowInviteModal(false);
+      setSelectedRole(null);
+      setInviteEmail('');
+      setInviteName('');
+      
+    } catch (error: any) {
+      console.error('Invitation error:', error);
+      const errorMsg = error.response?.data?.detail || 'Impossible de créer l\'invitation';
+      Alert.alert('Erreur', errorMsg);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setShowInviteModal(false);
-    setSelectedRole(null);
-    setInviteEmail('');
-    setInviteName('');
-    setIsLoading(false);
   };
   
   const handleRemoveMember = (memberId: string, memberName: string) => {
