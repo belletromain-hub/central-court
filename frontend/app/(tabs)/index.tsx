@@ -10,7 +10,6 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
-  Linking,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,32 +19,42 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../src/constants/colors';
-import { getOnboardingStatus } from '../../src/utils/progressiveOnboarding';
-import { AppleDatePicker, AppleTimePicker, AppleOptionPicker } from '../../src/components/inputs';
 import {
   fetchEvents,
   fetchTournamentWeeks,
   fetchAlerts,
   createEvent as apiCreateEvent,
-  updateEvent as apiUpdateEvent,
-  addObservation as apiAddObservation,
   registerTournament as apiRegisterTournament,
-  hideTournament as apiHideTournament,
 } from '../../src/services/api';
-import { 
-  TournamentStatus,
-  TOURNAMENT_STATUS_LABELS,
-  SURFACE_COLORS 
-} from '../../src/data/tournamentsV1';
-import { 
-  EVENT_CATEGORIES, 
-  EventTypeV1, 
-  CalendarEventV1,
-  Observation
-} from '../../src/data/eventsV1';
 
-const USER_EMAIL_KEY = 'user_email';
+// ============ CONSTANTS ============
+
 const ONBOARDING_DATA_KEY = 'onboarding_data';
+
+const EVENT_CATEGORIES: Record<string, { color: string; icon: string; label: string }> = {
+  training_tennis: { color: '#4CAF50', icon: 'tennisball', label: 'Tennis' },
+  training_physical: { color: '#2196F3', icon: 'fitness', label: 'Physique' },
+  medical: { color: '#E91E63', icon: 'medkit', label: 'Médical' },
+  tournament: { color: '#FF9800', icon: 'trophy', label: 'Tournoi' },
+  travel: { color: '#9C27B0', icon: 'airplane', label: 'Voyage' },
+  other: { color: '#607D8B', icon: 'ellipsis-horizontal', label: 'Autre' },
+};
+
+const TOURNAMENT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  interested: { label: 'Intéressé', color: '#9E9E9E' },
+  pending: { label: 'En attente', color: '#FF9800' },
+  accepted: { label: 'Accepté', color: '#4CAF50' },
+  participating: { label: 'Participant', color: '#2196F3' },
+  declined: { label: 'Décliné', color: '#F44336' },
+};
+
+const SURFACE_COLORS: Record<string, string> = {
+  'Hard': '#2196F3',
+  'Clay': '#E65100',
+  'Grass': '#4CAF50',
+  'Carpet': '#9C27B0',
+  'Indoor Hard': '#1565C0',
+};
 
 // Configure French locale
 LocaleConfig.locales['fr'] = {
@@ -57,28 +66,76 @@ LocaleConfig.locales['fr'] = {
 };
 LocaleConfig.defaultLocale = 'fr';
 
-export default function CalendarScreenV1() {
+// ============ TYPES ============
+
+interface CalendarEvent {
+  id: string;
+  type: string;
+  title: string;
+  date: string;
+  time?: string;
+  location?: string;
+}
+
+interface Tournament {
+  id: string;
+  name: string;
+  circuit: string;
+  category: string;
+  surface: string;
+  startDate: string;
+  endDate: string;
+  week: number;
+  city: string;
+  country: string;
+  prizeMoney: number;
+  currency: string;
+  registration?: { status: string };
+  hidden?: boolean;
+}
+
+interface TournamentWeek {
+  weekNumber: number;
+  startDate: string;
+  tournaments: Tournament[];
+}
+
+// ============ COMPONENT ============
+
+export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
-  // State
+  // Core state
   const [currentMonth, setCurrentMonth] = useState('2026-02');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [events, setEvents] = useState<CalendarEventV1[]>([]);
-  const [weekTournaments, setWeekTournaments] = useState<any[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [tournamentWeeks, setTournamentWeeks] = useState<TournamentWeek[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [userCircuits, setUserCircuits] = useState<string[]>(['ATP']);
 
-  // Load user circuits from storage
+  // Modal state
+  const [showTournamentModal, setShowTournamentModal] = useState(false);
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState<TournamentWeek | null>(null);
+  
+  // New event form
+  const [newEventTitle, setNewEventTitle] = useState('');
+  const [newEventType, setNewEventType] = useState('training_tennis');
+  const [newEventTime, setNewEventTime] = useState('');
+  const [newEventLocation, setNewEventLocation] = useState('');
+
+  // ============ DATA LOADING ============
+
+  // Load user circuits from onboarding
   useEffect(() => {
     const loadUserCircuits = async () => {
       try {
         const stored = await AsyncStorage.getItem(ONBOARDING_DATA_KEY);
         if (stored) {
           const data = JSON.parse(stored);
-          if (data.circuits && data.circuits.length > 0) {
-            // Map ITF_WHEELCHAIR to ITF for API compatibility
+          if (data.circuits && Array.isArray(data.circuits) && data.circuits.length > 0) {
             const mappedCircuits = data.circuits.map((c: string) => 
               c === 'ITF_WHEELCHAIR' ? 'ITF' : c
             );
@@ -92,101 +149,87 @@ export default function CalendarScreenV1() {
     loadUserCircuits();
   }, []);
 
-  // Load data from API
+  // Load calendar data
   useEffect(() => {
     const loadData = async () => {
+      setLoading(true);
       try {
-        // Join user circuits for API call
         const circuitsParam = userCircuits.join(',');
         
         const [eventsData, weeksData, alertsData] = await Promise.all([
-          fetchEvents(currentMonth),
-          fetchTournamentWeeks(circuitsParam),
-          fetchAlerts(true),
+          fetchEvents(currentMonth).catch(() => []),
+          fetchTournamentWeeks(circuitsParam).catch(() => ({ weeks: [] })),
+          fetchAlerts(true).catch(() => []),
         ]);
-        setEvents(eventsData);
         
-        // Handle new API response format: { weeks: [...], totalTournaments: n }
-        if (weeksData && weeksData.weeks) {
-          setWeekTournaments(weeksData.weeks);
+        // Events
+        setEvents(Array.isArray(eventsData) ? eventsData : []);
+        
+        // Tournament weeks - handle new API format
+        if (weeksData && weeksData.weeks && Array.isArray(weeksData.weeks)) {
+          setTournamentWeeks(weeksData.weeks);
         } else if (Array.isArray(weeksData)) {
-          setWeekTournaments(weeksData);
+          setTournamentWeeks(weeksData);
         } else {
-          setWeekTournaments([]);
+          setTournamentWeeks([]);
         }
         
-        setUnreadAlertCount(alertsData.length);
+        // Alerts
+        setUnreadAlertCount(Array.isArray(alertsData) ? alertsData.length : 0);
+        
       } catch (e) {
         console.error('Failed to load data:', e);
+        setTournamentWeeks([]);
+        setEvents([]);
       } finally {
         setLoading(false);
       }
     };
+    
     loadData();
   }, [currentMonth, userCircuits]);
-  
-  // Modals
-  const [showTournamentModal, setShowTournamentModal] = useState(false);
-  const [showAddEventModal, setShowAddEventModal] = useState(false);
-  const [showEventDetailModal, setShowEventDetailModal] = useState(false);
-  const [selectedWeek, setSelectedWeek] = useState<any | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEventV1 | null>(null);
-  
-  // New event form
-  const [newEvent, setNewEvent] = useState<Partial<CalendarEventV1>>({
-    type: 'training_tennis',
-    title: '',
-    date: '',
-    time: '',
-    location: '',
-    visibleToStaff: true,
-    observations: []
-  });
-  
-  // Observation input
-  const [newObservationText, setNewObservationText] = useState('');
-  
-  // Event modification
-  const [showEditEventModal, setShowEditEventModal] = useState(false);
-  const [showSuggestChangeModal, setShowSuggestChangeModal] = useState(false);
-  const [editedEvent, setEditedEvent] = useState<Partial<CalendarEventV1>>({});
-  const [suggestionMessage, setSuggestionMessage] = useState('');
-  const [showEventConfirmation, setShowEventConfirmation] = useState(false);
-  const [eventConfirmationMessage, setEventConfirmationMessage] = useState('');
-  
-  // Progressive onboarding trigger
-  const [showTravelPrompt, setShowTravelPrompt] = useState(false);
-  const [promptTournamentName, setPromptTournamentName] = useState('');
-  
-  // Check if travel preferences need to be collected
-  const checkTravelPreferences = useCallback(async (tournamentName: string) => {
-    try {
-      const status = await getOnboardingStatus();
-      if (status.voyage.status !== 'completed' && status.voyage.status !== 'dismissed') {
-        setPromptTournamentName(tournamentName);
-        setShowTravelPrompt(true);
-      }
-    } catch (e) {
-      // Silent fail
-    }
-  }, []);
-  
-  // Get events for a specific date
-  const getEventsForDate = (date: string) => {
+
+  // ============ HELPERS ============
+
+  const getEventsForDate = useCallback((date: string): CalendarEvent[] => {
     return events.filter(e => e.date === date);
-  };
-  
-  // Combine all marks for calendar
+  }, [events]);
+
+  const getWeekForDate = useCallback((date: string): TournamentWeek | undefined => {
+    const d = new Date(date);
+    return tournamentWeeks.find(week => {
+      if (!week.startDate || !week.tournaments?.length) return false;
+      const firstTournament = week.tournaments[0];
+      if (!firstTournament?.startDate || !firstTournament?.endDate) return false;
+      const start = new Date(firstTournament.startDate);
+      const end = new Date(firstTournament.endDate);
+      return d >= start && d <= end;
+    });
+  }, [tournamentWeeks]);
+
+  const getVisibleTournaments = useCallback((week: TournamentWeek): Tournament[] => {
+    if (!week?.tournaments || !Array.isArray(week.tournaments)) return [];
+    return week.tournaments.filter(t => !t.hidden);
+  }, []);
+
+  // ============ CALENDAR MARKS ============
+
   const calendarMarks = useMemo(() => {
     const marks: Record<string, any> = {};
     
-    // First, add tournament marks from registered tournaments
-    weekTournaments.forEach(week => {
-      // New format: tournaments have registration property directly
-      const registeredTournaments = week.tournaments?.filter((t: any) => t.registration) || [];
+    // Safety check
+    if (!Array.isArray(tournamentWeeks)) return marks;
+    
+    // Add tournament marks
+    tournamentWeeks.forEach(week => {
+      if (!week?.tournaments || !Array.isArray(week.tournaments)) return;
       
-      registeredTournaments.forEach((tournament: any) => {
-        if (tournament.startDate && tournament.endDate) {
+      const registeredTournaments = week.tournaments.filter(t => t?.registration);
+      
+      registeredTournaments.forEach(tournament => {
+        if (!tournament?.startDate || !tournament?.endDate) return;
+        
+        try {
           let currentDate = new Date(tournament.startDate);
           const endDate = new Date(tournament.endDate);
           
@@ -195,9 +238,8 @@ export default function CalendarScreenV1() {
             if (!marks[dateStr]) {
               marks[dateStr] = { dots: [] };
             }
-            // Only add tournament dot if not already present
-            const hasTournamentDot = marks[dateStr].dots?.some((d: any) => d.key === `tournament-${tournament.id}`);
-            if (!hasTournamentDot) {
+            const hasDot = marks[dateStr].dots.some((d: any) => d.key === `tournament-${tournament.id}`);
+            if (!hasDot) {
               marks[dateStr].dots.push({ 
                 key: `tournament-${tournament.id}`,
                 color: EVENT_CATEGORIES.tournament.color 
@@ -205,270 +247,110 @@ export default function CalendarScreenV1() {
             }
             currentDate.setDate(currentDate.getDate() + 1);
           }
+        } catch (e) {
+          // Skip invalid dates
         }
       });
     });
     
-    // Then add event marks with unique keys
-    events.forEach(event => {
-      const category = EVENT_CATEGORIES[event.type];
-      if (!marks[event.date]) {
-        marks[event.date] = { dots: [] };
-      }
-      if (!marks[event.date].dots) {
-        marks[event.date].dots = [];
-      }
-      // Only add if not already present (using event id as key)
-      const hasEventDot = marks[event.date].dots.some((d: any) => d.key === `event-${event.id}`);
-      if (!hasEventDot) {
-        marks[event.date].dots.push({ 
-          key: `event-${event.id}`,
-          color: category.color 
-        });
-      }
-    });
+    // Add event marks
+    if (Array.isArray(events)) {
+      events.forEach(event => {
+        if (!event?.date || !event?.type) return;
+        
+        const category = EVENT_CATEGORIES[event.type] || EVENT_CATEGORIES.other;
+        if (!marks[event.date]) {
+          marks[event.date] = { dots: [] };
+        }
+        const hasDot = marks[event.date].dots.some((d: any) => d.key === `event-${event.id}`);
+        if (!hasDot) {
+          marks[event.date].dots.push({ 
+            key: `event-${event.id}`,
+            color: category.color 
+          });
+        }
+      });
+    }
     
-    // Add selected date highlight
+    // Mark selected date
     if (selectedDate) {
-      marks[selectedDate] = {
-        ...marks[selectedDate],
-        selected: true,
-        selectedColor: Colors.primary,
-      };
+      if (!marks[selectedDate]) {
+        marks[selectedDate] = { dots: [] };
+      }
+      marks[selectedDate].selected = true;
+      marks[selectedDate].selectedColor = Colors.accent?.primary || '#1e3c72';
     }
     
     return marks;
-  }, [events, selectedDate, weekTournaments]);
-  
-  // Handle tournament registration (add or update)
-  const handleRegisterTournament = async (weekNumber: number, tournamentId: string, status: TournamentStatus) => {
-    let tournamentName = '';
-    const week = weekTournaments.find((w: any) => w.weekNumber === weekNumber);
-    if (week) {
-      const t = week.tournaments.find((t: any) => t.id === tournamentId);
-      if (t) tournamentName = t.name;
-    }
+  }, [tournamentWeeks, events, selectedDate]);
+
+  // ============ ACTIONS ============
+
+  const handleRegisterTournament = async (tournamentId: string, status: string) => {
     try {
       await apiRegisterTournament(tournamentId, status);
-      const weeksData = await fetchTournamentWeeks('atp');
-      setWeekTournaments(weeksData);
-      const updatedWeek = weeksData.find((w: any) => w.weekNumber === weekNumber);
-      if (updatedWeek) setSelectedWeek(updatedWeek);
-      if ((status === 'participating' || status === 'accepted') && tournamentName) {
-        checkTravelPreferences(tournamentName);
-      }
+      
+      // Update local state
+      setTournamentWeeks(prev => {
+        if (!Array.isArray(prev)) return prev;
+        return prev.map(week => ({
+          ...week,
+          tournaments: (week.tournaments || []).map(t => 
+            t.id === tournamentId 
+              ? { ...t, registration: { status } }
+              : t
+          )
+        }));
+      });
+      
+      Alert.alert('Succès', 'Inscription mise à jour');
     } catch (e) {
       console.error('Registration failed:', e);
+      Alert.alert('Erreur', 'Échec de l\'inscription');
     }
   };
-  
-  // Handle removing registration (pas intéressé - hide tournament)
-  const handleRemoveRegistration = async (weekNumber: number, tournamentId: string) => {
-    try {
-      await apiHideTournament(tournamentId);
-      const weeksData = await fetchTournamentWeeks('atp');
-      setWeekTournaments(weeksData);
-      const updatedWeek = weeksData.find((w: any) => w.weekNumber === weekNumber);
-      if (updatedWeek) setSelectedWeek(updatedWeek);
-    } catch (e) {
-      console.error('Hide failed:', e);
-    }
-  };
-  
-  // Handle hiding a tournament without registering (from the list)
-  const handleHideTournament = async (weekNumber: number, tournamentId: string) => {
-    try {
-      await apiHideTournament(tournamentId);
-      const weeksData = await fetchTournamentWeeks('atp');
-      setWeekTournaments(weeksData);
-      const updatedWeek = weeksData.find((w: any) => w.weekNumber === weekNumber);
-      if (updatedWeek) setSelectedWeek(updatedWeek);
-    } catch (e) {
-      console.error('Hide failed:', e);
-    }
-  };
-  
-  // Get registration for a specific tournament
-  const getRegistration = (week: any, tournamentId: string): any => {
-    // New format: registration is on each tournament directly
-    const tournament = week.tournaments?.find((t: any) => t.id === tournamentId);
-    return tournament?.registration;
-  };
-  
-  // Get status options based on current status
-  const getAvailableStatusOptions = (currentStatus: TournamentStatus): TournamentStatus[] => {
-    if (currentStatus === 'pending' || currentStatus === 'accepted' || currentStatus === 'participating') {
-      return ['pending', 'accepted', 'participating', 'declined'];
-    }
-    return ['interested', 'pending', 'accepted', 'participating', 'declined'];
-  };
-  
-  // Check if player has a "participating" or "accepted" status for any tournament this week
-  const hasConfirmedParticipation = (week: any): boolean => {
-    // New format: check registration on each tournament
-    return (week.tournaments || []).some((t: any) => 
-      t.registration?.status === 'participating' || t.registration?.status === 'accepted'
-    );
-  };
-  
-  // Get visible tournaments for a week (filter out hidden ones)
-  const getVisibleTournaments = (week: any) => {
-    return (week.tournaments || []).filter((t: any) => !t.hidden);
-  };
-  
-  // Handle add event
-  const handleAddEvent = () => {
-    if (!newEvent.title || !newEvent.date) {
-      Alert.alert('Erreur', 'Veuillez remplir le titre et la date');
+
+  const handleAddEvent = async () => {
+    if (!newEventTitle.trim() || !selectedDate) {
+      Alert.alert('Erreur', 'Veuillez remplir le titre');
       return;
     }
     
-    const event: CalendarEventV1 = {
-      id: `evt-${Date.now()}`,
-      type: newEvent.type || 'training_tennis',
-      title: newEvent.title || '',
-      date: newEvent.date || '',
-      time: newEvent.time,
-      location: newEvent.location,
-      observations: [],
-      visibleToStaff: newEvent.visibleToStaff !== false
-    };
-    
-    setEvents(prev => [...prev, event]);
-    setShowAddEventModal(false);
-    setNewEvent({
-      type: 'training_tennis',
-      title: '',
-      date: selectedDate || '',
-      time: '',
-      location: '',
-      visibleToStaff: true,
-      observations: []
-    });
+    try {
+      const eventData = {
+        type: newEventType,
+        title: newEventTitle.trim(),
+        date: selectedDate,
+        time: newEventTime,
+        location: newEventLocation,
+      };
+      
+      const savedEvent = await apiCreateEvent(eventData);
+      setEvents(prev => [...prev, savedEvent]);
+      
+      // Reset form
+      setNewEventTitle('');
+      setNewEventTime('');
+      setNewEventLocation('');
+      setShowAddEventModal(false);
+      
+      Alert.alert('Succès', 'Événement ajouté');
+    } catch (e) {
+      console.error('Failed to create event:', e);
+      Alert.alert('Erreur', 'Échec de la création');
+    }
   };
-  
-  // Handle add observation
-  const handleAddObservation = () => {
-    if (!selectedEvent || !newObservationText.trim()) return;
+
+  // ============ RENDER HELPERS ============
+
+  const renderTournamentWeekCard = (week: TournamentWeek) => {
+    if (!week?.tournaments) return null;
     
-    const newObservation: Observation = {
-      id: `obs-${Date.now()}`,
-      author: 'Moi', // In real app, get from user profile
-      role: 'Joueur',
-      text: newObservationText.trim(),
-      createdAt: new Date().toISOString()
-    };
-    
-    // Update the event with new observation
-    setEvents(prev => prev.map(event => {
-      if (event.id === selectedEvent.id) {
-        return {
-          ...event,
-          observations: [...event.observations, newObservation]
-        };
-      }
-      return event;
-    }));
-    
-    // Update selected event to show the new observation immediately
-    setSelectedEvent(prev => prev ? {
-      ...prev,
-      observations: [...prev.observations, newObservation]
-    } : null);
-    
-    setNewObservationText('');
-  };
-  
-  // Open edit event modal
-  const openEditEvent = () => {
-    if (!selectedEvent) return;
-    setEditedEvent({
-      title: selectedEvent.title,
-      date: selectedEvent.date,
-      time: selectedEvent.time || '',
-      endTime: selectedEvent.endTime || '',
-      location: selectedEvent.location || '',
-    });
-    setShowEventDetailModal(false);
-    setShowEditEventModal(true);
-  };
-  
-  // Save event modifications
-  const saveEventModifications = () => {
-    if (!selectedEvent || !editedEvent.title) return;
-    
-    setEvents(prev => prev.map(event => {
-      if (event.id === selectedEvent.id) {
-        return {
-          ...event,
-          title: editedEvent.title || event.title,
-          date: editedEvent.date || event.date,
-          time: editedEvent.time || event.time,
-          endTime: editedEvent.endTime || event.endTime,
-          location: editedEvent.location || event.location,
-        };
-      }
-      return event;
-    }));
-    
-    setShowEditEventModal(false);
-    setEventConfirmationMessage('✅ Événement modifié\n\nVos modifications ont été enregistrées.');
-    setShowEventConfirmation(true);
-  };
-  
-  // Open suggest change modal
-  const openSuggestChange = () => {
-    if (!selectedEvent) return;
-    setEditedEvent({
-      date: selectedEvent.date,
-      time: selectedEvent.time || '',
-      endTime: selectedEvent.endTime || '',
-    });
-    setSuggestionMessage('');
-    setShowEventDetailModal(false);
-    setShowSuggestChangeModal(true);
-  };
-  
-  // Send suggestion to staff
-  const sendSuggestion = () => {
-    if (!selectedEvent) return;
-    
-    // Get assigned staff names
-    const staffNames = selectedEvent.assignedStaffIds?.length 
-      ? selectedEvent.assignedStaffIds.map((id: string) => {
-          return 'Staff';
-        }).join(', ')
-      : 'le staff concerné';
-    
-    setShowSuggestChangeModal(false);
-    setEventConfirmationMessage(
-      `🔄 Suggestion envoyée\n\n` +
-      `${staffNames} recevra votre proposition de modification` +
-      (suggestionMessage ? ` avec votre message.` : '.')
-    );
-    setShowEventConfirmation(true);
-    setSuggestionMessage('');
-  };
-  
-  // Get week number for a date
-  const getWeekForDate = (date: string) => {
-    return weekTournaments.find(week => {
-      const start = new Date(week.startDate);
-      const end = new Date(week.endDate);
-      const d = new Date(date);
-      return d >= start && d <= end;
-    });
-  };
-  
-  // Render tournament week card
-  const renderTournamentWeekCard = (week: any) => {
     const visibleTournaments = getVisibleTournaments(week);
-    const registeredTournaments = (week.tournaments || [])
-      .filter((t: any) => t.registration)
-      .map((t: any) => ({
-        tournament: t,
-        status: t.registration?.status
-      }));
+    const registeredTournaments = week.tournaments.filter(t => t?.registration);
+    const firstTournament = visibleTournaments[0];
+    
+    if (!firstTournament) return null;
     
     return (
       <TouchableOpacity
@@ -478,66 +360,51 @@ export default function CalendarScreenV1() {
           setSelectedWeek(week);
           setShowTournamentModal(true);
         }}
+        activeOpacity={0.7}
       >
         <View style={styles.weekCardHeader}>
-          <Text style={styles.weekLabel}>Semaine {week.weekNumber}</Text>
-          <Text style={styles.weekDates}>{week.weekLabel}</Text>
+          <Text style={styles.weekNumber}>S{week.weekNumber}</Text>
+          <Text style={styles.weekDates}>
+            {firstTournament.startDate ? new Date(firstTournament.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
+          </Text>
         </View>
         
-        {registeredTournaments.length > 0 ? (
-          <View style={styles.registeredTournamentsContainer}>
-            {registeredTournaments.map(({ tournament, status }) => {
-              if (!tournament) return null;
-              const statusInfo = TOURNAMENT_STATUS_LABELS[status];
-              return (
-                <View key={tournament.id} style={styles.registeredTournamentRow}>
-                  <Text style={styles.tournamentFlag}>{tournament.countryFlag}</Text>
-                  <Text style={styles.tournamentNameSmall} numberOfLines={1}>{tournament.name}</Text>
-                  <View style={[styles.statusBadgeSmall, { backgroundColor: statusInfo.color }]}>
-                    <Text style={styles.statusTextSmall}>{statusInfo.emoji}</Text>
-                  </View>
-                </View>
-              );
-            })}
-            {/* Show how many more available */}
-            {visibleTournaments.length > registeredTournaments.length && (
-              <Text style={styles.moreAvailableText}>
-                +{visibleTournaments.length - registeredTournaments.length} disponible{visibleTournaments.length - registeredTournaments.length > 1 ? 's' : ''}
-              </Text>
-            )}
-          </View>
-        ) : visibleTournaments.length > 0 ? (
-          <View style={styles.noTournamentSelected}>
-            <Ionicons name="add-circle-outline" size={24} color={Colors.text.muted} />
-            <Text style={styles.noTournamentText}>
-              {visibleTournaments.length} tournoi{visibleTournaments.length > 1 ? 's' : ''} disponible{visibleTournaments.length > 1 ? 's' : ''}
+        <Text style={styles.tournamentName} numberOfLines={1}>
+          {firstTournament.name}
+        </Text>
+        
+        <View style={styles.tournamentMeta}>
+          <View style={[styles.surfaceBadge, { backgroundColor: (SURFACE_COLORS[firstTournament.surface] || '#666') + '20' }]}>
+            <Text style={[styles.surfaceText, { color: SURFACE_COLORS[firstTournament.surface] || '#666' }]}>
+              {firstTournament.surface}
             </Text>
           </View>
-        ) : (
-          <View style={styles.noTournamentSelected}>
-            <Ionicons name="close-circle-outline" size={24} color={Colors.text.muted} />
-            <Text style={styles.noTournamentText}>Pas de tournoi cette semaine</Text>
+          <Text style={styles.tournamentLocation}>{firstTournament.city}, {firstTournament.country}</Text>
+        </View>
+        
+        {registeredTournaments.length > 0 && (
+          <View style={styles.registrationBadge}>
+            <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+            <Text style={styles.registrationText}>
+              {registeredTournaments[0]?.registration?.status === 'participating' ? 'Participant' : 'Inscrit'}
+            </Text>
           </View>
         )}
       </TouchableOpacity>
     );
   };
-  
-  // Render events for selected date
+
   const renderDayEvents = () => {
     if (!selectedDate) return null;
     
     const dayEvents = getEventsForDate(selectedDate);
     const week = getWeekForDate(selectedDate);
     
-    // Get all registered tournaments for this week that include this date
-    const tournamentsForDay = week 
-      ? (week.tournaments || [])
-          .filter((t: any) => t.registration && 
-            new Date(selectedDate) >= new Date(t.startDate) &&
-            new Date(selectedDate) <= new Date(t.endDate)
-          )
-      : [];
+    const tournamentsForDay = week?.tournaments?.filter(t => 
+      t?.registration && t?.startDate && t?.endDate &&
+      new Date(selectedDate) >= new Date(t.startDate) &&
+      new Date(selectedDate) <= new Date(t.endDate)
+    ) || [];
     
     return (
       <View style={styles.dayEventsContainer}>
@@ -550,1784 +417,333 @@ export default function CalendarScreenV1() {
             })}
           </Text>
           <TouchableOpacity
-            data-testid="add-event-btn"
             style={styles.addEventBtn}
-            onPress={() => {
-              setNewEvent(prev => ({ ...prev, date: selectedDate }));
-              setShowAddEventModal(true);
-            }}
+            onPress={() => setShowAddEventModal(true)}
           >
             <Ionicons name="add" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
         
-        {/* Tournament info if applicable - show all registered tournaments for this day */}
-        {tournamentsForDay.map(tournament => tournament && (
-          <View key={tournament.id} style={[styles.eventCard, { borderLeftColor: EVENT_CATEGORIES.tournament.color }]}>
-            <View style={styles.eventCardContent}>
-              <View style={styles.eventTypeRow}>
-                <Text style={styles.eventEmoji}>{EVENT_CATEGORIES.tournament.icon}</Text>
-                <Text style={[styles.eventType, { color: EVENT_CATEGORIES.tournament.color }]}>
-                  {tournament.category}
-                </Text>
-              </View>
+        {/* Tournaments for the day */}
+        {tournamentsForDay.map(tournament => (
+          <View key={tournament.id} style={styles.dayEventCard}>
+            <View style={[styles.eventIcon, { backgroundColor: EVENT_CATEGORIES.tournament.color + '20' }]}>
+              <Ionicons name="trophy" size={18} color={EVENT_CATEGORIES.tournament.color} />
+            </View>
+            <View style={styles.eventInfo}>
               <Text style={styles.eventTitle}>{tournament.name}</Text>
-              <Text style={styles.eventLocation}>
-                {tournament.countryFlag} {tournament.city}, {tournament.country}
-              </Text>
+              <Text style={styles.eventMeta}>{tournament.city} • {tournament.surface}</Text>
             </View>
           </View>
         ))}
         
         {/* Regular events */}
         {dayEvents.map(event => {
-          const category = EVENT_CATEGORIES[event.type];
+          const category = EVENT_CATEGORIES[event.type] || EVENT_CATEGORIES.other;
           return (
-            <TouchableOpacity
-              key={event.id}
-              style={[styles.eventCard, { borderLeftColor: category.color }]}
-              onPress={() => {
-                setSelectedEvent(event);
-                setShowEventDetailModal(true);
-              }}
-            >
-              <View style={styles.eventCardContent}>
-                <View style={styles.eventTypeRow}>
-                  <Text style={styles.eventEmoji}>{category.icon}</Text>
-                  <Text style={[styles.eventType, { color: category.color }]}>{category.label}</Text>
-                  {event.time && (
-                    <Text style={styles.eventTime}>{event.time}{event.endTime ? ` - ${event.endTime}` : ''}</Text>
-                  )}
-                </View>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                {event.location && (
-                  <Text style={styles.eventLocation}>{event.location}</Text>
-                )}
-                {event.observations.length > 0 && (
-                  <View style={styles.observationsBadge}>
-                    <Ionicons name="chatbubble-ellipses" size={12} color={Colors.text.secondary} />
-                    <Text style={styles.observationsCount}>{event.observations.length} observation{event.observations.length > 1 ? 's' : ''}</Text>
-                  </View>
-                )}
+            <View key={event.id} style={styles.dayEventCard}>
+              <View style={[styles.eventIcon, { backgroundColor: category.color + '20' }]}>
+                <Ionicons name={category.icon as any} size={18} color={category.color} />
               </View>
-            </TouchableOpacity>
+              <View style={styles.eventInfo}>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                {event.time && <Text style={styles.eventMeta}>{event.time}</Text>}
+              </View>
+            </View>
           );
         })}
         
-        {dayEvents.length === 0 && tournamentsForDay.length === 0 && (
-          <View style={styles.noEventsPlaceholder}>
-            <Ionicons name="calendar-outline" size={32} color={Colors.text.muted} />
-            <Text style={styles.noEventsText}>Aucun événement</Text>
-          </View>
+        {tournamentsForDay.length === 0 && dayEvents.length === 0 && (
+          <Text style={styles.noEventsText}>Aucun événement</Text>
         )}
       </View>
     );
   };
 
+  // ============ MAIN RENDER ============
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#1e3c72" />
+        <Text style={styles.loadingText}>Chargement...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={[Colors.primary, '#1565c0']}
-        style={[styles.header, { paddingTop: insets.top + 12 }]}
+        colors={['#1e3c72', '#2a5298']}
+        style={[styles.header, { paddingTop: insets.top + 16 }]}
       >
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>🎾 Tennis Assistant</Text>
-            <Text style={styles.headerSubtitle}>Calendrier {currentMonth.split('-')[1] === '02' ? 'Février' : ''} 2026</Text>
-          </View>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Calendrier</Text>
           <TouchableOpacity 
-            style={styles.notificationBtn}
+            style={styles.alertBtn}
             onPress={() => router.push('/notifications')}
           >
             <Ionicons name="notifications-outline" size={24} color="#fff" />
             {unreadAlertCount > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>
-                  {unreadAlertCount}
-                </Text>
+              <View style={styles.alertBadge}>
+                <Text style={styles.alertBadgeText}>{unreadAlertCount}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
+        
+        {/* Circuit badges */}
+        <View style={styles.circuitRow}>
+          {userCircuits.map(circuit => (
+            <View key={circuit} style={styles.circuitBadge}>
+              <Text style={styles.circuitText}>{circuit}</Text>
+            </View>
+          ))}
+        </View>
       </LinearGradient>
-      
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Calendar */}
         <View style={styles.calendarContainer}>
           <Calendar
             current={currentMonth}
-            onDayPress={(day) => setSelectedDate(day.dateString)}
-            onMonthChange={(month) => setCurrentMonth(`${month.year}-${String(month.month).padStart(2, '0')}`)}
-            markedDates={calendarMarks}
+            onMonthChange={(month: any) => setCurrentMonth(month.dateString.substring(0, 7))}
+            onDayPress={(day: any) => setSelectedDate(day.dateString)}
             markingType="multi-dot"
+            markedDates={calendarMarks}
             theme={{
+              backgroundColor: '#fff',
               calendarBackground: '#fff',
-              textSectionTitleColor: Colors.text.secondary,
-              selectedDayBackgroundColor: Colors.primary,
+              textSectionTitleColor: '#666',
+              selectedDayBackgroundColor: '#1e3c72',
               selectedDayTextColor: '#fff',
-              todayTextColor: Colors.primary,
-              dayTextColor: Colors.text.primary,
-              textDisabledColor: Colors.text.muted,
-              arrowColor: Colors.primary,
-              monthTextColor: Colors.text.primary,
-              textMonthFontWeight: '600',
-              textDayFontSize: 14,
-              textMonthFontSize: 16,
+              todayTextColor: '#1e3c72',
+              dayTextColor: '#1a1a1a',
+              textDisabledColor: '#d9e1e8',
+              arrowColor: '#1e3c72',
+              monthTextColor: '#1a1a1a',
+              textDayFontWeight: '500',
+              textMonthFontWeight: '700',
+              textDayHeaderFontWeight: '600',
             }}
-            style={styles.calendar}
           />
         </View>
-        
-        {/* Selected day events */}
+
+        {/* Selected date events */}
         {selectedDate && renderDayEvents()}
-        
+
         {/* Tournament weeks */}
-        <View style={styles.tournamentSection}>
-          <Text style={styles.sectionTitle}>🏆 Tournois de la semaine</Text>
-          <Text style={styles.sectionSubtitle}>Sélectionnez vos tournois pour chaque semaine</Text>
-          
-          {weekTournaments.map(renderTournamentWeekCard)}
-        </View>
-        
-        {/* Legend */}
-        <View style={styles.legendSection}>
-          <Text style={styles.legendTitle}>Légende</Text>
-          <View style={styles.legendGrid}>
-            {Object.entries(EVENT_CATEGORIES).map(([key, category]) => (
-              <View key={key} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: category.color }]} />
-                <Text style={styles.legendText}>{category.icon} {category.label}</Text>
-              </View>
-            ))}
-          </View>
+        <View style={styles.tournamentsSection}>
+          <Text style={styles.sectionTitle}>Prochains tournois</Text>
+          {tournamentWeeks.length === 0 ? (
+            <Text style={styles.noTournamentsText}>Aucun tournoi disponible</Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weeksScroll}>
+              {tournamentWeeks.slice(0, 10).map(week => renderTournamentWeekCard(week))}
+            </ScrollView>
+          )}
         </View>
         
         <View style={{ height: 100 }} />
       </ScrollView>
-      
-      {/* FAB for quick add */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => {
-          setNewEvent(prev => ({ ...prev, date: selectedDate || new Date().toISOString().split('T')[0] }));
-          setShowAddEventModal(true);
-        }}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
-      
-      {/* Tournament Selection Modal */}
+
+      {/* Tournament Detail Modal */}
       <Modal visible={showTournamentModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choisir un tournoi</Text>
+              <Text style={styles.modalTitle}>
+                {selectedWeek?.tournaments?.[0]?.name || 'Tournoi'}
+              </Text>
               <TouchableOpacity onPress={() => setShowTournamentModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
+                <Ionicons name="close" size={24} color="#1a1a1a" />
               </TouchableOpacity>
             </View>
             
-            {selectedWeek && (
-              <ScrollView style={styles.tournamentModalContent} showsVerticalScrollIndicator={true}>
-                <Text style={styles.weekModalLabel}>
-                  Semaine {selectedWeek.weekNumber} • {selectedWeek.weekLabel}
-                </Text>
-                
-                {/* Afficher TOUS les tournois visibles avec leur statut */}
-                {getVisibleTournaments(selectedWeek).map(tournament => {
-                  const registration = getRegistration(selectedWeek, tournament.id);
-                  const isRegistered = !!registration;
-                  const currentStatus = registration?.status || 'none';
-                  const statusInfo = isRegistered ? TOURNAMENT_STATUS_LABELS[currentStatus] : null;
-                  
-                  return (
-                    <View key={tournament.id} style={styles.tournamentOptionContainer}>
-                      <View style={[
-                        styles.tournamentOption,
-                        isRegistered && styles.tournamentOptionSelected
-                      ]}>
-                        <View style={styles.tournamentOptionHeader}>
-                          <Text style={styles.tournamentOptionFlag}>{tournament.countryFlag}</Text>
-                          <View style={styles.tournamentOptionInfo}>
-                            <Text style={styles.tournamentOptionName}>{tournament.name}</Text>
-                            <Text style={styles.tournamentOptionCity}>{tournament.city}, {tournament.country}</Text>
-                          </View>
-                          {isRegistered && statusInfo && (
-                            <View style={[styles.currentStatusBadge, { backgroundColor: statusInfo.color }]}>
-                              <Text style={styles.currentStatusEmoji}>{statusInfo.emoji}</Text>
-                            </View>
-                          )}
-                        </View>
-                        
-                        <View style={styles.tournamentOptionDetails}>
-                          <View style={[styles.categoryBadge, { backgroundColor: SURFACE_COLORS[tournament.surface] + '20' }]}>
-                            <Text style={[styles.categoryBadgeText, { color: SURFACE_COLORS[tournament.surface] }]}>
-                              {tournament.category}
-                            </Text>
-                          </View>
-                          <View style={[styles.surfaceBadge, { backgroundColor: SURFACE_COLORS[tournament.surface] + '20' }]}>
-                            <Text style={[styles.surfaceBadgeText, { color: SURFACE_COLORS[tournament.surface] }]}>
-                              {tournament.surface}
-                            </Text>
-                          </View>
-                          <Text style={styles.tournamentPrize}>{tournament.prize}</Text>
-                        </View>
-                        
-                        {/* Status Selection for this tournament */}
-                        <View style={styles.statusSectionInline}>
-                          <View style={styles.statusGridInline}>
-                            {getAvailableStatusOptions(currentStatus).map(status => {
-                              const sInfo = TOURNAMENT_STATUS_LABELS[status];
-                              const isSelected = currentStatus === status;
-                              return (
-                                <TouchableOpacity
-                                  key={status}
-                                  style={[
-                                    styles.statusOptionSmall,
-                                    isSelected && { backgroundColor: sInfo.color, borderColor: sInfo.color }
-                                  ]}
-                                  onPress={() => handleRegisterTournament(selectedWeek.weekNumber, tournament.id, status)}
-                                >
-                                  <Text style={[styles.statusOptionEmojiSmall, isSelected && { color: '#fff' }]}>
-                                    {sInfo.emoji}
-                                  </Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </View>
-                          
-                          {/* Bouton Pas intéressé - masque le tournoi */}
-                          <TouchableOpacity
-                            style={styles.hideInlineBtnContainer}
-                            onPress={() => handleHideTournament(selectedWeek.weekNumber, tournament.id)}
-                          >
-                            <Ionicons name="eye-off-outline" size={16} color="#9e9e9e" />
-                          </TouchableOpacity>
-                        </View>
-                        
-                        {/* Lien Player Zone */}
-                        <TouchableOpacity
-                          style={styles.playerZoneBtn}
-                          onPress={() => Linking.openURL(tournament.playerZoneLink)}
-                        >
-                          <Ionicons name="open-outline" size={16} color={Colors.primary} />
-                          <Text style={styles.playerZoneBtnText}>S'inscrire (Player Zone)</Text>
-                        </TouchableOpacity>
-                      </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {selectedWeek?.tournaments?.map(tournament => (
+                <View key={tournament.id} style={styles.tournamentDetail}>
+                  <Text style={styles.tournamentDetailName}>{tournament.name}</Text>
+                  <Text style={styles.tournamentDetailMeta}>
+                    {tournament.city}, {tournament.country}
+                  </Text>
+                  <Text style={styles.tournamentDetailMeta}>
+                    {tournament.startDate} - {tournament.endDate}
+                  </Text>
+                  <View style={styles.tournamentDetailRow}>
+                    <View style={[styles.surfaceBadge, { backgroundColor: (SURFACE_COLORS[tournament.surface] || '#666') + '20' }]}>
+                      <Text style={[styles.surfaceText, { color: SURFACE_COLORS[tournament.surface] || '#666' }]}>
+                        {tournament.surface}
+                      </Text>
                     </View>
-                  );
-                })}
-                
-                {/* Message si aucun tournoi visible */}
-                {getVisibleTournaments(selectedWeek).length === 0 && (
-                  <View style={styles.noTournamentsMessage}>
-                    <Ionicons name="calendar-outline" size={48} color={Colors.text.muted} />
-                    <Text style={styles.noTournamentsText}>Aucun tournoi disponible</Text>
-                    <Text style={styles.noTournamentsHint}>Tous les tournois ont été masqués</Text>
+                    <Text style={styles.prizeText}>
+                      {tournament.prizeMoney?.toLocaleString()} {tournament.currency}
+                    </Text>
                   </View>
-                )}
-              </ScrollView>
-            )}
+                  
+                  {/* Registration buttons */}
+                  <View style={styles.registrationButtons}>
+                    {['interested', 'pending', 'participating'].map(status => (
+                      <TouchableOpacity
+                        key={status}
+                        style={[
+                          styles.statusBtn,
+                          tournament.registration?.status === status && styles.statusBtnActive
+                        ]}
+                        onPress={() => handleRegisterTournament(tournament.id, status)}
+                      >
+                        <Text style={[
+                          styles.statusBtnText,
+                          tournament.registration?.status === status && styles.statusBtnTextActive
+                        ]}>
+                          {TOURNAMENT_STATUS_LABELS[status]?.label || status}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
-      
+
       {/* Add Event Modal */}
       <Modal visible={showAddEventModal} animationType="slide" transparent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nouvel événement</Text>
+              <Text style={styles.modalTitle}>Ajouter un événement</Text>
               <TouchableOpacity onPress={() => setShowAddEventModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
+                <Ionicons name="close" size={24} color="#1a1a1a" />
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-              {/* Event Type Selector - Apple Wheel Picker */}
-              <View style={styles.pickerSection}>
-                <AppleOptionPicker
-                  label="Type d'événement"
-                  options={(Object.entries(EVENT_CATEGORIES) as [EventTypeV1, typeof EVENT_CATEGORIES[EventTypeV1]][])
-                    .filter(([key]) => key !== 'tournament')
-                    .map(([key, category]) => ({
-                      label: category.label,
-                      value: key,
-                      icon: category.icon,
-                    }))}
-                  selectedValue={newEvent.type || 'training_tennis'}
-                  onValueChange={(value) => setNewEvent({ ...newEvent, type: value as EventTypeV1 })}
-                />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Event type */}
+              <Text style={styles.inputLabel}>Type</Text>
+              <View style={styles.typeGrid}>
+                {Object.entries(EVENT_CATEGORIES).map(([key, cat]) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[
+                      styles.typeOption,
+                      newEventType === key && { backgroundColor: cat.color + '20', borderColor: cat.color }
+                    ]}
+                    onPress={() => setNewEventType(key)}
+                  >
+                    <Ionicons name={cat.icon as any} size={20} color={newEventType === key ? cat.color : '#666'} />
+                    <Text style={[styles.typeLabel, newEventType === key && { color: cat.color }]}>
+                      {cat.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
               
               {/* Title */}
-              <Text style={styles.inputLabel}>Titre *</Text>
+              <Text style={styles.inputLabel}>Titre</Text>
               <TextInput
                 style={styles.input}
-                value={newEvent.title}
-                onChangeText={title => setNewEvent({ ...newEvent, title })}
-                placeholder="Ex: Séance service"
-                placeholderTextColor={Colors.text.muted}
+                value={newEventTitle}
+                onChangeText={setNewEventTitle}
+                placeholder="Ex: Entraînement avec coach"
+                placeholderTextColor="#999"
               />
               
-              {/* Date - Apple Wheel Picker */}
-              <View style={styles.pickerSection}>
-                <AppleDatePicker
-                  label="Date *"
-                  value={newEvent.date || selectedDate || new Date().toISOString().split('T')[0]}
-                  onChange={(date) => setNewEvent({ ...newEvent, date })}
-                  minYear={2024}
-                  maxYear={2030}
-                />
-              </View>
-              
-              {/* Time - Apple Wheel Picker */}
-              <View style={styles.pickerSection}>
-                <AppleTimePicker
-                  label="Heure"
-                  value={newEvent.time || '09:00'}
-                  onChange={(time) => setNewEvent({ ...newEvent, time })}
-                  minuteStep={5}
-                />
-              </View>
+              {/* Time */}
+              <Text style={styles.inputLabel}>Heure (optionnel)</Text>
+              <TextInput
+                style={styles.input}
+                value={newEventTime}
+                onChangeText={setNewEventTime}
+                placeholder="Ex: 10:00"
+                placeholderTextColor="#999"
+              />
               
               {/* Location */}
-              <Text style={styles.inputLabel}>Lieu</Text>
+              <Text style={styles.inputLabel}>Lieu (optionnel)</Text>
               <TextInput
                 style={styles.input}
-                value={newEvent.location}
-                onChangeText={location => setNewEvent({ ...newEvent, location })}
-                placeholder="Mouratoglou Academy, Nice"
-                placeholderTextColor={Colors.text.muted}
+                value={newEventLocation}
+                onChangeText={setNewEventLocation}
+                placeholder="Ex: Court central"
+                placeholderTextColor="#999"
               />
               
-              {/* Privacy toggle for personal events */}
-              {newEvent.type === 'personal' && (
-                <View style={styles.privacyToggle}>
-                  <Ionicons name="eye-off" size={20} color={Colors.text.secondary} />
-                  <Text style={styles.privacyText}>Cet événement sera masqué pour le staff</Text>
-                </View>
-              )}
+              <TouchableOpacity style={styles.saveBtn} onPress={handleAddEvent}>
+                <Ionicons name="checkmark-circle" size={22} color="#fff" />
+                <Text style={styles.saveBtnText}>Ajouter</Text>
+              </TouchableOpacity>
             </ScrollView>
-            
-            <TouchableOpacity
-              style={[styles.submitBtn, (!newEvent.title || !newEvent.date) && styles.submitBtnDisabled]}
-              onPress={handleAddEvent}
-              disabled={!newEvent.title || !newEvent.date}
-            >
-              <Ionicons name="add-circle" size={20} color="#fff" />
-              <Text style={styles.submitBtnText}>Ajouter</Text>
-            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
-      
-      {/* Event Detail Modal */}
-      <Modal visible={showEventDetailModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Détail événement</Text>
-              <TouchableOpacity onPress={() => setShowEventDetailModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-            
-            {selectedEvent && (
-              <ScrollView style={styles.eventDetailContent}>
-                <View style={[styles.eventDetailHeader, { backgroundColor: EVENT_CATEGORIES[selectedEvent.type].color + '15' }]}>
-                  <Text style={styles.eventDetailEmoji}>{EVENT_CATEGORIES[selectedEvent.type].icon}</Text>
-                  <View>
-                    <Text style={styles.eventDetailTitle}>{selectedEvent.title}</Text>
-                    <Text style={[styles.eventDetailType, { color: EVENT_CATEGORIES[selectedEvent.type].color }]}>
-                      {EVENT_CATEGORIES[selectedEvent.type].label}
-                    </Text>
-                  </View>
-                </View>
-                
-                <View style={styles.eventDetailInfo}>
-                  <View style={styles.eventDetailRow}>
-                    <Ionicons name="calendar-outline" size={18} color={Colors.text.secondary} />
-                    <Text style={styles.eventDetailText}>
-                      {new Date(selectedEvent.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                    </Text>
-                  </View>
-                  
-                  {selectedEvent.time && (
-                    <View style={styles.eventDetailRow}>
-                      <Ionicons name="time-outline" size={18} color={Colors.text.secondary} />
-                      <Text style={styles.eventDetailText}>
-                        {selectedEvent.time}{selectedEvent.endTime ? ` - ${selectedEvent.endTime}` : ''}
-                      </Text>
-                    </View>
-                  )}
-                  
-                  {selectedEvent.location && (
-                    <View style={styles.eventDetailRow}>
-                      <Ionicons name="location-outline" size={18} color={Colors.text.secondary} />
-                      <Text style={styles.eventDetailText}>{selectedEvent.location}</Text>
-                    </View>
-                  )}
-                </View>
-                
-                {/* Observations section */}
-                <View style={styles.observationsSection}>
-                  <Text style={styles.observationsTitle}>💬 Observations</Text>
-                  
-                  {selectedEvent.observations.length > 0 ? (
-                    selectedEvent.observations.map(obs => (
-                      <View key={obs.id} style={styles.observationCard}>
-                        <View style={styles.observationHeader}>
-                          <Text style={styles.observationAuthor}>{obs.author}</Text>
-                          <Text style={styles.observationRole}>{obs.role}</Text>
-                        </View>
-                        <Text style={styles.observationText}>{obs.text}</Text>
-                        <Text style={styles.observationDate}>
-                          {new Date(obs.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={styles.noObservationsText}>Aucune observation pour le moment</Text>
-                  )}
-                  
-                  {/* Add observation form */}
-                  <View style={styles.addObservationSection}>
-                    <Text style={styles.addObservationLabel}>Ajouter une observation</Text>
-                    <TextInput
-                      style={styles.observationInput}
-                      placeholder="Ex: Focus service slice. 45 min travail rebond haut."
-                      placeholderTextColor={Colors.text.muted}
-                      multiline
-                      numberOfLines={3}
-                      maxLength={200}
-                      onChangeText={(text) => {
-                        // Store temporarily - will be used on submit
-                        setNewObservationText(text);
-                      }}
-                      value={newObservationText}
-                    />
-                    <View style={styles.observationFooter}>
-                      <Text style={styles.charCount}>{newObservationText.length}/200</Text>
-                      <TouchableOpacity
-                        style={[styles.addObservationBtn, !newObservationText.trim() && styles.addObservationBtnDisabled]}
-                        onPress={handleAddObservation}
-                        disabled={!newObservationText.trim()}
-                      >
-                        <Ionicons name="send" size={16} color="#fff" />
-                        <Text style={styles.addObservationBtnText}>Envoyer</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-                
-                {/* Action buttons - Modifier / Suggérer */}
-                <View style={styles.eventActionsSection}>
-                  <TouchableOpacity style={styles.editEventBtn} onPress={openEditEvent}>
-                    <Ionicons name="create-outline" size={18} color="#1a1a1a" />
-                    <Text style={styles.editEventBtnText}>Modifier</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.suggestChangeBtn} onPress={openSuggestChange}>
-                    <Ionicons name="git-compare-outline" size={18} color="#9b51e0" />
-                    <Text style={styles.suggestChangeBtnText}>Suggérer une modification</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Edit Event Modal */}
-      <Modal visible={showEditEventModal} animationType="fade" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Modifier l'événement</Text>
-              <TouchableOpacity onPress={() => setShowEditEventModal(false)}>
-                <Ionicons name="close" size={24} color="#9e9e9e" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Titre</Text>
-              <TextInput
-                style={styles.editInput}
-                value={editedEvent.title}
-                onChangeText={(text) => setEditedEvent(prev => ({ ...prev, title: text }))}
-                placeholder="Titre de l'événement"
-                placeholderTextColor="#bdbdbd"
-              />
-            </View>
-            
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Date</Text>
-              <TextInput
-                style={styles.editInput}
-                value={editedEvent.date}
-                onChangeText={(text) => setEditedEvent(prev => ({ ...prev, date: text }))}
-                placeholder="2026-02-05"
-                placeholderTextColor="#bdbdbd"
-              />
-            </View>
-            
-            <View style={styles.editTimeRow}>
-              <View style={[styles.editInputGroup, { flex: 1 }]}>
-                <Text style={styles.editInputLabel}>Début</Text>
-                <TextInput
-                  style={styles.editInput}
-                  value={editedEvent.time}
-                  onChangeText={(text) => setEditedEvent(prev => ({ ...prev, time: text }))}
-                  placeholder="09:00"
-                  placeholderTextColor="#bdbdbd"
-                />
-              </View>
-              <View style={[styles.editInputGroup, { flex: 1, marginLeft: 12 }]}>
-                <Text style={styles.editInputLabel}>Fin</Text>
-                <TextInput
-                  style={styles.editInput}
-                  value={editedEvent.endTime}
-                  onChangeText={(text) => setEditedEvent(prev => ({ ...prev, endTime: text }))}
-                  placeholder="11:00"
-                  placeholderTextColor="#bdbdbd"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Lieu</Text>
-              <TextInput
-                style={styles.editInput}
-                value={editedEvent.location}
-                onChangeText={(text) => setEditedEvent(prev => ({ ...prev, location: text }))}
-                placeholder="Lieu de l'événement"
-                placeholderTextColor="#bdbdbd"
-              />
-            </View>
-            
-            <View style={styles.editActionsRow}>
-              <TouchableOpacity style={styles.editCancelBtn} onPress={() => setShowEditEventModal(false)}>
-                <Text style={styles.editCancelBtnText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.editSaveBtn} onPress={saveEventModifications}>
-                <Ionicons name="checkmark" size={18} color="#fff" />
-                <Text style={styles.editSaveBtnText}>Enregistrer</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-      
-      {/* Suggest Change Modal */}
-      <Modal visible={showSuggestChangeModal} animationType="fade" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Suggérer une modification</Text>
-              <TouchableOpacity onPress={() => setShowSuggestChangeModal(false)}>
-                <Ionicons name="close" size={24} color="#9e9e9e" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.suggestionInfo}>
-              <Ionicons name="information-circle-outline" size={18} color="#2d9cdb" />
-              <Text style={styles.suggestionInfoText}>
-                Votre suggestion sera envoyée au staff concerné pour validation
-              </Text>
-            </View>
-            
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Nouvelle date (optionnel)</Text>
-              <TextInput
-                style={styles.editInput}
-                value={editedEvent.date}
-                onChangeText={(text) => setEditedEvent(prev => ({ ...prev, date: text }))}
-                placeholder="2026-02-06"
-                placeholderTextColor="#bdbdbd"
-              />
-            </View>
-            
-            <View style={styles.editTimeRow}>
-              <View style={[styles.editInputGroup, { flex: 1 }]}>
-                <Text style={styles.editInputLabel}>Nouveau début</Text>
-                <TextInput
-                  style={styles.editInput}
-                  value={editedEvent.time}
-                  onChangeText={(text) => setEditedEvent(prev => ({ ...prev, time: text }))}
-                  placeholder="10:00"
-                  placeholderTextColor="#bdbdbd"
-                />
-              </View>
-              <View style={[styles.editInputGroup, { flex: 1, marginLeft: 12 }]}>
-                <Text style={styles.editInputLabel}>Nouvelle fin</Text>
-                <TextInput
-                  style={styles.editInput}
-                  value={editedEvent.endTime}
-                  onChangeText={(text) => setEditedEvent(prev => ({ ...prev, endTime: text }))}
-                  placeholder="12:00"
-                  placeholderTextColor="#bdbdbd"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Message (optionnel)</Text>
-              <TextInput
-                style={[styles.editInput, { minHeight: 80, textAlignVertical: 'top' }]}
-                value={suggestionMessage}
-                onChangeText={setSuggestionMessage}
-                placeholder="Expliquez la raison de votre demande..."
-                placeholderTextColor="#bdbdbd"
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-            
-            <View style={styles.editActionsRow}>
-              <TouchableOpacity style={styles.editCancelBtn} onPress={() => setShowSuggestChangeModal(false)}>
-                <Text style={styles.editCancelBtnText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.suggestSendBtn} onPress={sendSuggestion}>
-                <Ionicons name="send" size={16} color="#fff" />
-                <Text style={styles.suggestSendBtnText}>Envoyer</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-      
-      {/* Event Confirmation Modal */}
-      <Modal visible={showEventConfirmation} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.confirmationModalContent}>
-            <Text style={styles.confirmationModalText}>{eventConfirmationMessage}</Text>
-            <TouchableOpacity 
-              style={styles.confirmationOkBtn} 
-              onPress={() => {
-                setShowEventConfirmation(false);
-                setSelectedEvent(null);
-              }}
-            >
-              <Text style={styles.confirmationOkBtnText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Travel Preferences Prompt Modal */}
-      <Modal visible={showTravelPrompt} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.travelPromptContent}>
-            <Text style={styles.travelPromptEmoji}>✈️</Text>
-            <Text style={styles.travelPromptTitle}>Préparer ton voyage ?</Text>
-            <Text style={styles.travelPromptText}>
-              Tu participes à <Text style={{ fontWeight: '700' }}>{promptTournamentName}</Text>. Configure tes préférences de voyage pour recevoir des recommandations personnalisées.
-            </Text>
-            <TouchableOpacity
-              style={styles.travelPromptBtn}
-              onPress={() => {
-                setShowTravelPrompt(false);
-                router.push('/preferences/voyage');
-              }}
-            >
-              <Ionicons name="airplane" size={18} color="#fff" />
-              <Text style={styles.travelPromptBtnText}>Configurer mes préférences</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.travelPromptSkip}
-              onPress={() => setShowTravelPrompt(false)}
-            >
-              <Text style={styles.travelPromptSkipText}>Plus tard</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </Modal>
     </View>
   );
 }
 
+// ============ STYLES ============
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.secondary,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
-  },
-  notificationBtn: {
-    position: 'relative',
-    padding: 8,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#eb5757',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  notificationBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  content: {
-    flex: 1,
-  },
-  calendarContainer: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  calendar: {
-    borderRadius: 16,
-  },
-  dayEventsContainer: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
-    padding: 16,
-  },
-  dayEventsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  dayEventsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    textTransform: 'capitalize',
-  },
-  addEventBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eventCard: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 10,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    overflow: 'hidden',
-  },
-  eventCardContent: {
-    padding: 12,
-  },
-  eventTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  eventEmoji: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  eventType: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  eventTime: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-    marginLeft: 'auto',
-  },
-  eventTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    marginBottom: 2,
-  },
-  eventLocation: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-  },
-  observationsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-  },
-  observationsCount: {
-    fontSize: 11,
-    color: Colors.text.secondary,
-  },
-  noEventsPlaceholder: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  noEventsText: {
-    fontSize: 14,
-    color: Colors.text.muted,
-    marginTop: 8,
-  },
-  tournamentSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text.primary,
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-    marginBottom: 12,
-  },
-  weekCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  weekCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  weekLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  weekDates: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-  },
-  selectedTournamentInfo: {
-    gap: 8,
-  },
-  tournamentNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  tournamentFlag: {
-    fontSize: 28,
-  },
-  tournamentDetails: {
-    flex: 1,
-  },
-  tournamentName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  tournamentCategory: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  noTournamentSelected: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-  },
-  noTournamentText: {
-    fontSize: 14,
-    color: Colors.text.muted,
-  },
-  legendSection: {
-    marginTop: 24,
-    marginHorizontal: 16,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-  },
-  legendTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginBottom: 12,
-  },
-  legendGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '48%',
-    gap: 6,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 100,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
-    zIndex: 999,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text.primary,
-  },
-  weekModalLabel: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-    marginBottom: 16,
-  },
-  tournamentList: {
-    maxHeight: 400,
-  },
-  tournamentOption: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  tournamentOptionSelected: {
-    borderColor: Colors.success,
-    backgroundColor: Colors.success + '08',
-  },
-  tournamentOptionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  tournamentOptionFlag: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  tournamentOptionInfo: {
-    flex: 1,
-  },
-  tournamentOptionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  tournamentOptionCity: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-  },
-  tournamentOptionDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  categoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  categoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  surfaceBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  surfaceBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  tournamentPrize: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.success,
-    marginLeft: 'auto',
-  },
-  playerZoneBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: Colors.primary + '10',
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  playerZoneBtnText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: Colors.primary,
-  },
-  noTournamentBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
-    marginTop: 10,
-  },
-  noTournamentBtnText: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-  },
-  modalForm: {
-    maxHeight: 500,
-  },
-  pickerSection: {
-    marginVertical: 16,
-    alignItems: 'center',
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  input: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 15,
-    color: Colors.text.primary,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-  },
-  typeSelector: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  typeOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.background.secondary,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-  },
-  typeOptionEmoji: {
-    fontSize: 14,
-  },
-  typeOptionText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.text.secondary,
-  },
-  privacyToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: Colors.text.muted + '15',
-    borderRadius: 10,
-  },
-  privacyText: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-    flex: 1,
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 16,
-    marginBottom: Platform.OS === 'ios' ? 20 : 0,
-  },
-  submitBtnDisabled: {
-    opacity: 0.5,
-  },
-  submitBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  eventDetailContent: {
-    maxHeight: 420,
-  },
-  eventDetailHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  eventDetailEmoji: {
-    fontSize: 40,
-  },
-  eventDetailTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  eventDetailType: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  eventDetailInfo: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 12,
-    padding: 14,
-    gap: 12,
-  },
-  eventDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  eventDetailText: {
-    fontSize: 14,
-    color: Colors.text.primary,
-    flex: 1,
-  },
-  observationsSection: {
-    marginTop: 20,
-  },
-  observationsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    marginBottom: 12,
-  },
-  observationCard: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-  },
-  observationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  observationAuthor: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  observationRole: {
-    fontSize: 12,
-    color: Colors.primary,
-  },
-  observationText: {
-    fontSize: 14,
-    color: Colors.text.primary,
-    lineHeight: 20,
-  },
-  observationDate: {
-    fontSize: 11,
-    color: Colors.text.muted,
-    marginTop: 6,
-  },
-  noObservationsText: {
-    fontSize: 14,
-    color: Colors.text.muted,
-    fontStyle: 'italic',
-  },
-  addObservationSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
-  },
-  addObservationLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginBottom: 8,
-  },
-  observationInput: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 14,
-    color: Colors.text.primary,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  observationFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  charCount: {
-    fontSize: 12,
-    color: Colors.text.muted,
-  },
-  addObservationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  addObservationBtnDisabled: {
-    opacity: 0.5,
-  },
-  addObservationBtnText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  // Status section styles
-  statusSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
-  },
-  statusSectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    marginBottom: 12,
-  },
-  statusGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  statusOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.background.secondary,
-    borderWidth: 2,
-    borderColor: Colors.border.light,
-    minWidth: 90,
-  },
-  statusOptionEmoji: {
-    fontSize: 16,
-  },
-  statusOptionText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.text.secondary,
-  },
-  // Locked tournament styles (when accepted/participating)
-  lockedTournamentMessage: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  lockedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 12,
-  },
-  lockedBadgeEmoji: {
-    fontSize: 18,
-    color: '#fff',
-  },
-  lockedBadgeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  lockedTournamentName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text.primary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  lockedTournamentHint: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-  },
-  // Cancel registration button
-  cancelRegistrationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#f44336',
-    borderRadius: 8,
-  },
-  cancelRegistrationText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#f44336',
-  },
-  // Tournament option container
-  tournamentOptionContainer: {
-    marginBottom: 0,
-  },
-  // Tournament actions
-  tournamentActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  // Hide tournament button
-  hideTournamentBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#f5f5f5',
-  },
-  hideTournamentText: {
-    fontSize: 11,
-    color: '#9e9e9e',
-    fontWeight: '500',
-  },
-  // No tournaments message
-  noTournamentsMessage: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  noTournamentsText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginTop: 12,
-  },
-  noTournamentsHint: {
-    fontSize: 13,
-    color: Colors.text.muted,
-    marginTop: 4,
-  },
-  // New modal structure styles
-  tournamentModalContent: {
-    maxHeight: 500,
-    paddingBottom: 16,
-  },
-  selectedTournamentSection: {
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginBottom: 10,
-    marginTop: 8,
-  },
-  otherTournamentsHeader: {
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  separatorLine: {
-    height: 1,
-    backgroundColor: Colors.border.light,
-    marginBottom: 12,
-  },
-  lockedMessage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 10,
-    marginTop: 12,
-  },
-  lockedMessageText: {
-    flex: 1,
-    fontSize: 13,
-    color: Colors.text.secondary,
-  },
-  // Multi-registration styles
-  registeredTournamentsContainer: {
-    gap: 6,
-  },
-  registeredTournamentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 4,
-  },
-  tournamentNameSmall: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.text.primary,
-  },
-  statusBadgeSmall: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusTextSmall: {
-    fontSize: 12,
-    color: '#fff',
-  },
-  moreAvailableText: {
-    fontSize: 12,
-    color: Colors.text.muted,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  // Current status badge
-  currentStatusBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  currentStatusEmoji: {
-    fontSize: 14,
-    color: '#fff',
-  },
-  // Inline status selection
-  statusSectionInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 8,
-  },
-  statusGridInline: {
-    flexDirection: 'row',
-    gap: 6,
-    flex: 1,
-  },
-  statusOptionSmall: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background.secondary,
-    borderWidth: 2,
-    borderColor: Colors.border.light,
-  },
-  statusOptionEmojiSmall: {
-    fontSize: 16,
-  },
-  hideInlineBtnContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  // Event actions section (Modifier / Suggérer)
-  eventActionsSection: {
-    marginTop: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    gap: 10,
-  },
-  editEventBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-  },
-  editEventBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  suggestChangeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#9b51e0',
-    borderStyle: 'dashed',
-  },
-  suggestChangeBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9b51e0',
-  },
-  // Edit modal styles
-  editInputGroup: {
-    marginBottom: 16,
-  },
-  editInputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9e9e9e',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  editInput: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 15,
-    color: '#1a1a1a',
-  },
-  editTimeRow: {
-    flexDirection: 'row',
-  },
-  editActionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  editCancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
-  },
-  editCancelBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#9e9e9e',
-  },
-  editSaveBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#1a1a1a',
-  },
-  editSaveBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  // Suggestion modal
-  suggestionInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    backgroundColor: '#e8f4fc',
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  suggestionInfoText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#2d9cdb',
-    lineHeight: 18,
-  },
-  suggestSendBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#9b51e0',
-  },
-  suggestSendBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  // Confirmation modal
-  confirmationModalContent: {
-    width: '100%',
-    maxWidth: 320,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-  },
-  confirmationModalText: {
-    fontSize: 15,
-    color: '#1a1a1a',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  confirmationOkBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 40,
-    borderRadius: 8,
-    backgroundColor: '#1a1a1a',
-  },
-  confirmationOkBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  // Travel Preferences Prompt
-  travelPromptContent: {
-    backgroundColor: '#fff',
-    marginHorizontal: 24,
-    borderRadius: 20,
-    padding: 28,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  travelPromptEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  travelPromptTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  travelPromptText: {
-    fontSize: 15,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  travelPromptBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#2D5016',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    width: '100%',
-  },
-  travelPromptBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  travelPromptSkip: {
-    marginTop: 16,
-    paddingVertical: 8,
-  },
-  travelPromptSkipText: {
-    fontSize: 14,
-    color: '#999',
-    fontWeight: '500',
-  },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
+  header: { paddingHorizontal: 20, paddingBottom: 16 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: '#fff' },
+  alertBtn: { position: 'relative', padding: 8 },
+  alertBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: '#FF5252', borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
+  alertBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  circuitRow: { flexDirection: 'row', marginTop: 12, gap: 8 },
+  circuitBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+  circuitText: { fontSize: 12, fontWeight: '600', color: '#fff' },
+  content: { flex: 1 },
+  calendarContainer: { backgroundColor: '#fff', margin: 16, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  dayEventsContainer: { marginHorizontal: 16, marginBottom: 16 },
+  dayEventsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  dayEventsTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a1a', textTransform: 'capitalize' },
+  addEventBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#1e3c72', alignItems: 'center', justifyContent: 'center' },
+  dayEventCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 12, borderRadius: 12, marginBottom: 8 },
+  eventIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  eventInfo: { flex: 1 },
+  eventTitle: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
+  eventMeta: { fontSize: 13, color: '#666', marginTop: 2 },
+  noEventsText: { fontSize: 14, color: '#999', textAlign: 'center', paddingVertical: 20 },
+  tournamentsSection: { marginHorizontal: 16, marginTop: 8 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginBottom: 12 },
+  noTournamentsText: { fontSize: 14, color: '#999', textAlign: 'center', paddingVertical: 20 },
+  weeksScroll: { marginLeft: -4 },
+  weekCard: { width: 180, backgroundColor: '#fff', borderRadius: 16, padding: 16, marginRight: 12, marginLeft: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  weekCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  weekNumber: { fontSize: 14, fontWeight: '700', color: '#1e3c72' },
+  weekDates: { fontSize: 12, color: '#666' },
+  tournamentName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a', marginBottom: 8 },
+  tournamentMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  surfaceBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  surfaceText: { fontSize: 11, fontWeight: '600' },
+  tournamentLocation: { fontSize: 12, color: '#666', flex: 1 },
+  registrationBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 4 },
+  registrationText: { fontSize: 12, color: '#4CAF50', fontWeight: '500' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, maxHeight: '80%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  tournamentDetail: { backgroundColor: '#f8f9fa', borderRadius: 12, padding: 16, marginBottom: 12 },
+  tournamentDetailName: { fontSize: 16, fontWeight: '600', color: '#1a1a1a', marginBottom: 4 },
+  tournamentDetailMeta: { fontSize: 13, color: '#666', marginBottom: 2 },
+  tournamentDetailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  prizeText: { fontSize: 14, fontWeight: '600', color: '#1e3c72' },
+  registrationButtons: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  statusBtn: { flex: 1, padding: 10, borderRadius: 8, backgroundColor: '#f0f0f0', alignItems: 'center' },
+  statusBtnActive: { backgroundColor: '#1e3c72' },
+  statusBtnText: { fontSize: 12, fontWeight: '600', color: '#666' },
+  statusBtnTextActive: { color: '#fff' },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#666', marginBottom: 8, marginTop: 16 },
+  input: { backgroundColor: '#f5f5f5', borderRadius: 12, padding: 14, fontSize: 16, color: '#1a1a1a' },
+  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  typeOption: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, backgroundColor: '#f5f5f5', borderWidth: 2, borderColor: 'transparent', gap: 6 },
+  typeLabel: { fontSize: 13, fontWeight: '500', color: '#666' },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e3c72', padding: 16, borderRadius: 12, marginTop: 24, gap: 8 },
+  saveBtnText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 });
