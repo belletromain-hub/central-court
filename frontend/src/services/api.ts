@@ -44,11 +44,17 @@ export const addObservation = (eventId: string, data: { author: string; role: st
   apiFetch<any>(`/api/events/${eventId}/observations`, { method: 'POST', body: JSON.stringify(data) });
 
 // ── Tournaments ──
-export const fetchTournaments = (circuit?: string) =>
-  apiFetch<any[]>(circuit ? `/api/tournaments?circuit=${circuit}` : '/api/tournaments');
+export const fetchTournaments = (circuits?: string) =>
+  apiFetch<any[]>(circuits ? `/api/tournaments?circuits=${circuits}` : '/api/tournaments');
+
+export const fetchTournamentsByUser = (userId: string) =>
+  apiFetch<any[]>(`/api/tournaments/user/${userId}`);
 
 export const fetchTournamentWeeks = (circuits?: string) =>
-  apiFetch<any[]>(circuits ? `/api/tournaments/weeks?circuits=${circuits}` : '/api/tournaments/weeks');
+  apiFetch<any>(circuits ? `/api/tournaments/weeks?circuits=${circuits}` : '/api/tournaments/weeks');
+
+export const fetchTournamentStats = () =>
+  apiFetch<{ total: number; byCircuit: Record<string, number> }>('/api/tournaments/stats');
 
 export const registerTournament = (tournamentId: string, status: string) =>
   apiFetch<any>('/api/tournaments/register', {
