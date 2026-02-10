@@ -1,0 +1,85 @@
+{
+  "summary": "Backend API testing completed for Tournament Import System. All 46 tests passed covering: stats endpoint, circuit filtering (ATP/WTA/ITF), user preferences, weeks grouping, registration, and hide/unhide functionality. Fixed one bug in registration endpoint.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_tournament_endpoints.py",
+    "/app/test_reports/pytest/pytest_tournament_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fixed bug in tournament_routes.py line 253: Changed 'weekNumber' to 'week' to match actual tournament data field name",
+    "Tournament data structure is consistent across all circuits (ATP, WTA, ITF)",
+    "ITF tournaments correctly include tournamentUrl and signUpLink fields from CSV import"
+  ],
+  "updated_files": [
+    "/app/backend/routes/tournament_routes.py",
+    "/app/backend/tests/test_tournament_endpoints.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 46/46 tests passed",
+    "frontend": "N/A - Backend only testing requested (React Native Expo app)"
+  },
+  "test_credentials": {
+    "test_user_id": "698aaef916877c9eb27fdeb4",
+    "test_tournament_id": "united-cup-2026"
+  },
+  "seed_data_creation": "228 tournaments imported from 3 data sources: ATP JSON (60), WTA JSON (52), ITF Wheelchair CSV (116)",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Tournament import system fully tested. All 8 endpoints working: GET /api/tournaments/stats (returns {total:228, byCircuit:{ATP:60, WTA:52, ITF:116}}), GET /api/tournaments?circuits=X (filters by circuit), GET /api/tournaments/user/{user_id} (filters by user preferences), GET /api/tournaments/weeks?circuits=X (groups by week), POST /api/tournaments/register (5 statuses: interested, pending, accepted, participating, declined), POST /api/tournaments/hide, DELETE /api/tournaments/hide/{id}. Additional filters: surface, country, week, category.",
+  "features_tested": {
+    "GET /api/tournaments/stats": {
+      "status": "PASS",
+      "details": "Returns total:228, byCircuit:{ATP:60, WTA:52, ITF:116}"
+    },
+    "GET /api/tournaments?circuits=ATP": {
+      "status": "PASS",
+      "details": "Returns only ATP tournaments (60 total)"
+    },
+    "GET /api/tournaments?circuits=WTA": {
+      "status": "PASS",
+      "details": "Returns only WTA tournaments (52 total)"
+    },
+    "GET /api/tournaments?circuits=ITF": {
+      "status": "PASS",
+      "details": "Returns only ITF/Wheelchair tournaments (116 total)"
+    },
+    "GET /api/tournaments?circuits=ATP,WTA": {
+      "status": "PASS",
+      "details": "Returns both ATP and WTA tournaments (112 total)"
+    },
+    "GET /api/tournaments/user/{user_id}": {
+      "status": "PASS",
+      "details": "Returns tournaments filtered by user's circuit preferences from onboarding"
+    },
+    "GET /api/tournaments/weeks?circuits=X": {
+      "status": "PASS",
+      "details": "Returns tournaments grouped by week with registration and hidden status"
+    },
+    "POST /api/tournaments/register": {
+      "status": "PASS",
+      "details": "Registers for tournament with status (interested/pending/accepted/participating/declined). Fixed bug with 'participating' status."
+    },
+    "POST /api/tournaments/hide": {
+      "status": "PASS",
+      "details": "Hides tournament from user's view"
+    },
+    "DELETE /api/tournaments/hide/{id}": {
+      "status": "PASS",
+      "details": "Unhides tournament"
+    }
+  },
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  },
+  "rca_of_issues": "Found and fixed bug in POST /api/tournaments/register endpoint. When status='participating', the code tried to hide other tournaments in the same week but used 'weekNumber' field which doesn't exist. The correct field name is 'week'. Fixed by changing tournament['weekNumber'] to tournament.get('week') on line 253 of tournament_routes.py."
+}
