@@ -313,8 +313,7 @@ export default function CalendarScreenV1() {
   
   // Get visible tournaments for a week (filter out hidden ones)
   const getVisibleTournaments = (week: any) => {
-    const hiddenIds = week.hiddenTournamentIds || [];
-    return week.tournaments.filter(t => !hiddenIds.includes(t.id));
+    return (week.tournaments || []).filter((t: any) => !t.hidden);
   };
   
   // Handle add event
