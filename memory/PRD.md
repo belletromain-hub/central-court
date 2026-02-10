@@ -204,27 +204,26 @@ Construire une application professionnelle de tennis pour les joueurs profession
 
 ## Recent Updates (10 Février 2026)
 
-### Session Actuelle - Import des Tournois + Système d'Invitation Staff
+### Session Actuelle - Optimisation Codebase & Profil
 
-#### Import des Tournois (NOUVEAU)
-- ✅ **228 tournois importés** dans MongoDB depuis 3 sources de données :
-  - ATP: 60 tournois (JSON)
-  - WTA: 52 tournois (JSON)
-  - ITF Wheelchair: 116 tournois (CSV)
-- ✅ **Endpoints créés** :
-  - `GET /api/tournaments/stats` - Statistiques par circuit
-  - `GET /api/tournaments?circuits=ATP,WTA,ITF` - Liste filtrée par circuits
-  - `GET /api/tournaments/user/{user_id}` - Tournois selon préférences onboarding
-  - `GET /api/tournaments/weeks?circuits=X` - Groupés par semaine
-  - `POST /api/tournaments/register` - Inscription (5 statuts)
-  - `POST /api/tournaments/hide` - Masquer un tournoi
-- ✅ **Frontend mis à jour** pour charger les circuits depuis l'onboarding
+#### Refactoring Profil (NOUVEAU)
+- ✅ **Page profil réécrite** - Code optimisé et simplifié (~500 lignes vs 900+)
+- ✅ **Affichage circuits** - ATP, WTA, ITF avec badges colorés
+- ✅ **Affichage niveaux tournois** - Grand Slam, 1000, 500, 250, etc.
+- ✅ **Suppression sections non-fonctionnelles** - Aide & Support, Confidentialité, Notifications
+- ✅ **Source unique de données** - MongoDB uniquement (plus de duplication AsyncStorage)
+
+#### Nettoyage Codebase
+- ✅ **Supprimé `staff_routes.py`** - Remplacé par `invitation_routes.py` plus complet
+- ✅ **Supprimé `events.ts`** - Fichier obsolète (utilise `eventsV1.ts`)
+- ✅ **Supprimé `tournaments.ts`** - Fichier obsolète (utilise `tournamentsV1.ts`)
+- ✅ **Supprimé `locationService.ts`** - Non utilisé
+- ✅ **Onboarding connecté au backend** - Les données sont maintenant sauvegardées dans MongoDB à la fin de l'onboarding
+
+#### Import des Tournois
+- ✅ **228 tournois importés** (ATP:60, WTA:52, ITF:116)
+- ✅ **Filtrage par circuits utilisateur** depuis préférences onboarding
 - ✅ **46/46 tests passés** (iteration_10)
-
-#### Système d'Invitation Staff
-- ✅ **Backend complet pour les invitations** - 9 endpoints implémentés et testés
-- ✅ **Page d'inscription staff** (`/app/frontend/app/join/[token].tsx`)
-- ✅ **26/26 tests passés** (iteration_9)
 
 ### Bugs Corrigés
 - ✅ **Route API `/api/documents/stats`** - Corrigé le conflit de route
