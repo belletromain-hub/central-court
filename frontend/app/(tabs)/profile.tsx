@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,93 +11,66 @@ import {
   Platform,
   ActivityIndicator,
   TextInput,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Colors from '../../src/constants/colors';
 import api from '../../src/services/api';
 
-// Staff roles selon specs V1
+// ============ CONSTANTS ============
+
+const USER_EMAIL_KEY = '@central_court_user_email';
+
+const CIRCUIT_COLORS: Record<string, string> = {
+  'ATP': '#1976d2',
+  'WTA': '#9c27b0', 
+  'ITF': '#2e7d32',
+  'ITF_WHEELCHAIR': '#ff5722',
+};
+
+const LEVEL_LABELS: Record<string, string> = {
+  'grand_slam': 'Grand Slam',
+  '1000': 'Masters 1000',
+  '500': 'ATP/WTA 500',
+  '250': 'ATP/WTA 250',
+  'challenger': 'Challenger',
+  'itf': 'ITF',
+};
+
 const STAFF_ROLES = [
-  { 
-    id: 'tennis_coach', 
-    label: 'Entraîneur Tennis', 
-    icon: 'tennisball',
-    emoji: '🎾',
-    color: '#388e3c',
-    permissions: ['training_tennis', 'tournament']
-  },
-  { 
-    id: 'physical_coach', 
-    label: 'Préparateur Physique', 
-    icon: 'barbell',
-    emoji: '💪',
-    color: '#2e7d32',
-    permissions: ['training_physical', 'medical_kine']
-  },
-  { 
-    id: 'physio', 
-    label: 'Kiné', 
-    icon: 'medkit',
-    emoji: '🏥',
-    color: '#c2185b',
-    permissions: ['medical_kine', 'training_tennis', 'training_physical']
-  },
-  { 
-    id: 'agent', 
-    label: 'Agent', 
-    icon: 'briefcase',
-    emoji: '💼',
-    color: '#1976d2',
-    permissions: ['sponsor', 'media', 'tournament', 'travel']
-  },
-  { 
-    id: 'family', 
-    label: 'Famille', 
-    icon: 'people',
-    emoji: '👨‍👩‍👧',
-    color: '#ff9800',
-    permissions: ['all_except_personal']
-  },
-  { 
-    id: 'other', 
-    label: 'Autre', 
-    icon: 'person',
-    emoji: '👤',
-    color: '#757575',
-    permissions: []
-  },
+  { id: 'tennis_coach', label: 'Entraîneur Tennis', emoji: '🎾', color: '#388e3c' },
+  { id: 'physical_coach', label: 'Préparateur Physique', emoji: '💪', color: '#2e7d32' },
+  { id: 'physio', label: 'Kiné', emoji: '🏥', color: '#c2185b' },
+  { id: 'agent', label: 'Agent', emoji: '💼', color: '#1976d2' },
+  { id: 'family', label: 'Famille', emoji: '👨‍👩‍👧', color: '#ff9800' },
+  { id: 'other', label: 'Autre', emoji: '👤', color: '#757575' },
 ];
+
+// ============ TYPES ============
+
+interface UserProfile {
+  id: string;
+  prenom: string;
+  email: string;
+  classement?: string;
+  circuits?: string[];
+  niveaux?: string[];
+  residenceFiscale?: string;
+  dateNaissance?: string;
+}
 
 interface TeamMember {
   id: string;
   name: string;
   email: string;
   role: string;
-  addedAt: string;
+  status: 'active' | 'pending';
 }
 
-interface TravelDay {
-  country: string;
-  flag: string;
-  days: number;
-}
-
-interface UserProfile {
-  id?: string;
-  prenom: string;
-  email: string;
-  classement?: string;
-  circuits?: string[];
-  residenceFiscale?: string;
-}
-
-const TEAM_STORAGE_KEY = '@central_court_team';
-const TRAVEL_STORAGE_KEY = '@central_court_travel_days';
-const USER_EMAIL_KEY = '@central_court_user_email';
+// ============ COMPONENT ============
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -105,158 +78,131 @@ export default function ProfileScreen() {
   
   // State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [team, setTeam] = useState<TeamMember[]>([]);
-  const [travelDays, setTravelDays] = useState<TravelDay[]>([
-    { country: 'France', flag: '🇫🇷', days: 20 },
-    { country: 'Monaco', flag: '🇲🇨', days: 5 },
-    { country: 'Australie', flag: '🇦🇺', days: 3 },
-  ]);
   
   // Modals
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showTravelModal, setShowTravelModal] = useState(false);
-  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
-  // Edit profile state
+  // Edit form
   const [editClassement, setEditClassement] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editResidenceFiscale, setEditResidenceFiscale] = useState('');
-  
-  useEffect(() => {
-    loadData();
-  }, []);
-  
-  const loadData = async () => {
+
+  // ============ DATA LOADING ============
+
+  const loadProfile = useCallback(async () => {
     try {
-      setIsLoadingProfile(true);
-      
-      // Load travel from local storage
-      const [travelData, savedEmail] = await Promise.all([
-        AsyncStorage.getItem(TRAVEL_STORAGE_KEY),
-        AsyncStorage.getItem(USER_EMAIL_KEY),
-      ]);
-      
-      if (travelData) setTravelDays(JSON.parse(travelData));
-      
-      // Try to load profile from backend
-      if (savedEmail) {
-        try {
-          const response = await api.get(`/api/users/profile/email/${encodeURIComponent(savedEmail)}`);
-          if (response.data) {
-            setUserProfile(response.data);
-            
-            // Load team members and invitations from backend
-            try {
-              const [staffResponse, invitationsResponse] = await Promise.all([
-                api.get(`/api/invitations/staff/player/${response.data.id}`),
-                api.get(`/api/invitations/player/${response.data.id}`)
-              ]);
-              
-              // Combine active staff and pending invitations for display
-              const activeStaff = (staffResponse.data.staff || []).map((s: any) => ({
-                id: s.id,
-                name: `${s.firstName}${s.lastName ? ' ' + s.lastName : ''}`,
-                email: s.email,
-                role: s.role,
-                addedAt: s.joinedAt,
-                status: 'active',
-              }));
-              
-              const pendingInvitations = (invitationsResponse.data.invitations || [])
-                .filter((inv: any) => inv.status === 'pending')
-                .map((inv: any) => ({
-                  id: inv.id,
-                  name: inv.inviteeName || inv.inviteeEmail.split('@')[0],
-                  email: inv.inviteeEmail,
-                  role: inv.role,
-                  addedAt: inv.sentAt,
-                  status: 'pending',
-                  invitationId: inv.id,
-                }));
-              
-              setTeam([...activeStaff, ...pendingInvitations]);
-            } catch (e) {
-              console.log('Could not load staff/invitations from backend');
-            }
-          }
-        } catch (e) {
-          console.log('Profile not found in backend');
-        }
+      const savedEmail = await AsyncStorage.getItem(USER_EMAIL_KEY);
+      if (!savedEmail) {
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await api.get(`/api/users/profile/email/${encodeURIComponent(savedEmail)}`);
+      if (response.data) {
+        setUserProfile(response.data);
+        
+        // Load team from backend
+        const [staffRes, invitesRes] = await Promise.all([
+          api.get(`/api/invitations/staff/player/${response.data.id}`).catch(() => ({ data: { staff: [] } })),
+          api.get(`/api/invitations/player/${response.data.id}`).catch(() => ({ data: { invitations: [] } })),
+        ]);
+        
+        const activeStaff = (staffRes.data.staff || []).map((s: any) => ({
+          id: s.id,
+          name: `${s.firstName}${s.lastName ? ' ' + s.lastName : ''}`,
+          email: s.email,
+          role: s.role,
+          status: 'active' as const,
+        }));
+        
+        const pendingInvites = (invitesRes.data.invitations || [])
+          .filter((inv: any) => inv.status === 'pending')
+          .map((inv: any) => ({
+            id: inv.id,
+            name: inv.inviteeName || inv.inviteeEmail.split('@')[0],
+            email: inv.inviteeEmail,
+            role: inv.role,
+            status: 'pending' as const,
+          }));
+        
+        setTeam([...activeStaff, ...pendingInvites]);
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading profile:', error);
     } finally {
-      setIsLoadingProfile(false);
+      setIsLoading(false);
+      setRefreshing(false);
     }
-  };
-  
-  const saveTeam = async (newTeam: TeamMember[]) => {
-    setTeam(newTeam);
-    // No longer saving to AsyncStorage - using backend instead
-  };
-  
-  const openEditProfile = () => {
+  }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadProfile();
+  }, [loadProfile]);
+
+  // ============ ACTIONS ============
+
+  const openEditModal = () => {
     setEditClassement(userProfile?.classement || '');
     setEditEmail(userProfile?.email || '');
     setEditResidenceFiscale(userProfile?.residenceFiscale || '');
-    setShowEditProfileModal(true);
+    setShowEditModal(true);
   };
-  
+
   const saveProfile = async () => {
-    if (!editEmail) {
-      Alert.alert('Erreur', 'L\'email est requis');
-      return;
-    }
+    if (!userProfile?.id) return;
     
-    setIsLoading(true);
-    
+    setIsSaving(true);
     try {
-      // Update profile in backend
-      const response = await api.post('/api/users/onboarding', {
-        prenom: userProfile?.prenom || '',
-        email: editEmail,
+      await api.put(`/api/users/profile/${userProfile.id}`, {
         classement: editClassement,
+        email: editEmail,
         residenceFiscale: editResidenceFiscale,
-        circuits: userProfile?.circuits || [],
-        onboardingCompleted: true,
       });
       
-      if (response.data) {
-        setUserProfile(response.data);
-        // Save email for future loads
+      // Update local state
+      setUserProfile(prev => prev ? {
+        ...prev,
+        classement: editClassement,
+        email: editEmail,
+        residenceFiscale: editResidenceFiscale,
+      } : null);
+      
+      // Update stored email if changed
+      if (editEmail !== userProfile.email) {
         await AsyncStorage.setItem(USER_EMAIL_KEY, editEmail);
       }
       
-      setShowEditProfileModal(false);
-      Alert.alert('Succès', 'Votre profil a été mis à jour');
+      setShowEditModal(false);
+      Alert.alert('Succès', 'Profil mis à jour');
     } catch (error) {
       console.error('Error saving profile:', error);
       Alert.alert('Erreur', 'Impossible de sauvegarder le profil');
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
-  
+
   const handleInvite = async () => {
-    if (!selectedRole || !inviteEmail || !inviteName) {
+    if (!selectedRole || !inviteEmail || !inviteName || !userProfile?.id) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
     
-    if (!userProfile?.id) {
-      Alert.alert('Erreur', 'Veuillez d\'abord configurer votre profil');
-      return;
-    }
-    
-    setIsLoading(true);
-    
+    setIsSaving(true);
     try {
-      // Create invitation via backend API
       const response = await api.post('/api/invitations/create', {
         playerId: userProfile.id,
         inviteeEmail: inviteEmail,
@@ -266,93 +212,121 @@ export default function ProfileScreen() {
       
       const invitation = response.data;
       const roleInfo = STAFF_ROLES.find(r => r.id === selectedRole);
-      
-      // Generate invitation link
-      const inviteUrl = `tennispro://join/${invitation.token}`;
       const webUrl = `https://tennis-nexus.preview.emergentagent.com/join/${invitation.token}`;
       
-      // Add to local team display as pending
-      const newMember: TeamMember = {
+      // Add to local team
+      setTeam(prev => [...prev, {
         id: invitation.id,
         name: inviteName,
         email: inviteEmail,
         role: selectedRole,
-        addedAt: new Date().toISOString(),
-      };
+        status: 'pending',
+      }]);
       
-      setTeam(prev => [...prev, newMember]);
-      
-      // Share the invitation
+      // Share invitation
       if (Platform.OS === 'web') {
         await navigator.clipboard.writeText(webUrl);
-        Alert.alert(
-          'Invitation créée ! ✉️', 
-          `Lien copié dans le presse-papier.\n\n${inviteName} recevra un email d'invitation pour rejoindre votre équipe en tant que ${roleInfo?.label}.`
-        );
+        Alert.alert('Invitation créée ! ✉️', `Lien copié. ${inviteName} peut rejoindre votre équipe en tant que ${roleInfo?.label}.`);
       } else {
         await Share.share({
-          message: `${userProfile?.prenom || 'Un joueur'} vous invite à rejoindre son équipe sur Le Court Central en tant que ${roleInfo?.label}!\n\nCliquez sur ce lien pour vous inscrire:\n${webUrl}`,
+          message: `${userProfile.prenom} vous invite à rejoindre son équipe en tant que ${roleInfo?.label}!\n\n${webUrl}`,
           title: 'Invitation Le Court Central'
         });
       }
       
       setShowInviteModal(false);
-      setSelectedRole(null);
-      setInviteEmail('');
-      setInviteName('');
-      
+      resetInviteForm();
     } catch (error: any) {
-      console.error('Invitation error:', error);
-      const errorMsg = error.response?.data?.detail || 'Impossible de créer l\'invitation';
-      Alert.alert('Erreur', errorMsg);
+      Alert.alert('Erreur', error.response?.data?.detail || 'Impossible de créer l\'invitation');
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
-  
-  const handleRemoveMember = (memberId: string, memberName: string) => {
+
+  const handleRemoveMember = (member: TeamMember) => {
     Alert.alert(
       'Retirer du staff',
-      `Voulez-vous retirer ${memberName} de votre équipe ?`,
+      `Voulez-vous retirer ${member.name} ?`,
       [
         { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Retirer', 
+        {
+          text: 'Retirer',
           style: 'destructive',
           onPress: async () => {
             try {
-              // Try to delete from backend
-              await api.delete(`/api/invitations/staff/${memberId}`);
-            } catch (e) {
-              // May be a pending invitation, try to cancel it
-              try {
-                await api.post(`/api/invitations/${memberId}/cancel`);
-              } catch (e2) {
-                console.log('Could not remove from backend', e2);
+              if (member.status === 'active') {
+                await api.delete(`/api/invitations/staff/${member.id}`);
+              } else {
+                await api.post(`/api/invitations/${member.id}/cancel`);
               }
+            } catch (e) {
+              console.log('Error removing member:', e);
             }
-            // Update local state
-            setTeam(prev => prev.filter(m => m.id !== memberId));
+            setTeam(prev => prev.filter(m => m.id !== member.id));
           }
         }
       ]
     );
   };
-  
-  const getRoleInfo = (roleId: string) => {
-    return STAFF_ROLES.find(r => r.id === roleId) || STAFF_ROLES[5];
+
+  const resetInviteForm = () => {
+    setSelectedRole(null);
+    setInviteEmail('');
+    setInviteName('');
   };
-  
-  const totalTravelDays = travelDays.reduce((sum, t) => sum + t.days, 0);
-  
-  // Display values
-  const displayName = userProfile?.prenom || 'Configurer le profil';
-  const displayClassement = userProfile?.classement || '--';
-  const displayCircuit = userProfile?.circuits?.[0] || 'ATP';
+
+  const getRoleInfo = (roleId: string) => STAFF_ROLES.find(r => r.id === roleId) || STAFF_ROLES[5];
+
+  // ============ RENDER HELPERS ============
+
+  const renderCircuitBadges = () => {
+    const circuits = userProfile?.circuits || [];
+    if (circuits.length === 0) return null;
+    
+    return (
+      <View style={styles.badgesRow}>
+        {circuits.map(circuit => (
+          <View 
+            key={circuit} 
+            style={[styles.badge, { backgroundColor: CIRCUIT_COLORS[circuit] || '#666' }]}
+          >
+            <Text style={styles.badgeText}>{circuit}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderLevelBadges = () => {
+    const niveaux = userProfile?.niveaux || [];
+    if (niveaux.length === 0) return null;
+    
+    return (
+      <View style={styles.badgesRow}>
+        {niveaux.map(niveau => (
+          <View key={niveau} style={[styles.levelBadge]}>
+            <Text style={styles.levelBadgeText}>{LEVEL_LABELS[niveau] || niveau}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  // ============ LOADING STATE ============
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#1e3c72" />
+      </View>
+    );
+  }
+
+  // ============ MAIN RENDER ============
 
   return (
     <View style={styles.container}>
-      {/* Header with name and ranking */}
+      {/* Header */}
       <LinearGradient
         colors={['#1e3c72', '#2a5298']}
         style={[styles.header, { paddingTop: insets.top + 16 }]}
@@ -360,55 +334,63 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={40} color="#fff" />
-            </View>
-            <View style={styles.circuitBadge}>
-              <Text style={styles.circuitBadgeText}>{displayCircuit}</Text>
+              <Ionicons name="person" size={36} color="#fff" />
             </View>
           </View>
+          
           <View style={styles.profileInfo}>
-            <Text style={styles.playerName}>{displayName}</Text>
-            {/* Classement prominent display */}
-            <View style={styles.rankingContainer}>
-              <Ionicons name="trophy" size={18} color="#FFD700" />
-              <Text style={styles.rankingNumber}>#{displayClassement}</Text>
-            </View>
+            <Text style={styles.playerName}>{userProfile?.prenom || 'Configurer le profil'}</Text>
+            
+            {userProfile?.classement && (
+              <View style={styles.rankingRow}>
+                <Ionicons name="trophy" size={16} color="#FFD700" />
+                <Text style={styles.rankingText}>#{userProfile.classement}</Text>
+              </View>
+            )}
+            
+            {renderCircuitBadges()}
+            
             {userProfile?.residenceFiscale && (
               <Text style={styles.residenceText}>📍 {userProfile.residenceFiscale}</Text>
             )}
           </View>
-          <TouchableOpacity 
-            style={styles.editBtn}
-            onPress={openEditProfile}
-            testID="btn-edit-profile"
-          >
+          
+          <TouchableOpacity style={styles.editBtn} onPress={openEditModal} testID="btn-edit-profile">
             <Ionicons name="create-outline" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Team Management */}
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Niveaux de tournois */}
+        {userProfile?.niveaux && userProfile.niveaux.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🏆 Niveaux de tournois</Text>
+            <View style={styles.levelsCard}>
+              {renderLevelBadges()}
+            </View>
+          </View>
+        )}
+
+        {/* Équipe */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>👥 Mon équipe</Text>
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => setShowInviteModal(true)}
-              testID="btn-invite-team"
-            >
-              <Ionicons name="person-add" size={18} color="#fff" />
+            <TouchableOpacity style={styles.addBtn} onPress={() => setShowInviteModal(true)} testID="btn-invite">
+              <Ionicons name="person-add" size={16} color="#fff" />
               <Text style={styles.addBtnText}>Inviter</Text>
             </TouchableOpacity>
           </View>
 
           {team.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="people-outline" size={40} color={Colors.text.muted} />
+              <Ionicons name="people-outline" size={36} color="#999" />
               <Text style={styles.emptyTitle}>Aucun membre</Text>
-              <Text style={styles.emptySubtitle}>
-                Invitez votre coach, kiné, agent...
-              </Text>
+              <Text style={styles.emptySubtitle}>Invitez votre coach, kiné, agent...</Text>
             </View>
           ) : (
             <View style={styles.teamCard}>
@@ -417,11 +399,8 @@ export default function ProfileScreen() {
                 return (
                   <TouchableOpacity
                     key={member.id}
-                    style={[
-                      styles.teamMember,
-                      index < team.length - 1 && styles.teamMemberBorder
-                    ]}
-                    onLongPress={() => handleRemoveMember(member.id, member.name)}
+                    style={[styles.teamMember, index < team.length - 1 && styles.teamMemberBorder]}
+                    onLongPress={() => handleRemoveMember(member)}
                   >
                     <View style={[styles.memberAvatar, { backgroundColor: roleInfo.color + '20' }]}>
                       <Text style={styles.memberEmoji}>{roleInfo.emoji}</Text>
@@ -430,172 +409,95 @@ export default function ProfileScreen() {
                       <Text style={styles.memberName}>{member.name}</Text>
                       <Text style={[styles.memberRole, { color: roleInfo.color }]}>
                         {roleInfo.label}
+                        {member.status === 'pending' && ' (en attente)'}
                       </Text>
                     </View>
-                    <TouchableOpacity style={styles.memberAction}>
-                      <Ionicons name="mail-outline" size={20} color={Colors.text.muted} />
-                    </TouchableOpacity>
+                    {member.status === 'pending' && (
+                      <View style={styles.pendingBadge}>
+                        <Ionicons name="time-outline" size={14} color="#ff9800" />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}
             </View>
           )}
-          
-          <Text style={styles.teamNote}>
-            Appuyez longuement sur un membre pour le retirer
-          </Text>
+          <Text style={styles.hint}>Appuyez longuement pour retirer un membre</Text>
         </View>
 
-        {/* Travel Days */}
+        {/* Actions rapides */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>✈️ Jours de voyage</Text>
-            <TouchableOpacity
-              style={styles.viewAllBtn}
-              onPress={() => setShowTravelModal(true)}
-            >
-              <Text style={styles.viewAllText}>Voir tout</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+          <Text style={styles.sectionTitle}>⚡ Actions</Text>
+          <View style={styles.actionsCard}>
+            <TouchableOpacity style={styles.actionItem} onPress={openEditModal}>
+              <Ionicons name="person-outline" size={20} color="#1e3c72" />
+              <Text style={styles.actionText}>Modifier mon profil</Text>
+              <Ionicons name="chevron-forward" size={18} color="#999" />
             </TouchableOpacity>
-          </View>
-          
-          <View style={styles.travelCard}>
-            <View style={styles.travelSummary}>
-              <Text style={styles.travelTotal}>{totalTravelDays}</Text>
-              <Text style={styles.travelLabel}>jours en 2026</Text>
-            </View>
-            <View style={styles.travelCountries}>
-              {travelDays.slice(0, 3).map(travel => (
-                <View key={travel.country} style={styles.travelItem}>
-                  <Text style={styles.travelFlag}>{travel.flag}</Text>
-                  <Text style={styles.travelDays}>{travel.days}j</Text>
-                </View>
-              ))}
-            </View>
+            <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/onboarding')}>
+              <Ionicons name="refresh-outline" size={20} color="#1e3c72" />
+              <Text style={styles.actionText}>Refaire l'onboarding</Text>
+              <Ionicons name="chevron-forward" size={18} color="#999" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Settings Menu */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚙️ Paramètres</Text>
-          <View style={styles.menuCard}>
-            <TouchableOpacity 
-              style={[styles.menuItem, styles.menuItemBorder]}
-              onPress={openEditProfile}
-              testID="menu-edit-profile"
-            >
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="person-outline" size={22} color={Colors.text.secondary} />
-                <Text style={styles.menuItemLabel}>Mettre à jour mon profil</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="notifications-outline" size={22} color={Colors.text.secondary} />
-                <Text style={styles.menuItemLabel}>Notifications</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="shield-outline" size={22} color={Colors.text.secondary} />
-                <Text style={styles.menuItemLabel}>Confidentialité</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="help-circle-outline" size={22} color={Colors.text.secondary} />
-                <Text style={styles.menuItemLabel}>Aide & Support</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
-            </TouchableOpacity>
-          </View>
-        </View>
-        
         <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Edit Profile Modal */}
-      <Modal visible={showEditProfileModal} animationType="slide" transparent>
+      <Modal visible={showEditModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.editProfileModal}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Mettre à jour mon profil</Text>
-              <TouchableOpacity 
-                onPress={() => setShowEditProfileModal(false)}
-                testID="close-edit-profile"
-              >
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              <Text style={styles.modalTitle}>Modifier le profil</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.editForm} showsVerticalScrollIndicator={false}>
-              {/* Classement */}
+            <ScrollView style={styles.modalBody}>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>
-                  <Ionicons name="trophy" size={16} color="#FFD700" /> Classement
-                </Text>
+                <Text style={styles.formLabel}>Classement</Text>
                 <TextInput
                   style={styles.formInput}
                   value={editClassement}
                   onChangeText={setEditClassement}
                   placeholder="Ex: 45"
-                  placeholderTextColor={Colors.text.muted}
+                  placeholderTextColor="#999"
                   keyboardType="number-pad"
-                  testID="input-classement"
                 />
-                <Text style={styles.formHint}>Votre classement ATP/WTA actuel</Text>
               </View>
               
-              {/* Email */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>
-                  <Ionicons name="mail" size={16} color={Colors.primary} /> Adresse email
-                </Text>
+                <Text style={styles.formLabel}>Email</Text>
                 <TextInput
                   style={styles.formInput}
                   value={editEmail}
                   onChangeText={setEditEmail}
                   placeholder="votre@email.com"
-                  placeholderTextColor={Colors.text.muted}
+                  placeholderTextColor="#999"
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  testID="input-email"
                 />
               </View>
               
-              {/* Résidence fiscale */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>
-                  <Ionicons name="location" size={16} color="#4CAF50" /> Résidence fiscale désirée
-                </Text>
+                <Text style={styles.formLabel}>Résidence fiscale désirée</Text>
                 <TextInput
                   style={styles.formInput}
                   value={editResidenceFiscale}
                   onChangeText={setEditResidenceFiscale}
-                  placeholder="Ex: Monaco, Suisse, Dubaï..."
-                  placeholderTextColor={Colors.text.muted}
-                  testID="input-residence"
+                  placeholder="Ex: Monaco, Suisse..."
+                  placeholderTextColor="#999"
                 />
-                <Text style={styles.formHint}>Pays où vous souhaitez établir votre résidence fiscale</Text>
               </View>
               
-              {/* Save Button */}
-              <TouchableOpacity 
-                style={styles.saveButton}
-                onPress={saveProfile}
-                disabled={isLoading}
-                testID="btn-save-profile"
-              >
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
+              <TouchableOpacity style={styles.saveBtn} onPress={saveProfile} disabled={isSaving}>
+                {isSaving ? (
+                  <ActivityIndicator color="#fff" />
                 ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                    <Text style={styles.saveButtonText}>Enregistrer</Text>
-                  </>
+                  <Text style={styles.saveBtnText}>Enregistrer</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -603,19 +505,18 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Invite Team Modal */}
+      {/* Invite Modal */}
       <Modal visible={showInviteModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.inviteModal}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Inviter un membre</Text>
-              <TouchableOpacity onPress={() => setShowInviteModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              <TouchableOpacity onPress={() => { setShowInviteModal(false); resetInviteForm(); }}>
+                <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
             
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Role Selection */}
+            <ScrollView style={styles.modalBody}>
               <Text style={styles.formLabel}>Choisir un rôle</Text>
               <View style={styles.roleGrid}>
                 {STAFF_ROLES.map(role => (
@@ -623,18 +524,12 @@ export default function ProfileScreen() {
                     key={role.id}
                     style={[
                       styles.roleCard,
-                      selectedRole === role.id && { 
-                        backgroundColor: role.color + '15',
-                        borderColor: role.color 
-                      }
+                      selectedRole === role.id && { backgroundColor: role.color + '15', borderColor: role.color }
                     ]}
                     onPress={() => setSelectedRole(role.id)}
                   >
                     <Text style={styles.roleEmoji}>{role.emoji}</Text>
-                    <Text style={[
-                      styles.roleLabel,
-                      selectedRole === role.id && { color: role.color }
-                    ]}>
+                    <Text style={[styles.roleLabel, selectedRole === role.id && { color: role.color }]}>
                       {role.label}
                     </Text>
                   </TouchableOpacity>
@@ -650,7 +545,7 @@ export default function ProfileScreen() {
                       value={inviteName}
                       onChangeText={setInviteName}
                       placeholder="Prénom Nom"
-                      placeholderTextColor={Colors.text.muted}
+                      placeholderTextColor="#999"
                     />
                   </View>
                   
@@ -661,23 +556,19 @@ export default function ProfileScreen() {
                       value={inviteEmail}
                       onChangeText={setInviteEmail}
                       placeholder="email@example.com"
-                      placeholderTextColor={Colors.text.muted}
+                      placeholderTextColor="#999"
                       keyboardType="email-address"
                       autoCapitalize="none"
                     />
                   </View>
                   
-                  <TouchableOpacity 
-                    style={styles.inviteButton}
-                    onPress={handleInvite}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleInvite} disabled={isSaving}>
+                    {isSaving ? (
+                      <ActivityIndicator color="#fff" />
                     ) : (
                       <>
                         <Ionicons name="send" size={18} color="#fff" />
-                        <Text style={styles.inviteButtonText}>Envoyer l'invitation</Text>
+                        <Text style={styles.saveBtnText}>Envoyer l'invitation</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -687,43 +578,20 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Travel Days Modal */}
-      <Modal visible={showTravelModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.travelModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Jours de voyage 2026</Text>
-              <TouchableOpacity onPress={() => setShowTravelModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.travelModalSummary}>
-              <Text style={styles.travelModalTotal}>{totalTravelDays}</Text>
-              <Text style={styles.travelModalLabel}>jours au total</Text>
-            </View>
-            
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {travelDays.map(travel => (
-                <View key={travel.country} style={styles.travelModalItem}>
-                  <Text style={styles.travelModalFlag}>{travel.flag}</Text>
-                  <Text style={styles.travelModalCountry}>{travel.country}</Text>
-                  <Text style={styles.travelModalDays}>{travel.days} jours</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
+
+// ============ STYLES ============
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     paddingHorizontal: 20,
@@ -731,51 +599,66 @@ const styles = StyleSheet.create({
   },
   profileSection: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   avatarContainer: {
-    position: 'relative',
+    marginRight: 16,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  circuitBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  circuitBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
   profileInfo: {
     flex: 1,
-    marginLeft: 16,
   },
   playerName: {
     fontSize: 22,
     fontWeight: '700',
     color: '#fff',
+    marginBottom: 4,
   },
-  rankingContainer: {
+  rankingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    gap: 6,
+    gap: 4,
+    marginBottom: 8,
   },
-  rankingNumber: {
-    fontSize: 20,
+  rankingText: {
+    fontSize: 18,
     fontWeight: '700',
+    color: '#FFD700',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  levelBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,215,0,0.2)',
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  levelBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: '#FFD700',
   },
   residenceText: {
@@ -806,54 +689,49 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text.primary,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
   },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#1e3c72',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
+    borderRadius: 20,
+    gap: 4,
   },
   addBtnText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#fff',
   },
-  viewAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  viewAllText: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '500',
+  levelsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
   },
   emptyCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 32,
     alignItems: 'center',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.text.primary,
+    color: '#333',
     marginTop: 12,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: Colors.text.muted,
+    color: '#999',
     marginTop: 4,
-    textAlign: 'center',
   },
   teamCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   teamMember: {
@@ -871,124 +749,76 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   memberEmoji: {
     fontSize: 20,
   },
   memberInfo: {
     flex: 1,
-    marginLeft: 12,
   },
   memberName: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.text.primary,
+    color: '#333',
   },
   memberRole: {
     fontSize: 13,
     marginTop: 2,
   },
-  memberAction: {
-    padding: 8,
+  pendingBadge: {
+    padding: 6,
   },
-  teamNote: {
+  hint: {
     fontSize: 12,
-    color: Colors.text.muted,
+    color: '#999',
     textAlign: 'center',
     marginTop: 8,
   },
-  travelCard: {
+  actionsCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  travelSummary: {
-    alignItems: 'center',
-    paddingRight: 16,
-    borderRightWidth: 1,
-    borderRightColor: '#f0f0f0',
-  },
-  travelTotal: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  travelLabel: {
-    fontSize: 12,
-    color: Colors.text.muted,
-  },
-  travelCountries: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingLeft: 16,
-  },
-  travelItem: {
-    alignItems: 'center',
-  },
-  travelFlag: {
-    fontSize: 24,
-  },
-  travelDays: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginTop: 4,
-  },
-  menuCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 8,
   },
-  menuItem: {
+  actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     padding: 16,
-  },
-  menuItemBorder: {
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
   },
-  menuItemLabel: {
+  actionText: {
+    flex: 1,
     fontSize: 15,
-    color: Colors.text.primary,
+    color: '#333',
   },
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.text.primary,
+    color: '#333',
   },
-  // Edit Profile Modal
-  editProfileModal: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  modalBody: {
     padding: 20,
-    maxHeight: '80%',
-  },
-  editForm: {
-    flex: 1,
   },
   formGroup: {
     marginBottom: 20,
@@ -996,7 +826,7 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.text.primary,
+    color: '#666',
     marginBottom: 8,
   },
   formInput: {
@@ -1004,36 +834,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
-    color: Colors.text.primary,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
-  formHint: {
-    fontSize: 12,
-    color: Colors.text.muted,
-    marginTop: 4,
-  },
-  saveButton: {
-    flexDirection: 'row',
+  saveBtn: {
+    backgroundColor: '#1e3c72',
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 8,
-    marginBottom: 20,
+    marginTop: 12,
+    marginBottom: 32,
   },
-  saveButtonText: {
+  saveBtnText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#fff',
-  },
-  // Invite Modal
-  inviteModal: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '85%',
   },
   roleGrid: {
     flexDirection: 'row',
@@ -1042,84 +861,22 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   roleCard: {
-    width: '31%',
-    backgroundColor: '#f5f5f5',
+    width: '47%',
+    padding: 14,
     borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#e0e0e0',
+    alignItems: 'center',
   },
   roleEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
+    fontSize: 28,
+    marginBottom: 6,
   },
   roleLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: Colors.text.secondary,
-    textAlign: 'center',
-  },
-  inviteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  inviteButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  // Travel Modal
-  travelModal: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  travelModalSummary: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  travelModalTotal: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  travelModalLabel: {
-    fontSize: 14,
-    color: Colors.text.muted,
-  },
-  travelModalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  travelModalFlag: {
-    fontSize: 28,
-    marginRight: 12,
-  },
-  travelModalCountry: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.text.primary,
-  },
-  travelModalDays: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: '#666',
+    textAlign: 'center',
   },
 });
