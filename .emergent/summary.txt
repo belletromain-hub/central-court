@@ -1,162 +1,172 @@
 <analysis>**original_problem_statement:**
 The user wants to build a professional tennis application. The project has evolved through several phases:
-1.  **Initial Setup & Refactoring:** Modular FastAPI backend, MongoDB migration, Resend integration.
-2.  **Admin Dashboard:** A full-stack admin dashboard for user and metrics management.
-3.  **Fluid UX & Onboarding:** A complete multi-step user onboarding flow.
-4.  **UI/UX Enhancements:** Apple-style wheel picker components, redesigned Documents tab.
-5.  **High-Performance OCR System:** An ultra-performant OCR system to handle images and PDFs, using  for structured data extraction, with a robust frontend for user verification and inline editing.
-6.  **Data Persistence & Export:** Store all processed documents in MongoDB and provide a PDF export feature.
-7.  **Profile Management:** Redesign the profile page to show key user info and provide a simplified screen for updates.
+1.  **Initial Setup & Core Features:** Modular FastAPI backend, MongoDB database, user onboarding, and an advanced OCR system for document management.
+2.  **UI/UX & Profile:** Redesigned profile page, Apple-style wheel pickers, and a streamlined profile update flow.
+3.  **Staff & Tournament Management:** A complete staff invitation system with deep-linking and a comprehensive tournament database (ATP, WTA, ITF) that displays events based on the user's selected circuits.
+4.  **Code Health & Refactoring:** The user requested a full codebase review to optimize the structure, remove duplicate code, and ensure data is not stored in multiple places (e.g., AsyncStorage vs. MongoDB).
+5.  **Recent Bug Fixes:** The user's latest request is to fix four specific issues: a bug preventing new account creation, adding a logout function, ensuring profile edits are saved correctly, and displaying prize money on tournaments.
 
 **User's preferred language**: French. The next agent MUST respond in French.
 
 **what currently exists?**
-A full-stack application with a React Native (Expo) frontend, a Python (FastAPI) backend, and a MongoDB database. The core features are implemented, including:
-*   A complete, multi-step user onboarding flow.
-*   An advanced OCR system that processes both images and PDFs, extracts structured data, and allows users to verify and edit the results inline.
-*   Full backend integration with MongoDB to persist, retrieve, update, and delete all user documents.
-*   A backend endpoint to export user documents to a PDF file.
-*   An updated profile page that dynamically loads and displays the user's name and ranking from the backend.
-*   Apple-style wheel pickers integrated into the onboarding flow for date selection.
+A full-stack application with a React Native (Expo) frontend and a FastAPI backend using a MongoDB database. The codebase has recently undergone significant refactoring and is in a much healthier state.
+- **Core Functionality:** User authentication, OCR document processing, and a dynamic calendar are implemented.
+- **Data Model:** The application is now almost fully data-driven from MongoDB, storing users, documents, staff invitations, and a database of 228 tournaments.
+- **Staff Invitation System:** A complete backend and frontend flow allows players to invite staff members (e.g., coach, physio) via a unique token-based link. Invitation status (, ) is tracked.
+- **Tournament System:** Tournament data is imported and displayed on the main calendar, filtered according to the circuits (ATP, WTA, ITF) the user selected during onboarding.
+- **Refactored Components:**
+    -  (Documents page) was refactored from a 1870-line monolith into smaller, modular components, reducing its size by ~65%.
+    -  (Calendar page) and  (Profile page) were completely rewritten to be more robust, cleaner, and to fix crashes and data inconsistencies.
+- **Code Cleanup:** Obsolete backend routes () and frontend files (, etc.) have been removed, and the onboarding flow now correctly saves user data to the backend database.
 
 **Last working item**:
-*   **Last item agent was working:** The agent was implementing the user's request for a redesigned profile page and a simplified profile update screen. The agent successfully modified the profile view () to display the user's name and ranking from the backend. The backend user model () was also updated to support a new  field. The work stopped before creating the simplified editing screen.
+*   **Last item agent was working:** The agent was addressing a batch of four user-reported issues.
+    1.  **Account Creation Error:** Identified a bug in  where an API call was failing. A fix was implemented to use the correct  instance.
+    2.  **Missing Logout:** Implemented a  function in the refactored .
+    3.  **Profile Edit Not Saving:** Found an API route mismatch. The frontend was calling a non-existent endpoint. A new  endpoint was created in  to handle updates.
+    4.  **Display Prize Money:** This part has not been started yet.
 *   **Status:** IN PROGRESS
 *   **Agent Testing Done:** N
-*   **Which testing method agent to use?** Frontend testing agent. The test should cover the full user flow: viewing the profile, navigating to the edit screen, modifying the ranking, email, and fiscal residence, saving the changes, and verifying that the profile page updates correctly.
+*   **Which testing method agent to use?** both
+    - **Backend:** Test the new  and the fixed  endpoints using .
+    - **Frontend:** Use the  to validate the entire user flow: create an account, log in, edit profile details and save, view prize money on a tournament, and log out successfully.
 *   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
-*   **Issue 1: Critical and recurring frontend crash (P0)**
-    *   **Description:** The application intermittently crashes with the error . This error appears to be caused by an incompatibility between the versions of ,  packages, and React 19.
-    *   **Attempted fixes:** The agent tried numerous solutions: creating , clearing the Metro cache, completely reinstalling , and changing the provider order in the root layout. A full dependency reinstall (yarn install v1.22.22
-[1/4] Resolving packages...
-[2/4] Fetching packages...
-[3/4] Linking dependencies...
-info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.) provided a temporary fix, but the error returned, indicating a deep-rooted dependency conflict.
+*   **Issue 1: Complete and Test the 4-Point Bug Fix (P0)**
+    *   **Description:** This is the 
+wtmp begins Tue Feb 10 03:32:17 2026. The agent has implemented fixes for 3 of the 4 issues (Account Creation, Logout, Profile Edit), but they have not been tested. The 4th issue (Display Prize Money) is pending implementation.
+    *   **Attempted fixes:** Code has been written for the first three points in , , and .
     *   **Next debug checklist:**
-        1.  Do not assume the issue is gone. It is a critical blocker.
-        2.  Use the  with the full history of attempted fixes.
-        3.  Consult the Expo and React Navigation documentation for known compatibility issues with Expo SDK 54/55 and React 19.
-        4.  Systematically check  for version mismatches across all  packages and align them with a known stable configuration for .
-    *   **Why fix this issue and what will be achieved with the fix?** This is a critical stability issue that makes the application unreliable and blocks all further frontend development and testing. Fixing it will stabilize the application's navigation and rendering.
-    *   **Status:** BLOCKED
-    *   **Is recurring issue?** Y
-    *   **Should Test frontend/backend/both after fix?** Frontend
-    *   **Blocked on other issue:** No, this is the primary blocker.
+        1.  **Implement:** Modify the tournament components in  to display the  field, which is available in the tournament data.
+        2.  **Test Backend:** Use  to verify the  and  endpoints work as expected.
+        3.  **Test Frontend:** Run a full end-to-end test of the user flow: Sign up -> Log in -> Edit Profile -> View Prize Money -> Log out.
+    *   **Status:** IN PROGRESS
+    *   **Is recurring issue?** N
+    *   **Should Test frontend/backend/both after fix?** both
+    *   **Blocked on other issue:** None
 
 **In progress Task List**:
-*   **Task 1: Complete Simplified Profile Update Feature (P0)**
-    *   **Where to resume:**
-        1.  Create the navigation from the profile page () to the edit page.
-        2.  Create or modify the profile edit screen () to be a simplified form containing only three editable fields:  (ranking), , and  (desired fiscal residence).
-        3.  Implement the  logic to call the  endpoint.
-    *   **What will be achieved with this?** Fulfills the user's request for a streamlined profile management experience.
-    *   **Status:** IN PROGRESS
-    *   **Should Test frontend/backend/both after fix?** Both
-    *   **Blocked on something:** Blocked by **Issue 1**, as navigation may be unreliable.
+N/A
 
 **Upcoming and Future Tasks**
 *   **Upcoming Tasks:**
-    *   **P1: Implement Document Filtering by Date:** Add a date range picker to  and connect it to the  endpoint, passing  and  parameters to filter the document list.
-    *   **P1: Integrate Apple Wheel Picker for Document Date:** Integrate the  component into the document edit modal in  to replace the standard text input for dates.
-    *   **P2: Implement PDF Export on Frontend:** Add a button to the  UI that calls the  endpoint and handles the download/display of the generated PDF file.
+    *   **P1: Implement Document Filtering by Date:** Add a date range picker to  and connect it to the  endpoint.
+    *   **P1: Implement PDF Export on Frontend:** Add a button to the  UI that calls the  endpoint and handles the file download.
+    *   **P2: Send Invitation Emails via Resend:** Integrate the Resend API into the  endpoint to automatically email staff members when an invitation is created.
 *   **Future Tasks:**
     *   Implement push notifications.
+    *   Implement automatic reminders for tournament registration deadlines.
 
 **Completed work in this session**
-- **High-Performance OCR System:** Implemented a full-stack OCR pipeline for images and PDFs with a verification screen and inline editing capabilities.
-- **MongoDB Data Persistence:** Backend and frontend were fully integrated to save, load, edit, and delete documents from a MongoDB collection, replacing all static data.
-- **Backend PDF Export:** Created an endpoint () using  to generate a PDF summary of documents.
-- **Apple Wheel Picker Integration:** Successfully integrated the  into the user onboarding flow, after resolving a critical application crash.
-- **Profile Page Redesign:** Updated the backend model and frontend view () to dynamically display the user's name and ranking.
+- **Backend Fixes:**
+    - Corrected API route ordering in  to fix  and .
+    - Fixed user model to correctly save the  field.
+    - Resolved a critical  related to timezone-naive and timezone-aware datetimes in .
+- **Full-Stack Feature Implementation:**
+    - **Staff Invitation System:** Built a complete system with a backend (), frontend UI in , and a signup page  for invited members.
+    - **Tournament Data Integration:** Imported 228 tournaments into MongoDB and updated the backend () and frontend calendar () to display tournaments based on user's selected circuits.
+- **Major Refactoring & Code Cleanup:**
+    - **:** Refactored a 1870-line monolith into six modular components, reducing its size by ~65%.
+    - ** (Calendar):** Completely rewrote the page to fix crashes and handle the new API data structure, making it clean and robust.
+    - **:** Rewrote the profile page to remove non-functional elements, rely solely on backend data, and display user's circuits and levels.
+    - **Onboarding Flow:** Fixed the final step () to correctly create the user in the MongoDB database.
+    - **File Deletion:** Removed numerous obsolete files like , , , and .
+- **Bug Fixes:**
+    - Resolved a  dependency crash by reinstalling  and restarting the Metro server.
+    - Added missing plugins to  for  and .
 
 **Earlier issues found/mentioned but not fixed**
-*   **Issue 1: Backend API Route Conflict:**
-    *   **Description:** In , the static route  is defined after the dynamic route . This causes requests to  to be incorrectly interpreted as a request for a document with ID stats, leading to an error.
-    *   **Debug checklist:** Move the  definition to be *before* the  definition in .
-    *   **Why to solve this issue and what will be achieved with this?** This is a simple logic bug that breaks the stats endpoint. Fixing it will restore the intended functionality.
-    *   **Should Test frontend/backend/both after fix:** Backend
-    *   **Is recurring issue?** N
+N/A
 
 **Known issue recurrence from previous fork**
-N/A.
+*   **Issue recurrence in previous fork:** A critical frontend crash  related to navigation dependencies was mentioned in the initial handoff.
+*   **Recurrence count:** 2 (The agent encountered a similar  crash during this session).
+*   **Status:** RESOLVED. The agent resolved the immediate crash by reinstalling . The app now builds successfully. However, the underlying dependency stack remains a potential point of fragility.
 
 **Code Architecture**
-LinkingContext
+
 
 **Key Technical Concepts**
-- **Frontend:** React Native, Expo (SDK 54), Expo Router, TypeScript
-- **Backend:** Python, FastAPI, Pydantic, 
+- **Frontend:** React Native, Expo, Expo Router, TypeScript, Axios
+- **Backend:** Python, FastAPI, Motor (async MongoDB driver), Pydantic
 - **Database:** MongoDB
 - **AI/ML:** OpenAI Vision API () for OCR.
-- **3rd Party Services:** Resend (email),  &  (PDF/Image processing).
+- **3rd Party Services:** Resend (for email, planned),  (for PDF generation).
 
 **key DB schema**
 - ****: 
 - ****: 
+- ****: 
+- ****: 
+- ****: 
+- ****: 
 
 **changes in tech stack**
-- **Backend:** Added  dependency for server-side PDF generation.
+-  has been more consistently adopted on the frontend for API requests.
 
 **All files of reference**
-- **/app/frontend/app/(tabs)/vault.tsx**: Main file for document management, needs urgent refactoring.
-- **/app/frontend/app/(tabs)/profile.tsx**: The user profile view.
-- **/app/frontend/app/profile-edit.tsx**: The user profile edit screen to be implemented.
-- **/app/frontend/app/_layout.tsx**: Root layout file, central to the  bug.
-- **/app/backend/routes/documents.py**: Contains the backend logic for documents and the API route order bug.
-- **/app/backend/routes/user_routes.py**: Contains the backend logic for user profiles.
+*   **/app/frontend/app/onboarding/step7-password.tsx**: Contains the fix for user account creation.
+*   **/app/frontend/app/(tabs)/profile.tsx**: Newly refactored profile page, contains logout and edit logic.
+*   **/app/frontend/app/(tabs)/index.tsx**: Newly refactored calendar page, needs prize money added.
+*   **/app/backend/routes/user_routes.py**: Contains the new  endpoint.
+*   **/app/backend/routes/tournament_routes.py**: Contains the logic for fetching tournaments.
+*   **/app/frontend/src/components/documents/**: Directory containing the new modular components for the documents page.
 
 **Areas that need refactoring**:
-- **/app/frontend/app/(tabs)/vault.tsx**: **[CRITICAL]** This file is now over 1700 lines. To fix a build error, the agent merged all OCR-related UI logic (upload, verification, inline-editing) directly into this file instead of using separate components as planned. This must be undone. The original import error needs to be properly debugged, and the logic must be extracted into smaller components (, , etc.) to restore maintainability.
+The most critical areas (, , ) have been successfully refactored. The codebase is now significantly cleaner. No new critical refactoring is required.
 
 **key api endpoints**
-- : Handles OCR processing for uploaded files.
-- : Full CRUD for documents stored in MongoDB.
-- : Generates a PDF export of documents.
-- : Manages user profile data.
+- : Creates a new user.
+- : **(NEW)** Updates a user's profile.
+- : Creates a new staff invitation.
+- : Allows an invited staff member to create their account.
+- : Retrieves tournaments, filtering by the user's circuits.
+- : Registers a user for a tournament.
 
 **Critical Info for New Agent**
-- **Fix the  bug first.** This is the highest priority (P0). The app is not stable enough for further development or testing until this recurring crash is permanently resolved.
-- **Refactor .** After the  bug is fixed, the next priority should be to break down the monolithic  file into the smaller, manageable components that were originally planned. Do not add more features to it in its current state.
-- **Fix the backend route order.** The  endpoint is broken due to incorrect ordering in . This is a quick fix that should be addressed.
+- Your immediate priority is to finish the 4-point bug fix request from the user. This involves implementing the prize money display and then thoroughly testing the account creation, profile editing, and logout flows.
+- The codebase has been heavily refactored in the last session. The ,  (documents), and  (calendar) pages are now modular and cleaner. Familiarize yourself with the new structure, especially the new components in .
+- A recurring frontend stability issue was temporarily fixed by reinstalling dependencies. Be mindful that the navigation stack might still be fragile.
 
 **documents and test reports created in this job**
+- 
+- 
+- 
 -  (Continuously updated)
--  (Successful test of the initial OCR feature)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User Request:** Store the image... Filter by period and/or all documents. (Task for filtering is pending).
-2.  **User Request:** Once Ive configured my profile, Id like the profile tab to show Romain, my ranking number... and when I click to update my profile I can only modify my ranking, my email address, my desired fiscal residence. (This is the current  task).
-3.  **User Request:** integrate apple wheel picker. (Partially done in onboarding, pending for document editing).
-4.  **User Confirmation:** 1 2 3 (Confirmed priorities from a list).
-5.  **User Confirmation:** inline editing. (Task completed).
-6.  **User Confirmation:** Continue next actions. (Gave go-ahead after OCR was done).
-7.  **User Confirmation:** P0 et p1. (Confirmed priorities for backend/frontend work).
+1.  **Request:** Fix account creation, add logout, fix profile edit saving, display prize money. (Current task, IN PROGRESS).
+2.  **Request:** Review the calendar page code to clean it up and ensure it uses the latest data structures. (DONE, page was rewritten).
+3.  **Bug Report:** User sent screenshots of the app crashing on the calendar page. (DONE, fixed by rewriting the page).
+4.  **Confirmation:** User approved the plan to implement the Apple wheel picker and refactor . (DONE).
+5.  **Request:** A major request to optimize the profile page, ensure data is stored only in the DB (not AsyncStorage), remove non-functional UI, and perform a full codebase cleanup. (DONE).
+6.  **Request:** Add all provided tournament data to the database and display them based on the user's circuit choices from onboarding. (DONE).
+7.  **Request:** Call the deployer agent and run a health check. (DONE, and resulting issues were fixed).
+8.  **Request:** Debug document upload and then implement the staff invitation flow. (DONE).
+9.  **Confirmation:** User approved the plan to fix backend bugs and complete the profile update feature. (DONE).
+10. **Confirmation:** Finir ca ! (Finish this!) - A general instruction to proceed. (Handled).
 
 **Project Health Check:**
-- **Broken:** The frontend is unstable due to the critical, recurring  navigation error.
-- **Mocked:** None. The application is now fully data-driven from the MongoDB backend.
+*   **Broken:** The account creation and profile edit save functionalities were broken. Fixes are implemented but require testing. Prize money display is missing.
+*   **Mocked:** None.
 
 **3rd Party Integrations**
-- **OpenAI GPT-4o**: Uses a User-provided API Key for OCR.
-- **Resend**: Email API, requires User API Key.
-- **MongoDB**: NoSQL Database.
-- **reportlab**: New Python library for PDF generation.
+*   **OpenAI GPT-4o**: Uses a User-provided API Key for OCR.
+*   **Resend**: Email API (planned for invitations), requires User API Key.
+*   **MongoDB**: NoSQL Database.
+*   **reportlab**: Python library for PDF generation.
 
 **Testing status**
-- **Testing agent used after significant changes:** YES. It successfully validated the OCR system in .
-- **Troubleshoot agent used after agent stuck in loop:** YES. It was used to diagnose the  issue and correctly identified a missing , though this did not ultimately solve the root problem.
-- **Test files created:** []
-- **Known regressions:** The entire frontend navigation system is prone to crashing.
+*   **Testing agent used after significant changes:** YES. The agent ran comprehensive tests after implementing the staff invitation and tournament features, generating  and .
+*   **Troubleshoot agent used after agent stuck in loop:** NO.
+*   **Test files created:** [, , ]
+*   **Known regressions:** None currently, but the app was unstable before the recent refactoring.
 
 **Credentials to test flow:**
-- **Admin Dashboard:**
-    - **Email:** 
-    - **Password:** 
-- **OpenAI Key:** Available in .
+-   **User Account:** Needs to be created via the onboarding flow to test the fix.
+-   **OpenAI Key:** Available in .
 
 **What agent forgot to execute**
-- The agent did not fix the backend API route order for .
-- The agent abandoned the plan to use separate components for the OCR UI and instead created a monolithic  file as a workaround for a build error, which is a major source of technical debt.
-- The agent created a new date picker component () but never integrated it into the document editing modal in .</analysis>
+-   The agent has not yet implemented the display prize money feature, which was part of the user's most recent request.
+-   The upcoming tasks from the previous handoff (document filtering by date, frontend PDF export) remain pending.</analysis>

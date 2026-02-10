@@ -187,7 +187,7 @@ Construire une application professionnelle de tennis pour les joueurs profession
 
 ## Credentials
 - **Admin Dashboard:** admin@lecourtcentral.com / admin123
-- **Preview URL:** https://tennis-nexus.preview.emergentagent.com
+- **Preview URL:** https://serve-preview.preview.emergentagent.com
 
 ## Testing Results (Février 2026)
 - ✅ Backend OCR: 13/13 tests passés (100%)
