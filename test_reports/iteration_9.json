@@ -1,0 +1,81 @@
+{
+  "summary": "Backend API testing completed successfully for Staff Invitation System. All 26 tests passed covering: create invitation, get by token, mark viewed, signup, list invitations, list staff, resend, cancel, and remove staff endpoints.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_invitation_endpoints.py",
+    "/app/test_reports/pytest/pytest_invitation_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "make_aware() helper function correctly handles timezone-naive datetime comparison - good fix for the datetime bug",
+    "Password hashing uses SHA256 - should use bcrypt in production (noted in code comment)",
+    "Auth token generation is basic - should use JWT in production (noted in code comment)",
+    "All endpoints properly validate ObjectId format and return appropriate error codes"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_invitation_endpoints.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 26/26 tests passed",
+    "frontend": "N/A - Backend only testing requested (React Native Expo app)"
+  },
+  "test_credentials": {
+    "player_id": "698aa79d59d2bf64a89327fb",
+    "test_email": "romain@test.com"
+  },
+  "seed_data_creation": "Created multiple TEST_staff_ prefixed invitations and staff members for testing. Test data includes invitations with various statuses (pending, accepted, cancelled) and staff members with different roles.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Staff invitation system fully tested. All 9 endpoints working: POST /api/invitations/create, GET /api/invitations/token/{token}, POST /api/invitations/token/{token}/view, POST /api/invitations/signup, GET /api/invitations/player/{player_id}, GET /api/invitations/staff/player/{player_id}, POST /api/invitations/{id}/resend, POST /api/invitations/{id}/cancel, DELETE /api/invitations/staff/{id}. Role-based permissions verified for tennis_coach and agent roles.",
+  "features_tested": {
+    "POST /api/invitations/create": {
+      "status": "PASS",
+      "details": "Creates invitation with unique 32-char token, 7-day expiry. Returns existing pending invitation if duplicate email/player combo."
+    },
+    "GET /api/invitations/token/{token}": {
+      "status": "PASS",
+      "details": "Returns invitation details. Auto-updates status to 'expired' if past expiresAt. Returns 404 for invalid token."
+    },
+    "POST /api/invitations/token/{token}/view": {
+      "status": "PASS",
+      "details": "Sets viewedAt timestamp. Returns updated=false if already viewed."
+    },
+    "POST /api/invitations/signup": {
+      "status": "PASS",
+      "details": "Creates staff member with role-based permissions. Updates invitation to 'accepted'. Returns auth token."
+    },
+    "GET /api/invitations/player/{player_id}": {
+      "status": "PASS",
+      "details": "Returns all invitations for player sorted by createdAt desc. Auto-updates expired invitations."
+    },
+    "GET /api/invitations/staff/player/{player_id}": {
+      "status": "PASS",
+      "details": "Returns active staff members (status != 'removed') sorted by joinedAt desc."
+    },
+    "POST /api/invitations/{id}/resend": {
+      "status": "PASS",
+      "details": "Resets status to 'pending', extends expiry by 7 days, increments reminderCount."
+    },
+    "POST /api/invitations/{id}/cancel": {
+      "status": "PASS",
+      "details": "Sets status to 'cancelled'. Returns 404 if already processed."
+    },
+    "DELETE /api/invitations/staff/{id}": {
+      "status": "PASS",
+      "details": "Soft delete - sets status to 'removed'. Returns 400 for invalid ObjectId."
+    }
+  },
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  },
+  "rca_of_issues": "No issues found. The datetime timezone comparison bug mentioned by main agent was already fixed with make_aware() helper function."
+}
