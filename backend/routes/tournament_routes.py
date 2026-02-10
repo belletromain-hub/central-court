@@ -106,7 +106,7 @@ async def list_user_tournaments(user_id: str, limit: int = Query(default=100, le
     # Get user's circuit preferences
     try:
         user = await db.users.find_one({"_id": ObjectId(user_id)})
-    except:
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid user ID")
     
     if not user:
