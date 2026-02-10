@@ -290,7 +290,9 @@ export default function CalendarScreenV1() {
   
   // Get registration for a specific tournament
   const getRegistration = (week: any, tournamentId: string): any => {
-    return (week.registrations || []).find((r: any) => r.tournamentId === tournamentId);
+    // New format: registration is on each tournament directly
+    const tournament = week.tournaments?.find((t: any) => t.id === tournamentId);
+    return tournament?.registration;
   };
   
   // Get status options based on current status
