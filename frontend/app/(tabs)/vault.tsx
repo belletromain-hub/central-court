@@ -113,7 +113,11 @@ export default function DocumentsScreen() {
     try {
       setIsLoading(true);
       const response = await api.get('/api/documents');
-      const docs = response.data.map((doc: any) => ({
+      
+      // Ensure response.data is an array
+      const data = Array.isArray(response.data) ? response.data : [];
+      
+      const docs = data.map((doc: any) => ({
         id: doc.id,
         name: doc.name || doc.fournisseur || 'Document',
         category: doc.category || 'other',
