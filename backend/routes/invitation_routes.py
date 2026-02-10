@@ -255,7 +255,8 @@ async def get_invitation_by_token(token: str):
     
     # Check if expired
     now = datetime.now(timezone.utc)
-    if invitation.get("expiresAt") and invitation["expiresAt"] < now:
+    expires_at = make_aware(invitation.get("expiresAt"))
+    if expires_at and expires_at < now:
         if invitation.get("status") == "pending":
             await db.invitations.update_one(
                 {"_id": invitation["_id"]},
