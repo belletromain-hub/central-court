@@ -64,6 +64,15 @@ def generate_token(length: int = 32) -> str:
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
+def make_aware(dt):
+    """Ensure datetime is timezone-aware (UTC)"""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def serialize_invitation(inv: dict) -> dict:
     """Convert MongoDB invitation to API response"""
     return {
