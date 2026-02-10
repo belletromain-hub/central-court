@@ -202,11 +202,25 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - **Resend** - Email API for transactional emails (test mode)
 - **OpenAI Vision (GPT-4o)** - Document OCR via emergentintegrations library
 
+## Recent Updates (10 Février 2026)
+
+### Bugs Corrigés
+- ✅ **Route API `/api/documents/stats`** - Corrigé le conflit avec `/{document_id}` en plaçant les routes statiques AVANT les routes dynamiques
+- ✅ **Route API `/api/documents/categories`** - Même correction appliquée
+- ✅ **Champ `residenceFiscale` manquant** - Ajouté dans l'endpoint `POST /api/users/onboarding`
+
+### Tests Passés
+- 100% - 15/15 tests backend passés (iteration_8)
+
 ## Priority Backlog
 
-### P2 - Upcoming Tasks
-- Intégrer les Apple wheel pickers dans d'autres formulaires de l'app
-- Corriger le conflit de route `/api/documents/stats` (placer avant `/{document_id}`)
+### P1 - Tâches à venir
+- Intégrer le wheel picker Apple dans l'édition des documents (dates)
+- Filtrage des documents par période côté frontend
+- Export PDF côté frontend (bouton pour télécharger)
+
+### P2 - Refactoring
+- ⚠️ **Découper vault.tsx** (~1700 lignes) en composants plus petits
 
 ### P3 - Future Tasks
 - Notifications push
@@ -224,3 +238,4 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - Application optimisée pour web, compatible mobile via Expo Go
 - Les wheel pickers utilisent un design inspiré d'iOS avec 3 options visibles
 - L'OCR utilise l'API OpenAI Vision (GPT-4o) - pas mocké, vraie intégration
+
