@@ -180,11 +180,13 @@ export default function CalendarScreenV1() {
   const calendarMarks = useMemo(() => {
     const marks: Record<string, any> = {};
     
-    // First, add tournament marks
+    // First, add tournament marks from registered tournaments
     weekTournaments.forEach(week => {
-      week.registrations.forEach(reg => {
-        const tournament = week.tournaments.find(t => t.id === reg.tournamentId);
-        if (tournament) {
+      // New format: tournaments have registration property directly
+      const registeredTournaments = week.tournaments?.filter((t: any) => t.registration) || [];
+      
+      registeredTournaments.forEach((tournament: any) => {
+        if (tournament.startDate && tournament.endDate) {
           let currentDate = new Date(tournament.startDate);
           const endDate = new Date(tournament.endDate);
           
