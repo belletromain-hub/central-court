@@ -250,7 +250,7 @@ async def register_tournament(req: RegisterTournamentRequest):
     # If participating, hide other tournaments in same week
     if req.status == "participating":
         week_tournaments = await db.tournaments.find(
-            {"weekNumber": tournament["weekNumber"], "id": {"$ne": req.tournamentId}},
+            {"week": tournament.get("week"), "id": {"$ne": req.tournamentId}},
             {"_id": 0, "id": 1}
         ).to_list(100)
         for t in week_tournaments:
