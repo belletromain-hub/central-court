@@ -319,7 +319,21 @@ export default function ProfileScreen() {
         { 
           text: 'Retirer', 
           style: 'destructive',
-          onPress: () => saveTeam(team.filter(m => m.id !== memberId))
+          onPress: async () => {
+            try {
+              // Try to delete from backend
+              await api.delete(`/api/invitations/staff/${memberId}`);
+            } catch (e) {
+              // May be a pending invitation, try to cancel it
+              try {
+                await api.post(`/api/invitations/${memberId}/cancel`);
+              } catch (e2) {
+                console.log('Could not remove from backend', e2);
+              }
+            }
+            // Update local state
+            setTeam(prev => prev.filter(m => m.id !== memberId));
+          }
         }
       ]
     );
