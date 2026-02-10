@@ -201,28 +201,27 @@ async def list_tournament_weeks(
         weeks.append(week_data)
     
     return {"weeks": weeks, "totalTournaments": len(all_tournaments)}
-            reg_by_week[wn] = []
-        reg_by_week[wn].append({"tournamentId": r["tournamentId"], "status": r["status"]})
 
-    hidden_ids = {h["tournamentId"] for h in hidden}
 
-    # Build response
-    result = []
-    for week in weeks:
-        wn = week["weekNumber"]
-        week_tournaments = tournaments_by_week.get(wn, [])
-        # Only include weeks that have tournaments for the requested circuits
-        if circuit_filter and not week_tournaments:
-            continue
-        result.append({
-            **week,
-            "tournaments": week_tournaments,
-            "registrations": reg_by_week.get(wn, []),
-            "hiddenTournamentIds": [tid for tid in hidden_ids
-                                    if any(t["id"] == tid for t in week_tournaments)],
-        })
-
-    return result
+@router.get("/stats")
+async def get_tournament_stats():
+    """Get statistics about available tournaments"""
+    pipeline = [
+        {"$group": {
+            "_id": "$circuit",
+            "count": {"$sum": 1}
+        }}
+    ]
+    
+    cursor = db.tournaments.aggregate(pipeline)
+    results = await cursor.to_list(length=10)
+    
+    by_circuit = {r["_id"]: r["count"] for r in results}
+    
+    return {
+        "total": sum(by_circuit.values()),
+        "byCircuit": by_circuit
+    }
 
 
 @router.post("/register")
