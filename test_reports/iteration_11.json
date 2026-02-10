@@ -1,0 +1,73 @@
+{
+  "summary": "Backend API testing completed for 4-point bug fix. All 18 tests passed. Validated: (1) POST /api/users/onboarding creates users with all fields including residenceFiscale, (2) GET /api/users/profile/email/{email} returns user profiles correctly, (3) PUT /api/users/profile/{user_id} updates classement, email, residenceFiscale and persists changes, (4) GET /api/tournaments returns tournaments with prizeMoney>0, (5) GET /api/tournaments/weeks returns weeks with prizeMoney in tournaments, (6) GET /api/tournaments/stats returns circuit statistics.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_bug_fixes.py",
+    "/app/test_reports/pytest/pytest_bug_fixes.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "All 4 bug fixes verified working correctly",
+    "residenceFiscale field properly handled in both onboarding and profile update",
+    "prizeMoney field present in tournament data (example: United Cup = $10,000,000 USD)",
+    "Profile update endpoint correctly validates and returns 400 for empty updates, 404 for non-existent users"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_bug_fixes.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 18/18 tests passed",
+    "frontend": "N/A - Backend only testing requested (React Native Expo app)"
+  },
+  "test_credentials": {
+    "existing_test_user": {
+      "email": "romain@test.com",
+      "id": "698aaef916877c9eb27fdeb4",
+      "prenom": "Romain",
+      "residenceFiscale": "Monaco",
+      "classement": "45"
+    }
+  },
+  "seed_data_creation": "Created test users with prefix TEST_bugfix_, TEST_getbyemail_, TEST_update_, TEST_minimal_, TEST_null_ during testing",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "4-point bug fix fully verified. Key endpoints tested: POST /api/users/onboarding (creates user with residenceFiscale), GET /api/users/profile/email/{email} (retrieves by email), PUT /api/users/profile/{user_id} (updates classement/email/residenceFiscale/prenom), GET /api/tournaments (has prizeMoney field), GET /api/tournaments/weeks (has prizeMoney in tournaments), GET /api/tournaments/stats (returns {total:228, byCircuit:{ATP:60, WTA:52, ITF:116}}). All tests use REACT_APP_BACKEND_URL=https://serve-preview.preview.emergentagent.com",
+  "features_tested": {
+    "POST /api/users/onboarding": {
+      "status": "PASS",
+      "details": "Creates user with all fields including residenceFiscale"
+    },
+    "GET /api/users/profile/email/{email}": {
+      "status": "PASS",
+      "details": "Returns correct user profile, 404 for non-existent"
+    },
+    "PUT /api/users/profile/{user_id}": {
+      "status": "PASS",
+      "details": "Updates classement, email, residenceFiscale, prenom. Returns 400 for empty update, 404 for non-existent user"
+    },
+    "GET /api/tournaments?circuits=ATP": {
+      "status": "PASS",
+      "details": "Returns tournaments with prizeMoney (e.g., United Cup: $10,000,000)"
+    },
+    "GET /api/tournaments/weeks?circuits=ATP": {
+      "status": "PASS",
+      "details": "Returns weeks data with prizeMoney in tournaments"
+    },
+    "GET /api/tournaments/stats": {
+      "status": "PASS",
+      "details": "Returns {total: 228, byCircuit: {ATP: 60, WTA: 52, ITF: 116}}"
+    }
+  },
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}
