@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../src/constants/colors';
+import api from '../../src/services/api';
 
 // Staff roles selon specs V1
 const STAFF_ROLES = [
@@ -85,16 +86,26 @@ interface TravelDay {
   days: number;
 }
 
-const PROFILE_STORAGE_KEY = '@central_court_player_profile';
+interface UserProfile {
+  id?: string;
+  prenom: string;
+  email: string;
+  classement?: string;
+  circuits?: string[];
+  residenceFiscale?: string;
+}
+
 const TEAM_STORAGE_KEY = '@central_court_team';
 const TRAVEL_STORAGE_KEY = '@central_court_travel_days';
+const USER_EMAIL_KEY = '@central_court_user_email';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
   // State
-  const [playerProfile, setPlayerProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [travelDays, setTravelDays] = useState<TravelDay[]>([
     { country: 'France', flag: '🇫🇷', days: 20 },
@@ -105,10 +116,16 @@ export default function ProfileScreen() {
   // Modals
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showTravelModal, setShowTravelModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Edit profile state
+  const [editClassement, setEditClassement] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editResidenceFiscale, setEditResidenceFiscale] = useState('');
   
   useEffect(() => {
     loadData();
@@ -116,23 +133,81 @@ export default function ProfileScreen() {
   
   const loadData = async () => {
     try {
-      const [profileData, teamData, travelData] = await Promise.all([
-        AsyncStorage.getItem(PROFILE_STORAGE_KEY),
+      setIsLoadingProfile(true);
+      
+      // Load team and travel from local storage
+      const [teamData, travelData, savedEmail] = await Promise.all([
         AsyncStorage.getItem(TEAM_STORAGE_KEY),
         AsyncStorage.getItem(TRAVEL_STORAGE_KEY),
+        AsyncStorage.getItem(USER_EMAIL_KEY),
       ]);
       
-      if (profileData) setPlayerProfile(JSON.parse(profileData));
       if (teamData) setTeam(JSON.parse(teamData));
       if (travelData) setTravelDays(JSON.parse(travelData));
+      
+      // Try to load profile from backend
+      if (savedEmail) {
+        try {
+          const response = await api.get(`/api/users/profile/email/${encodeURIComponent(savedEmail)}`);
+          if (response.data) {
+            setUserProfile(response.data);
+          }
+        } catch (e) {
+          console.log('Profile not found in backend');
+        }
+      }
     } catch (error) {
       console.error('Error loading data:', error);
+    } finally {
+      setIsLoadingProfile(false);
     }
   };
   
   const saveTeam = async (newTeam: TeamMember[]) => {
     setTeam(newTeam);
     await AsyncStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(newTeam));
+  };
+  
+  const openEditProfile = () => {
+    setEditClassement(userProfile?.classement || '');
+    setEditEmail(userProfile?.email || '');
+    setEditResidenceFiscale(userProfile?.residenceFiscale || '');
+    setShowEditProfileModal(true);
+  };
+  
+  const saveProfile = async () => {
+    if (!editEmail) {
+      Alert.alert('Erreur', 'L\'email est requis');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Update profile in backend
+      const response = await api.post('/api/users/onboarding', {
+        prenom: userProfile?.prenom || '',
+        email: editEmail,
+        classement: editClassement,
+        residenceFiscale: editResidenceFiscale,
+        circuits: userProfile?.circuits || [],
+        onboardingCompleted: true,
+      });
+      
+      if (response.data) {
+        setUserProfile(response.data);
+        // Save email for future loads
+        await AsyncStorage.setItem(USER_EMAIL_KEY, editEmail);
+      }
+      
+      setShowEditProfileModal(false);
+      Alert.alert('Succès', 'Votre profil a été mis à jour');
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder le profil');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleInvite = async () => {
@@ -143,7 +218,6 @@ export default function ProfileScreen() {
     
     setIsLoading(true);
     
-    // Simulate invitation creation
     const newMember: TeamMember = {
       id: `member-${Date.now()}`,
       name: inviteName,
@@ -154,7 +228,6 @@ export default function ProfileScreen() {
     
     await saveTeam([...team, newMember]);
     
-    // Share invitation link
     const inviteUrl = `centralcourt://invite?role=${selectedRole}`;
     const roleInfo = STAFF_ROLES.find(r => r.id === selectedRole);
     
@@ -164,8 +237,8 @@ export default function ProfileScreen() {
         Alert.alert('Invitation créée', `${inviteName} a été ajouté(e) comme ${roleInfo?.label}`);
       } else {
         await Share.share({
-          message: `${playerProfile?.firstName || 'Un joueur'} vous invite à rejoindre son équipe sur Tennis Assistant en tant que ${roleInfo?.label}!\n\nTéléchargez l'app et utilisez ce lien: ${inviteUrl}`,
-          title: 'Invitation Tennis Assistant'
+          message: `${userProfile?.prenom || 'Un joueur'} vous invite à rejoindre son équipe sur Le Court Central en tant que ${roleInfo?.label}!\n\nTéléchargez l'app et utilisez ce lien: ${inviteUrl}`,
+          title: 'Invitation Le Court Central'
         });
       }
     } catch (error) {
@@ -200,17 +273,14 @@ export default function ProfileScreen() {
   
   const totalTravelDays = travelDays.reduce((sum, t) => sum + t.days, 0);
   
-  // Display name
-  const displayName = playerProfile?.firstName && playerProfile?.lastName
-    ? `${playerProfile.firstName} ${playerProfile.lastName}`
-    : 'Joueur Tennis';
-  
-  const displayEmail = playerProfile?.email || 'Configurer le profil';
-  const displayCircuit = playerProfile?.circuit || 'ATP';
+  // Display values
+  const displayName = userProfile?.prenom || 'Configurer le profil';
+  const displayClassement = userProfile?.classement || '--';
+  const displayCircuit = userProfile?.circuits?.[0] || 'ATP';
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with name and ranking */}
       <LinearGradient
         colors={['#1e3c72', '#2a5298']}
         style={[styles.header, { paddingTop: insets.top + 16 }]}
@@ -226,17 +296,19 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.playerName}>{displayName}</Text>
-            <Text style={styles.playerEmail}>{displayEmail}</Text>
-            {playerProfile?.currentRanking && (
-              <View style={styles.rankingTag}>
-                <Ionicons name="trophy" size={14} color="#FFD700" />
-                <Text style={styles.rankingText}>Classement: #{playerProfile.currentRanking}</Text>
-              </View>
+            {/* Classement prominent display */}
+            <View style={styles.rankingContainer}>
+              <Ionicons name="trophy" size={18} color="#FFD700" />
+              <Text style={styles.rankingNumber}>#{displayClassement}</Text>
+            </View>
+            {userProfile?.residenceFiscale && (
+              <Text style={styles.residenceText}>📍 {userProfile.residenceFiscale}</Text>
             )}
           </View>
           <TouchableOpacity 
             style={styles.editBtn}
-            onPress={() => router.push('/onboarding')}
+            onPress={openEditProfile}
+            testID="btn-edit-profile"
           >
             <Ionicons name="create-outline" size={20} color="#fff" />
           </TouchableOpacity>
@@ -251,6 +323,7 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={styles.addBtn}
               onPress={() => setShowInviteModal(true)}
+              testID="btn-invite-team"
             >
               <Ionicons name="person-add" size={18} color="#fff" />
               <Text style={styles.addBtnText}>Inviter</Text>
@@ -301,7 +374,7 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Travel Days (Jours de voyage) */}
+        {/* Travel Days */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>✈️ Jours de voyage</Text>
@@ -336,11 +409,12 @@ export default function ProfileScreen() {
           <View style={styles.menuCard}>
             <TouchableOpacity 
               style={[styles.menuItem, styles.menuItemBorder]}
-              onPress={() => router.push('/onboarding')}
+              onPress={openEditProfile}
+              testID="menu-edit-profile"
             >
               <View style={styles.menuItemLeft}>
                 <Ionicons name="person-outline" size={22} color={Colors.text.secondary} />
-                <Text style={styles.menuItemLabel}>Modifier mon profil</Text>
+                <Text style={styles.menuItemLabel}>Mettre à jour mon profil</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
             </TouchableOpacity>
@@ -348,6 +422,13 @@ export default function ProfileScreen() {
               <View style={styles.menuItemLeft}>
                 <Ionicons name="notifications-outline" size={22} color={Colors.text.secondary} />
                 <Text style={styles.menuItemLabel}>Notifications</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="shield-outline" size={22} color={Colors.text.secondary} />
+                <Text style={styles.menuItemLabel}>Confidentialité</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
             </TouchableOpacity>
@@ -360,93 +441,177 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={styles.appName}>🎾 Tennis Assistant</Text>
-          <Text style={styles.appVersion}>Version 1.0.0 - MVP</Text>
-        </View>
-
+        
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Invite Modal */}
+      {/* Edit Profile Modal */}
+      <Modal visible={showEditProfileModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.editProfileModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Mettre à jour mon profil</Text>
+              <TouchableOpacity 
+                onPress={() => setShowEditProfileModal(false)}
+                testID="close-edit-profile"
+              >
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.editForm} showsVerticalScrollIndicator={false}>
+              {/* Classement */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  <Ionicons name="trophy" size={16} color="#FFD700" /> Classement
+                </Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={editClassement}
+                  onChangeText={setEditClassement}
+                  placeholder="Ex: 45"
+                  placeholderTextColor={Colors.text.muted}
+                  keyboardType="number-pad"
+                  testID="input-classement"
+                />
+                <Text style={styles.formHint}>Votre classement ATP/WTA actuel</Text>
+              </View>
+              
+              {/* Email */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  <Ionicons name="mail" size={16} color={Colors.primary} /> Adresse email
+                </Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={editEmail}
+                  onChangeText={setEditEmail}
+                  placeholder="votre@email.com"
+                  placeholderTextColor={Colors.text.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  testID="input-email"
+                />
+              </View>
+              
+              {/* Résidence fiscale */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  <Ionicons name="location" size={16} color="#4CAF50" /> Résidence fiscale désirée
+                </Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={editResidenceFiscale}
+                  onChangeText={setEditResidenceFiscale}
+                  placeholder="Ex: Monaco, Suisse, Dubaï..."
+                  placeholderTextColor={Colors.text.muted}
+                  testID="input-residence"
+                />
+                <Text style={styles.formHint}>Pays où vous souhaitez établir votre résidence fiscale</Text>
+              </View>
+              
+              {/* Save Button */}
+              <TouchableOpacity 
+                style={styles.saveButton}
+                onPress={saveProfile}
+                disabled={isLoading}
+                testID="btn-save-profile"
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    <Text style={styles.saveButtonText}>Enregistrer</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Invite Team Modal */}
       <Modal visible={showInviteModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.inviteModal}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Inviter un membre</Text>
               <TouchableOpacity onPress={() => setShowInviteModal(false)}>
                 <Ionicons name="close" size={24} color={Colors.text.primary} />
               </TouchableOpacity>
             </View>
-
-            <Text style={styles.modalSubtitle}>Choisissez le rôle</Text>
-
-            <ScrollView style={styles.rolesScroll} showsVerticalScrollIndicator={false}>
-              {STAFF_ROLES.map(role => (
-                <TouchableOpacity
-                  key={role.id}
-                  style={[
-                    styles.roleOption,
-                    selectedRole === role.id && { borderColor: role.color, backgroundColor: role.color + '10' }
-                  ]}
-                  onPress={() => setSelectedRole(role.id)}
-                >
-                  <View style={[styles.roleIcon, { backgroundColor: role.color + '20' }]}>
+            
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Role Selection */}
+              <Text style={styles.formLabel}>Choisir un rôle</Text>
+              <View style={styles.roleGrid}>
+                {STAFF_ROLES.map(role => (
+                  <TouchableOpacity
+                    key={role.id}
+                    style={[
+                      styles.roleCard,
+                      selectedRole === role.id && { 
+                        backgroundColor: role.color + '15',
+                        borderColor: role.color 
+                      }
+                    ]}
+                    onPress={() => setSelectedRole(role.id)}
+                  >
                     <Text style={styles.roleEmoji}>{role.emoji}</Text>
-                  </View>
-                  <View style={styles.roleInfo}>
-                    <Text style={styles.roleLabel}>{role.label}</Text>
-                  </View>
-                  {selectedRole === role.id && (
-                    <Ionicons name="checkmark-circle" size={22} color={role.color} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {selectedRole && (
-              <View style={styles.inviteForm}>
-                <Text style={styles.inputLabel}>Nom *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={inviteName}
-                  onChangeText={setInviteName}
-                  placeholder="Patrick Mouratoglou"
-                  placeholderTextColor={Colors.text.muted}
-                />
-                
-                <Text style={styles.inputLabel}>Email *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={inviteEmail}
-                  onChangeText={setInviteEmail}
-                  placeholder="coach@email.com"
-                  placeholderTextColor={Colors.text.muted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
+                    <Text style={[
+                      styles.roleLabel,
+                      selectedRole === role.id && { color: role.color }
+                    ]}>
+                      {role.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
-
-            <TouchableOpacity
-              style={[
-                styles.inviteBtn,
-                (!selectedRole || !inviteEmail || !inviteName) && styles.inviteBtnDisabled
-              ]}
-              onPress={handleInvite}
-              disabled={!selectedRole || !inviteEmail || !inviteName || isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
+              
+              {selectedRole && (
                 <>
-                  <Ionicons name="paper-plane" size={20} color="#fff" />
-                  <Text style={styles.inviteBtnText}>Envoyer l'invitation</Text>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Nom</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={inviteName}
+                      onChangeText={setInviteName}
+                      placeholder="Prénom Nom"
+                      placeholderTextColor={Colors.text.muted}
+                    />
+                  </View>
+                  
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Email</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={inviteEmail}
+                      onChangeText={setInviteEmail}
+                      placeholder="email@example.com"
+                      placeholderTextColor={Colors.text.muted}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.inviteButton}
+                    onPress={handleInvite}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="send" size={18} color="#fff" />
+                        <Text style={styles.inviteButtonText}>Envoyer l'invitation</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </>
               )}
-            </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -454,35 +619,28 @@ export default function ProfileScreen() {
       {/* Travel Days Modal */}
       <Modal visible={showTravelModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.travelModal}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Jours de voyage 2026</Text>
               <TouchableOpacity onPress={() => setShowTravelModal(false)}>
                 <Ionicons name="close" size={24} color={Colors.text.primary} />
               </TouchableOpacity>
             </View>
-
+            
             <View style={styles.travelModalSummary}>
               <Text style={styles.travelModalTotal}>{totalTravelDays}</Text>
               <Text style={styles.travelModalLabel}>jours au total</Text>
             </View>
-
-            <ScrollView style={styles.travelList}>
+            
+            <ScrollView showsVerticalScrollIndicator={false}>
               {travelDays.map(travel => (
-                <View key={travel.country} style={styles.travelListItem}>
-                  <Text style={styles.travelListFlag}>{travel.flag}</Text>
-                  <Text style={styles.travelListCountry}>{travel.country}</Text>
-                  <Text style={styles.travelListDays}>{travel.days} jours</Text>
+                <View key={travel.country} style={styles.travelModalItem}>
+                  <Text style={styles.travelModalFlag}>{travel.flag}</Text>
+                  <Text style={styles.travelModalCountry}>{travel.country}</Text>
+                  <Text style={styles.travelModalDays}>{travel.days} jours</Text>
                 </View>
               ))}
             </ScrollView>
-
-            <View style={styles.travelNote}>
-              <Ionicons name="information-circle" size={18} color={Colors.text.secondary} />
-              <Text style={styles.travelNoteText}>
-                Comptage manuel pour V1. La géolocalisation automatique sera disponible prochainement.
-              </Text>
-            </View>
           </View>
         </View>
       </Modal>
@@ -493,7 +651,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: '#f5f5f5',
   },
   header: {
     paddingHorizontal: 20,
@@ -513,60 +671,60 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.3)',
   },
   circuitBadge: {
     position: 'absolute',
     bottom: -4,
     right: -4,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FFD700',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#fff',
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   circuitBadgeText: {
-    color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
+    color: '#1a1a1a',
   },
   profileInfo: {
-    marginLeft: 14,
     flex: 1,
+    marginLeft: 16,
   },
   playerName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#fff',
   },
-  playerEmail: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 2,
-  },
-  rankingTag: {
+  rankingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     marginTop: 6,
+    gap: 6,
   },
-  rankingText: {
-    fontSize: 12,
+  rankingNumber: {
+    fontSize: 20,
+    fontWeight: '700',
     color: '#FFD700',
-    fontWeight: '600',
+  },
+  residenceText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
   },
   editBtn: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
-    marginTop: -8,
+    padding: 16,
   },
   section: {
-    marginTop: 20,
-    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -575,27 +733,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: Colors.text.primary,
   },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: Colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 16,
   },
   addBtnText: {
-    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
+    color: '#fff',
   },
   viewAllBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 2,
   },
   viewAllText: {
     fontSize: 13,
@@ -603,25 +762,27 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   emptyCard: {
-    alignItems: 'center',
-    padding: 32,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.text.primary,
     marginTop: 12,
   },
   emptySubtitle: {
-    fontSize: 13,
-    color: Colors.text.secondary,
+    fontSize: 14,
+    color: Colors.text.muted,
     marginTop: 4,
+    textAlign: 'center',
   },
   teamCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   teamMember: {
     flexDirection: 'row',
@@ -630,7 +791,7 @@ const styles = StyleSheet.create({
   },
   teamMemberBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: '#f0f0f0',
   },
   memberAvatar: {
     width: 44,
@@ -652,30 +813,30 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   memberRole: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    marginTop: 2,
   },
   memberAction: {
     padding: 8,
   },
   teamNote: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.text.muted,
     textAlign: 'center',
     marginTop: 8,
   },
   travelCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },
   travelSummary: {
     alignItems: 'center',
-    paddingRight: 20,
+    paddingRight: 16,
     borderRightWidth: 1,
-    borderRightColor: Colors.border.light,
+    borderRightColor: '#f0f0f0',
   },
   travelTotal: {
     fontSize: 32,
@@ -684,7 +845,7 @@ const styles = StyleSheet.create({
   },
   travelLabel: {
     fontSize: 12,
-    color: Colors.text.secondary,
+    color: Colors.text.muted,
   },
   travelCountries: {
     flex: 1,
@@ -699,14 +860,15 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   travelDays: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: Colors.text.secondary,
-    marginTop: 2,
+    marginTop: 4,
   },
   menuCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
     marginTop: 8,
   },
   menuItem: {
@@ -717,7 +879,7 @@ const styles = StyleSheet.create({
   },
   menuItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: '#f0f0f0',
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -728,105 +890,56 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.text.primary,
   },
-  appInfo: {
-    alignItems: 'center',
-    marginTop: 32,
-    paddingVertical: 16,
-  },
-  appName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  appVersion: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-    marginTop: 2,
-  },
   // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '85%',
-  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: Colors.text.primary,
   },
-  modalSubtitle: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-    marginBottom: 16,
+  // Edit Profile Modal
+  editProfileModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
   },
-  rolesScroll: {
-    maxHeight: 250,
-  },
-  roleOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.background.secondary,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  roleIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  roleEmoji: {
-    fontSize: 20,
-  },
-  roleInfo: {
+  editForm: {
     flex: 1,
-    marginLeft: 12,
   },
-  roleLabel: {
-    fontSize: 15,
+  formGroup: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 14,
     fontWeight: '600',
     color: Colors.text.primary,
+    marginBottom: 8,
   },
-  inviteForm: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.light,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-    marginBottom: 6,
-    marginTop: 10,
-  },
-  input: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 10,
+  formInput: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
     padding: 14,
-    fontSize: 15,
+    fontSize: 16,
     color: Colors.text.primary,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
   },
-  inviteBtn: {
+  formHint: {
+    fontSize: 12,
+    color: Colors.text.muted,
+    marginTop: 4,
+  },
+  saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -834,23 +947,77 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
-    marginTop: 20,
-    marginBottom: Platform.OS === 'ios' ? 20 : 0,
+    marginTop: 8,
+    marginBottom: 20,
   },
-  inviteBtnDisabled: {
-    opacity: 0.5,
-  },
-  inviteBtnText: {
-    color: '#fff',
+  saveButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#fff',
   },
-  // Travel modal
+  // Invite Modal
+  inviteModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '85%',
+  },
+  roleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 20,
+  },
+  roleCard: {
+    width: '31%',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  roleEmoji: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  roleLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+    textAlign: 'center',
+  },
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  inviteButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  // Travel Modal
+  travelModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '70%',
+  },
   travelModalSummary: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 16,
+    marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: '#f0f0f0',
   },
   travelModalTotal: {
     fontSize: 48,
@@ -859,48 +1026,28 @@ const styles = StyleSheet.create({
   },
   travelModalLabel: {
     fontSize: 14,
-    color: Colors.text.secondary,
+    color: Colors.text.muted,
   },
-  travelList: {
-    maxHeight: 300,
-    marginTop: 16,
-  },
-  travelListItem: {
+  travelModalItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
+    borderBottomColor: '#f0f0f0',
   },
-  travelListFlag: {
+  travelModalFlag: {
     fontSize: 28,
     marginRight: 12,
   },
-  travelListCountry: {
+  travelModalCountry: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '500',
     color: Colors.text.primary,
   },
-  travelListDays: {
-    fontSize: 14,
+  travelModalDays: {
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.primary,
-  },
-  travelNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: Colors.background.secondary,
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 16,
-    marginBottom: Platform.OS === 'ios' ? 20 : 0,
-  },
-  travelNoteText: {
-    flex: 1,
-    fontSize: 12,
-    color: Colors.text.secondary,
-    lineHeight: 16,
   },
 });
