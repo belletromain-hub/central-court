@@ -3,7 +3,17 @@
  * Centralizes all backend calls.
  */
 
+import axios from 'axios';
+
 const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+
+// Axios instance for use with api.get(), api.put(), etc.
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+export default api;
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

@@ -81,6 +81,7 @@ export default function Step7Password() {
         circuits: userData.circuits || [],
         niveaux: userData.niveaux || userData.niveauxTournois || [],
         classement: userData.classement || null,
+        residenceFiscale: userData.residenceFiscale || null,
         onboardingCompleted: true,
         onboardingStep: 7,
       });
