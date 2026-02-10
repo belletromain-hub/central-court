@@ -204,13 +204,30 @@ Construire une application professionnelle de tennis pour les joueurs profession
 
 ## Recent Updates (10 Février 2026)
 
+### Session Actuelle - Système d'Invitation Staff
+- ✅ **Backend complet pour les invitations** - 9 endpoints implémentés et testés
+  - `POST /api/invitations/create` - Créer une invitation
+  - `GET /api/invitations/token/{token}` - Récupérer une invitation par token
+  - `POST /api/invitations/token/{token}/view` - Marquer comme vue
+  - `POST /api/invitations/signup` - Inscription du membre staff via invitation
+  - `GET /api/invitations/player/{player_id}` - Liste des invitations d'un joueur
+  - `GET /api/invitations/staff/player/{player_id}` - Liste du staff actif
+  - `POST /api/invitations/{id}/resend` - Renvoyer une invitation expirée
+  - `POST /api/invitations/{id}/cancel` - Annuler une invitation
+  - `DELETE /api/invitations/staff/{id}` - Retirer un membre du staff
+- ✅ **Page d'inscription staff** (`/app/frontend/app/join/[token].tsx`)
+- ✅ **Frontend profile.tsx** mis à jour pour utiliser le backend
+- ✅ **Configuration Expo** mise à jour (plugins image-picker, document-picker)
+
 ### Bugs Corrigés
-- ✅ **Route API `/api/documents/stats`** - Corrigé le conflit avec `/{document_id}` en plaçant les routes statiques AVANT les routes dynamiques
-- ✅ **Route API `/api/documents/categories`** - Même correction appliquée
-- ✅ **Champ `residenceFiscale` manquant** - Ajouté dans l'endpoint `POST /api/users/onboarding`
+- ✅ **Route API `/api/documents/stats`** - Corrigé le conflit de route
+- ✅ **Route API `/api/documents/categories`** - Même correction
+- ✅ **Champ `residenceFiscale` manquant** - Ajouté dans onboarding
+- ✅ **Bug datetime timezone** - Ajouté `make_aware()` pour les comparaisons
 
 ### Tests Passés
-- 100% - 15/15 tests backend passés (iteration_8)
+- 100% - 15/15 tests backend (iteration_8) - Documents & User API
+- 100% - 26/26 tests backend (iteration_9) - Système d'invitation Staff
 
 ## Priority Backlog
 
