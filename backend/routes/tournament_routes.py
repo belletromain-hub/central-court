@@ -22,62 +22,185 @@ class HideTournamentRequest(BaseModel):
     tournamentId: str
 
 
+def serialize_tournament(t: dict) -> dict:
+    """Serialize tournament for API response"""
+    return {
+        "id": t.get("id"),
+        "name": t.get("name"),
+        "shortName": t.get("shortName"),
+        "circuit": t.get("circuit"),
+        "category": t.get("category"),
+        "surface": t.get("surface"),
+        "startDate": t.get("startDate").isoformat() if t.get("startDate") else None,
+        "endDate": t.get("endDate").isoformat() if t.get("endDate") else None,
+        "week": t.get("week", 0),
+        "city": t.get("city"),
+        "country": t.get("country"),
+        "venue": t.get("venue"),
+        "indoor": t.get("indoor", False),
+        "prizeMoney": t.get("prizeMoney", 0),
+        "currency": t.get("currency", "USD"),
+        "points": t.get("points", 0),
+        "drawSingles": t.get("drawSingles", 0),
+        "drawDoubles": t.get("drawDoubles", 0),
+        "year": t.get("year", 2026),
+        "tournamentUrl": t.get("tournamentUrl"),
+        "signUpLink": t.get("signUpLink"),
+    }
+
+
 @router.get("")
-async def list_tournaments(circuit: Optional[str] = None):
-    """List all tournaments, optionally filtered by circuit (atp, wta, itf, itf_wheelchair)"""
+async def list_tournaments(
+    circuits: Optional[str] = Query(None, description="Comma-separated circuit filter: ATP,WTA,ITF"),
+    category: Optional[str] = None,
+    week: Optional[int] = None,
+    surface: Optional[str] = None,
+    country: Optional[str] = None,
+    limit: int = Query(default=100, le=500),
+    skip: int = Query(default=0, ge=0)
+):
+    """List all tournaments with filters.
+    
+    Filter by:
+    - circuits: Comma-separated list (ATP, WTA, ITF)
+    - category: Tournament category (ATP 250, WTA 500, Grand Slam, etc.)
+    - week: Week number (1-52)
+    - surface: Hard, Clay, Grass, Carpet
+    - country: Country name
+    """
     query = {}
-    if circuit:
-        query["circuit"] = circuit
-    tournaments = await db.tournaments.find(query, {"_id": 0}).sort("startDate", 1).to_list(500)
-    return tournaments
+    
+    # Circuit filter
+    if circuits:
+        circuit_list = [c.strip().upper() for c in circuits.split(",") if c.strip()]
+        if circuit_list:
+            query["circuit"] = {"$in": circuit_list}
+    
+    # Category filter
+    if category:
+        query["category"] = {"$regex": category, "$options": "i"}
+    
+    # Week filter
+    if week:
+        query["week"] = week
+    
+    # Surface filter
+    if surface:
+        query["surface"] = {"$regex": surface, "$options": "i"}
+    
+    # Country filter
+    if country:
+        query["country"] = {"$regex": country, "$options": "i"}
+    
+    cursor = db.tournaments.find(query, {"_id": 0}).sort("startDate", 1).skip(skip).limit(limit)
+    tournaments = await cursor.to_list(length=limit)
+    
+    return [serialize_tournament(t) for t in tournaments]
+
+
+@router.get("/user/{user_id}")
+async def list_user_tournaments(user_id: str, limit: int = Query(default=100, le=500)):
+    """Get tournaments based on user's circuit preferences from onboarding"""
+    from bson import ObjectId
+    
+    # Get user's circuit preferences
+    try:
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user_circuits = user.get("circuits", [])
+    
+    if not user_circuits:
+        # Return all tournaments if no preference set
+        cursor = db.tournaments.find({}, {"_id": 0}).sort("startDate", 1).limit(limit)
+        tournaments = await cursor.to_list(length=limit)
+        return [serialize_tournament(t) for t in tournaments]
+    
+    # Map user circuit choices to database circuit values
+    circuit_mapping = {
+        "ATP": ["ATP"],
+        "WTA": ["WTA"],
+        "ITF": ["ITF"],
+        "Grand Slam": ["ATP", "WTA"],  # Grand Slams are in both circuits
+    }
+    
+    db_circuits = set()
+    for uc in user_circuits:
+        mapped = circuit_mapping.get(uc, [uc])
+        db_circuits.update(mapped)
+    
+    query = {"circuit": {"$in": list(db_circuits)}}
+    cursor = db.tournaments.find(query, {"_id": 0}).sort("startDate", 1).limit(limit)
+    tournaments = await cursor.to_list(length=limit)
+    
+    return [serialize_tournament(t) for t in tournaments]
 
 
 @router.get("/weeks")
 async def list_tournament_weeks(
-    circuits: Optional[str] = Query(None, description="Comma-separated circuit filter: atp,wta,itf,itf_wheelchair")
+    circuits: Optional[str] = Query(None, description="Comma-separated circuit filter: ATP,WTA,ITF")
 ):
     """Get tournaments grouped by week with registrations and hidden status.
     Filter by circuits (comma-separated) to show only relevant tournaments."""
     # Parse circuit filter
     circuit_filter = None
     if circuits:
-        circuit_filter = [c.strip().lower() for c in circuits.split(",") if c.strip()]
+        circuit_filter = [c.strip().upper() for c in circuits.split(",") if c.strip()]
 
-    # Get all weeks
-    weeks = await db.tournament_weeks.find({}, {"_id": 0}).sort("weekNumber", 1).to_list(100)
-
-    # Get all tournaments
+    # Get all tournaments matching filter
     t_query = {}
     if circuit_filter:
         t_query["circuit"] = {"$in": circuit_filter}
-    all_tournaments = await db.tournaments.find(t_query, {"_id": 0}).to_list(500)
+    
+    cursor = db.tournaments.find(t_query, {"_id": 0}).sort("startDate", 1)
+    all_tournaments = await cursor.to_list(length=500)
 
     # Group tournaments by week
     tournaments_by_week = {}
     for t in all_tournaments:
-        wn = t.get("weekNumber")
+        wn = t.get("week", 0)
         if wn not in tournaments_by_week:
             tournaments_by_week[wn] = []
-        tournaments_by_week[wn].append(t)
+        tournaments_by_week[wn].append(serialize_tournament(t))
 
     # Get registrations and hidden for current user (demo: no auth yet)
     registrations = await db.tournament_registrations.find({}, {"_id": 0}).to_list(500)
     hidden = await db.tournament_hidden.find({}, {"_id": 0}).to_list(500)
 
-    reg_by_week = {}
-    for r in registrations:
-        # Find tournament to get its week
-        t = next((t for t in all_tournaments if t["id"] == r["tournamentId"]), None)
-        if not t:
-            # Tournament might be in another circuit, check all
-            t_full = await db.tournaments.find_one({"id": r["tournamentId"]}, {"_id": 0})
-            if t_full:
-                wn = t_full.get("weekNumber")
-            else:
-                continue
-        else:
-            wn = t.get("weekNumber")
-        if wn not in reg_by_week:
+    # Build registration map by tournament ID
+    reg_by_tournament = {r["tournamentId"]: r for r in registrations}
+    hidden_ids = set(h["tournamentId"] for h in hidden)
+    
+    # Build week data
+    weeks = []
+    for week_num in sorted(tournaments_by_week.keys()):
+        week_tournaments = tournaments_by_week[week_num]
+        
+        # Get first tournament's date for week label
+        first_t = week_tournaments[0] if week_tournaments else None
+        
+        week_data = {
+            "weekNumber": week_num,
+            "startDate": first_t.get("startDate") if first_t else None,
+            "tournaments": []
+        }
+        
+        for t in week_tournaments:
+            t_id = t.get("id")
+            t_data = {
+                **t,
+                "registration": reg_by_tournament.get(t_id),
+                "hidden": t_id in hidden_ids,
+            }
+            week_data["tournaments"].append(t_data)
+        
+        weeks.append(week_data)
+    
+    return {"weeks": weeks, "totalTournaments": len(all_tournaments)}
             reg_by_week[wn] = []
         reg_by_week[wn].append({"tournamentId": r["tournamentId"], "status": r["status"]})
 
