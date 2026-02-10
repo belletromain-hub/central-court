@@ -82,6 +82,7 @@ class UserProfile(BaseModel):
     circuits: Optional[List[str]] = []
     niveaux: Optional[List[str]] = []
     classement: Optional[str] = None
+    residenceFiscale: Optional[str] = None
     travelPreferences: Optional[TravelPreferences] = None
     hotelPreferences: Optional[HotelPreferences] = None
     foodPreferences: Optional[FoodPreferences] = None
@@ -103,6 +104,7 @@ def serialize_user(user: dict) -> dict:
         "circuits": user.get("circuits", []),
         "niveaux": user.get("niveaux", []),
         "classement": user.get("classement"),
+        "residenceFiscale": user.get("residenceFiscale"),
         "travelPreferences": user.get("travelPreferences"),
         "hotelPreferences": user.get("hotelPreferences"),
         "foodPreferences": user.get("foodPreferences"),
