@@ -204,30 +204,33 @@ Construire une application professionnelle de tennis pour les joueurs profession
 
 ## Recent Updates (10 Février 2026)
 
-### Session Actuelle - Système d'Invitation Staff
+### Session Actuelle - Import des Tournois + Système d'Invitation Staff
+
+#### Import des Tournois (NOUVEAU)
+- ✅ **228 tournois importés** dans MongoDB depuis 3 sources de données :
+  - ATP: 60 tournois (JSON)
+  - WTA: 52 tournois (JSON)
+  - ITF Wheelchair: 116 tournois (CSV)
+- ✅ **Endpoints créés** :
+  - `GET /api/tournaments/stats` - Statistiques par circuit
+  - `GET /api/tournaments?circuits=ATP,WTA,ITF` - Liste filtrée par circuits
+  - `GET /api/tournaments/user/{user_id}` - Tournois selon préférences onboarding
+  - `GET /api/tournaments/weeks?circuits=X` - Groupés par semaine
+  - `POST /api/tournaments/register` - Inscription (5 statuts)
+  - `POST /api/tournaments/hide` - Masquer un tournoi
+- ✅ **Frontend mis à jour** pour charger les circuits depuis l'onboarding
+- ✅ **46/46 tests passés** (iteration_10)
+
+#### Système d'Invitation Staff
 - ✅ **Backend complet pour les invitations** - 9 endpoints implémentés et testés
-  - `POST /api/invitations/create` - Créer une invitation
-  - `GET /api/invitations/token/{token}` - Récupérer une invitation par token
-  - `POST /api/invitations/token/{token}/view` - Marquer comme vue
-  - `POST /api/invitations/signup` - Inscription du membre staff via invitation
-  - `GET /api/invitations/player/{player_id}` - Liste des invitations d'un joueur
-  - `GET /api/invitations/staff/player/{player_id}` - Liste du staff actif
-  - `POST /api/invitations/{id}/resend` - Renvoyer une invitation expirée
-  - `POST /api/invitations/{id}/cancel` - Annuler une invitation
-  - `DELETE /api/invitations/staff/{id}` - Retirer un membre du staff
 - ✅ **Page d'inscription staff** (`/app/frontend/app/join/[token].tsx`)
-- ✅ **Frontend profile.tsx** mis à jour pour utiliser le backend
-- ✅ **Configuration Expo** mise à jour (plugins image-picker, document-picker)
+- ✅ **26/26 tests passés** (iteration_9)
 
 ### Bugs Corrigés
 - ✅ **Route API `/api/documents/stats`** - Corrigé le conflit de route
-- ✅ **Route API `/api/documents/categories`** - Même correction
 - ✅ **Champ `residenceFiscale` manquant** - Ajouté dans onboarding
 - ✅ **Bug datetime timezone** - Ajouté `make_aware()` pour les comparaisons
-
-### Tests Passés
-- 100% - 15/15 tests backend (iteration_8) - Documents & User API
-- 100% - 26/26 tests backend (iteration_9) - Système d'invitation Staff
+- ✅ **Bug `weekNumber` dans /register** - Corrigé en `week`
 
 ## Priority Backlog
 
