@@ -74,12 +74,12 @@ export default function Step7Password() {
       console.log('Saving user to backend:', userData);
       
       // Send to backend API - this is the SINGLE SOURCE OF TRUTH
-      const response = await api.post('/api/users/onboarding', {
+      const response = await axios.post(`${API_URL}/api/users/onboarding`, {
         prenom: userData.prenom || '',
         email: userData.email || '',
         dateNaissance: userData.dateNaissance || null,
         circuits: userData.circuits || [],
-        niveaux: userData.niveaux || [],
+        niveaux: userData.niveaux || userData.niveauxTournois || [],
         classement: userData.classement || null,
         onboardingCompleted: true,
         onboardingStep: 7,
@@ -104,7 +104,6 @@ export default function Step7Password() {
       setTimeout(async () => {
         // Mark as completed in local storage
         await AsyncStorage.setItem('onboarding_completed', 'true');
-        // Keep onboarding data for circuits display (don't clear completely)
         // Navigate to main app
         router.replace('/(tabs)');
       }, 2000);
