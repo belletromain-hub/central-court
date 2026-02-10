@@ -12,3 +12,4 @@ export { default as WheelPicker } from './WheelPicker';
 export { default as AppleTimePicker } from './AppleTimePicker';
 export { default as AppleDatePicker } from './AppleDatePicker';
 export { default as AppleOptionPicker } from './AppleOptionPicker';
+export { default as AppleDatePickerFR } from './AppleDatePickerFR';
