@@ -531,12 +531,13 @@ export default function CalendarScreenV1() {
     const week = getWeekForDate(selectedDate);
     
     // Get all registered tournaments for this week that include this date
-    const tournamentsForDay = week ? week.registrations
-      .map(reg => week.tournaments.find(t => t.id === reg.tournamentId))
-      .filter(t => t && 
-        new Date(selectedDate) >= new Date(t.startDate) &&
-        new Date(selectedDate) <= new Date(t.endDate)
-      ) : [];
+    const tournamentsForDay = week 
+      ? (week.tournaments || [])
+          .filter((t: any) => t.registration && 
+            new Date(selectedDate) >= new Date(t.startDate) &&
+            new Date(selectedDate) <= new Date(t.endDate)
+          )
+      : [];
     
     return (
       <View style={styles.dayEventsContainer}>
