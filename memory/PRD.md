@@ -234,8 +234,8 @@ Construire une application professionnelle de tennis pour les joueurs profession
 ## Priority Backlog
 
 ### P1 - Tâches à venir
-- Intégrer le wheel picker Apple dans l'édition des documents (dates)
-- Filtrage des documents par période côté frontend
+- ✅ **DONE** - Wheel picker Apple intégré dans la modification des documents
+- ✅ **DONE** - Refactoring vault.tsx (1870 → 968 lignes = **-48%**)
 - Export PDF côté frontend (bouton pour télécharger)
 
 ### P2 - Refactoring
