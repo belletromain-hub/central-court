@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../src/constants/colors';
 import { getOnboardingStatus } from '../../src/utils/progressiveOnboarding';
 import { AppleDatePicker, AppleTimePicker, AppleOptionPicker } from '../../src/components/inputs';
@@ -43,6 +44,9 @@ import {
   Observation
 } from '../../src/data/eventsV1';
 
+const USER_EMAIL_KEY = 'user_email';
+const USER_CIRCUITS_KEY = 'user_circuits';
+
 // Configure French locale
 LocaleConfig.locales['fr'] = {
   monthNames: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
@@ -64,18 +68,46 @@ export default function CalendarScreenV1() {
   const [weekTournaments, setWeekTournaments] = useState<any[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [userCircuits, setUserCircuits] = useState<string[]>(['ATP']);
+
+  // Load user circuits from storage
+  useEffect(() => {
+    const loadUserCircuits = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(USER_CIRCUITS_KEY);
+        if (stored) {
+          setUserCircuits(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error('Failed to load user circuits:', e);
+      }
+    };
+    loadUserCircuits();
+  }, []);
 
   // Load data from API
   useEffect(() => {
     const loadData = async () => {
       try {
+        // Join user circuits for API call
+        const circuitsParam = userCircuits.join(',');
+        
         const [eventsData, weeksData, alertsData] = await Promise.all([
           fetchEvents(currentMonth),
-          fetchTournamentWeeks('atp'),
+          fetchTournamentWeeks(circuitsParam),
           fetchAlerts(true),
         ]);
         setEvents(eventsData);
-        setWeekTournaments(weeksData);
+        
+        // Handle new API response format: { weeks: [...], totalTournaments: n }
+        if (weeksData && weeksData.weeks) {
+          setWeekTournaments(weeksData.weeks);
+        } else if (Array.isArray(weeksData)) {
+          setWeekTournaments(weeksData);
+        } else {
+          setWeekTournaments([]);
+        }
+        
         setUnreadAlertCount(alertsData.length);
       } catch (e) {
         console.error('Failed to load data:', e);
@@ -84,7 +116,7 @@ export default function CalendarScreenV1() {
       }
     };
     loadData();
-  }, [currentMonth]);
+  }, [currentMonth, userCircuits]);
   
   // Modals
   const [showTournamentModal, setShowTournamentModal] = useState(false);
