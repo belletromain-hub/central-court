@@ -47,6 +47,7 @@ class OnboardingData(BaseModel):
     niveaux: Optional[List[str]] = []  # Tournament levels
     classement: Optional[str] = None
     email: str
+    residenceFiscale: Optional[str] = None  # Desired tax residence
     
     # Progressive modules
     travelPreferences: Optional[TravelPreferences] = None
@@ -65,6 +66,7 @@ class OnboardingUpdate(BaseModel):
     niveaux: Optional[List[str]] = None
     classement: Optional[str] = None
     email: Optional[str] = None
+    residenceFiscale: Optional[str] = None
     travelPreferences: Optional[TravelPreferences] = None
     hotelPreferences: Optional[HotelPreferences] = None
     foodPreferences: Optional[FoodPreferences] = None
