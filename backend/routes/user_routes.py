@@ -135,6 +135,7 @@ async def create_or_update_onboarding(data: OnboardingData):
         "circuits": data.circuits or [],
         "niveaux": data.niveaux or [],
         "classement": data.classement,
+        "residenceFiscale": data.residenceFiscale,
         "travelPreferences": data.travelPreferences.dict() if data.travelPreferences else None,
         "hotelPreferences": data.hotelPreferences.dict() if data.hotelPreferences else None,
         "foodPreferences": data.foodPreferences.dict() if data.foodPreferences else None,
