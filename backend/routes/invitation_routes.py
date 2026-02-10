@@ -377,7 +377,8 @@ async def staff_signup(request: StaffSignupRequest):
         raise HTTPException(status_code=400, detail="Invitation invalide ou déjà utilisée")
     
     # Check expiration
-    if invitation.get("expiresAt") and invitation["expiresAt"] < now:
+    expires_at = make_aware(invitation.get("expiresAt"))
+    if expires_at and expires_at < now:
         raise HTTPException(status_code=400, detail="Invitation expirée")
     
     # Check if email already registered as staff
