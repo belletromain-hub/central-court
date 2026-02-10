@@ -239,7 +239,9 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - Export PDF côté frontend (bouton pour télécharger)
 
 ### P2 - Refactoring
-- ⚠️ **Découper vault.tsx** (~1700 lignes) en composants plus petits
+- ✅ **DONE** - vault.tsx refactorisé (1870 → 968 lignes = **-48%**)
+- ✅ **DONE** - AppContext.tsx simplifié (suppression données statiques obsolètes)
+- ✅ **DONE** - Composants documents créés (DocumentCard, UploadModal, DocumentEditModal)
 
 ### P3 - Future Tasks
 - Notifications push
