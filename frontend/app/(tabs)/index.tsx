@@ -74,9 +74,16 @@ export default function CalendarScreenV1() {
   useEffect(() => {
     const loadUserCircuits = async () => {
       try {
-        const stored = await AsyncStorage.getItem(USER_CIRCUITS_KEY);
+        const stored = await AsyncStorage.getItem(ONBOARDING_DATA_KEY);
         if (stored) {
-          setUserCircuits(JSON.parse(stored));
+          const data = JSON.parse(stored);
+          if (data.circuits && data.circuits.length > 0) {
+            // Map ITF_WHEELCHAIR to ITF for API compatibility
+            const mappedCircuits = data.circuits.map((c: string) => 
+              c === 'ITF_WHEELCHAIR' ? 'ITF' : c
+            );
+            setUserCircuits(mappedCircuits);
+          }
         }
       } catch (e) {
         console.error('Failed to load user circuits:', e);
