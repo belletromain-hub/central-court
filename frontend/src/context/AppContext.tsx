@@ -1,12 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Tournament, tournaments as initialTournaments } from '../data/tournaments';
-import { CalendarEvent, sampleEvents } from '../data/events';
 import { Document, CountryDays, Channel, Message, Recommendation, TeamType } from '../types';
 
+// Simplified App State - tournaments and events now come from API
 interface AppState {
-  tournaments: Tournament[];
-  events: CalendarEvent[];
   documents: Document[];
   taxHistory: CountryDays[];
   channels: Channel[];
@@ -16,10 +13,6 @@ interface AppState {
 }
 
 interface AppContextType extends AppState {
-  updateTournamentStatus: (id: string, status: 'pending' | 'confirmed' | 'withdrawn') => void;
-  addEvent: (event: CalendarEvent) => void;
-  updateEvent: (id: string, event: Partial<CalendarEvent>) => void;
-  deleteEvent: (id: string) => void;
   addDocument: (doc: Document) => void;
   deleteDocument: (id: string) => void;
   updateDocumentSharing: (id: string, sharedWith: TeamType[]) => void;
@@ -33,8 +26,6 @@ interface AppContextType extends AppState {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  TOURNAMENTS: '@central_court_tournaments',
-  EVENTS: '@central_court_events',
   DOCUMENTS: '@central_court_documents',
   TAX_HISTORY: '@central_court_tax_history',
   MESSAGES: '@central_court_messages',
