@@ -281,6 +281,22 @@ async def get_documents_stats(
     }
 
 
+@router.get("/documents/categories")
+async def get_categories():
+    """Return available categories"""
+    return {
+        "categories": [
+            {"id": "travel", "label": "Transport", "icon": "airplane"},
+            {"id": "accommodation", "label": "Hébergement", "icon": "bed"},
+            {"id": "restaurant", "label": "Restauration", "icon": "restaurant"},
+            {"id": "medical", "label": "Médical", "icon": "medkit"},
+            {"id": "equipment", "label": "Matériel", "icon": "tennisball"},
+            {"id": "services", "label": "Services", "icon": "briefcase"},
+            {"id": "other", "label": "Autre", "icon": "document"}
+        ]
+    }
+
+
 @router.get("/documents/{document_id}", response_model=DocumentResponse)
 async def get_document(document_id: str):
     """Get a single document by ID"""
