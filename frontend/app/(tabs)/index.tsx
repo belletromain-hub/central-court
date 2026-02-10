@@ -463,12 +463,12 @@ export default function CalendarScreenV1() {
   // Render tournament week card
   const renderTournamentWeekCard = (week: any) => {
     const visibleTournaments = getVisibleTournaments(week);
-    const registeredTournaments = (week.registrations || [])
-      .map((r: any) => ({
-        tournament: week.tournaments.find(t => t.id === r.tournamentId),
-        status: r.status
-      }))
-      .filter(r => r.tournament);
+    const registeredTournaments = (week.tournaments || [])
+      .filter((t: any) => t.registration)
+      .map((t: any) => ({
+        tournament: t,
+        status: t.registration?.status
+      }));
     
     return (
       <TouchableOpacity
