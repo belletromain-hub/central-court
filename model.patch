@@ -1,1127 +1,1649 @@
-diff --git a/backend/tests/test_user_and_documents.py b/backend/tests/test_user_and_documents.py
+diff --git a/backend/tests/test_invitation_endpoints.py b/backend/tests/test_invitation_endpoints.py
 new file mode 100644
-index 00000000..a8925bc3
+index 00000000..933682f8
 --- /dev/null
-+++ b/backend/tests/test_user_and_documents.py
-@@ -0,0 +1,446 @@
++++ b/backend/tests/test_invitation_endpoints.py
+@@ -0,0 +1,503 @@
 +"""
-+Test suite for User Profile and Documents endpoints
-+Tests the following endpoints:
-+- GET /api/documents/stats - Document statistics
-+- GET /api/documents/categories - List of categories
-+- POST /api/users/onboarding - Create/update user with prenom, email, classement, residenceFiscale
-+- GET /api/users/profile/email/{email} - Get user profile by email
++Test suite for Staff Invitation System endpoints
++Tests: create invitation, get by token, mark viewed, signup, list invitations, list staff, resend, cancel, remove staff
 +"""
 +
 +import pytest
 +import requests
 +import os
-+import uuid
++import time
 +from datetime import datetime
 +
-+# Get BASE_URL from environment
++# Base URL from environment
 +BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://tennis-nexus.preview.emergentagent.com').rstrip('/')
 +
++# Test data
++TEST_PLAYER_ID = "698aa79d59d2bf64a89327fb"
++TEST_EMAIL_PREFIX = "TEST_staff_"
++TEST_TIMESTAMP = int(time.time())
 +
-+class TestDocumentsStats:
-+    """Test /api/documents/stats endpoint"""
++
++class TestInvitationCreate:
++    """Test POST /api/invitations/create endpoint"""
 +    
-+    def test_get_documents_stats_success(self):
-+        """Test that /api/documents/stats returns valid statistics"""
-+        response = requests.get(f"{BASE_URL}/api/documents/stats")
++    def test_create_invitation_success(self):
++        """Create a new staff invitation"""
++        test_email = f"{TEST_EMAIL_PREFIX}coach_{TEST_TIMESTAMP}@test.com"
 +        
-+        # Status code assertion
-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-+        
-+        # Data assertions
-+        data = response.json()
-+        assert "totalCount" in data, "Response should contain 'totalCount'"
-+        assert "totalAmount" in data, "Response should contain 'totalAmount'"
-+        assert "byCategory" in data, "Response should contain 'byCategory'"
-+        
-+        # Type assertions
-+        assert isinstance(data["totalCount"], int), "totalCount should be an integer"
-+        assert isinstance(data["totalAmount"], (int, float)), "totalAmount should be a number"
-+        assert isinstance(data["byCategory"], dict), "byCategory should be a dictionary"
-+        
-+        print(f"✓ Documents stats: {data['totalCount']} documents, {data['totalAmount']}€ total")
-+    
-+    def test_get_documents_stats_with_user_filter(self):
-+        """Test /api/documents/stats with userId filter"""
-+        response = requests.get(f"{BASE_URL}/api/documents/stats", params={"userId": "test_user_123"})
-+        
-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-+        
-+        data = response.json()
-+        assert "totalCount" in data
-+        assert "totalAmount" in data
-+        assert "byCategory" in data
-+        
-+        print(f"✓ Documents stats with userId filter works")
-+    
-+    def test_get_documents_stats_with_date_filter(self):
-+        """Test /api/documents/stats with date filters"""
-+        response = requests.get(f"{BASE_URL}/api/documents/stats", params={
-+            "startDate": "01/01/2024",
-+            "endDate": "31/12/2024"
++        response = requests.post(f"{BASE_URL}/api/invitations/create", json={
++            "playerId": TEST_PLAYER_ID,
++            "inviteeEmail": test_email,
++            "inviteeName": "Test Coach",
++            "role": "tennis_coach",
++            "roleCustom": None
 +        })
 +        
-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-+        
-+        data = response.json()
-+        assert "totalCount" in data
-+        assert "totalAmount" in data
-+        
-+        print(f"✓ Documents stats with date filter works")
-+
-+
-+class TestDocumentsCategories:
-+    """Test /api/documents/categories endpoint"""
-+    
-+    def test_get_categories_success(self):
-+        """Test that /api/documents/categories returns valid categories list"""
-+        response = requests.get(f"{BASE_URL}/api/documents/categories")
-+        
-+        # Status code assertion
 +        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
 +        
-+        # Data assertions
-+        data = response.json()
-+        assert "categories" in data, "Response should contain 'categories'"
-+        assert isinstance(data["categories"], list), "categories should be a list"
-+        assert len(data["categories"]) > 0, "categories list should not be empty"
-+        
-+        # Verify category structure
-+        for category in data["categories"]:
-+            assert "id" in category, "Each category should have 'id'"
-+            assert "label" in category, "Each category should have 'label'"
-+            assert "icon" in category, "Each category should have 'icon'"
-+        
-+        # Verify expected categories exist
-+        category_ids = [c["id"] for c in data["categories"]]
-+        expected_categories = ["travel", "accommodation", "restaurant", "medical", "equipment", "services", "other"]
-+        
-+        for expected in expected_categories:
-+            assert expected in category_ids, f"Category '{expected}' should be in the list"
-+        
-+        print(f"✓ Categories endpoint returns {len(data['categories'])} categories: {category_ids}")
-+    
-+    def test_categories_have_correct_labels(self):
-+        """Test that categories have correct French labels"""
-+        response = requests.get(f"{BASE_URL}/api/documents/categories")
-+        
-+        assert response.status_code == 200
-+        
-+        data = response.json()
-+        categories = {c["id"]: c["label"] for c in data["categories"]}
-+        
-+        # Verify French labels
-+        expected_labels = {
-+            "travel": "Transport",
-+            "accommodation": "Hébergement",
-+            "restaurant": "Restauration",
-+            "medical": "Médical",
-+            "equipment": "Matériel",
-+            "services": "Services",
-+            "other": "Autre"
-+        }
-+        
-+        for cat_id, expected_label in expected_labels.items():
-+            assert categories.get(cat_id) == expected_label, f"Category '{cat_id}' should have label '{expected_label}', got '{categories.get(cat_id)}'"
-+        
-+        print(f"✓ All category labels are correct in French")
-+
-+
-+class TestUserOnboarding:
-+    """Test /api/users/onboarding endpoint"""
-+    
-+    @pytest.fixture
-+    def unique_email(self):
-+        """Generate unique email for each test"""
-+        return f"TEST_user_{uuid.uuid4().hex[:8]}@test.com"
-+    
-+    def test_create_user_with_all_fields(self, unique_email):
-+        """Test creating a new user with all required fields including residenceFiscale"""
-+        payload = {
-+            "prenom": "TEST_Romain",
-+            "email": unique_email,
-+            "classement": "45",
-+            "residenceFiscale": "Monaco",
-+            "circuits": ["ATP"],
-+            "niveaux": ["250", "500"],
-+            "onboardingCompleted": True,
-+            "onboardingStep": 7
-+        }
-+        
-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
-+        
-+        # Status code assertion
-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-+        
-+        # Data assertions
 +        data = response.json()
 +        assert "id" in data, "Response should contain 'id'"
-+        assert data["prenom"] == "TEST_Romain", f"prenom should be 'TEST_Romain', got '{data.get('prenom')}'"
-+        assert data["email"] == unique_email, f"email should be '{unique_email}', got '{data.get('email')}'"
-+        assert data["classement"] == "45", f"classement should be '45', got '{data.get('classement')}'"
-+        assert data["residenceFiscale"] == "Monaco", f"residenceFiscale should be 'Monaco', got '{data.get('residenceFiscale')}'"
-+        assert data["circuits"] == ["ATP"], f"circuits should be ['ATP'], got '{data.get('circuits')}'"
-+        assert data["onboardingCompleted"] == True, "onboardingCompleted should be True"
++        assert "token" in data, "Response should contain 'token'"
++        assert data["playerId"] == TEST_PLAYER_ID
++        assert data["inviteeEmail"] == test_email
++        assert data["role"] == "tennis_coach"
++        assert data["status"] == "pending"
++        assert len(data["token"]) == 32, "Token should be 32 characters"
 +        
-+        print(f"✓ Created user with all fields: {data['prenom']} (#{data['classement']}) - {data['residenceFiscale']}")
++        # Store for later tests
++        TestInvitationCreate.created_invitation_id = data["id"]
++        TestInvitationCreate.created_token = data["token"]
++        TestInvitationCreate.created_email = test_email
 +        
-+        # Cleanup - verify user exists via GET
-+        get_response = requests.get(f"{BASE_URL}/api/users/profile/email/{unique_email}")
-+        assert get_response.status_code == 200, "User should be retrievable after creation"
-+        
-+        return data
++        print(f"✓ Created invitation: {data['id']} with token: {data['token'][:8]}...")
 +    
-+    def test_create_user_minimal_fields(self, unique_email):
-+        """Test creating a user with only required fields"""
-+        payload = {
-+            "prenom": "TEST_MinimalUser",
-+            "email": unique_email
-+        }
++    def test_create_invitation_duplicate_returns_existing(self):
++        """Creating duplicate invitation should return existing one"""
++        test_email = f"{TEST_EMAIL_PREFIX}coach_{TEST_TIMESTAMP}@test.com"
 +        
-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
++        response = requests.post(f"{BASE_URL}/api/invitations/create", json={
++            "playerId": TEST_PLAYER_ID,
++            "inviteeEmail": test_email,
++            "inviteeName": "Test Coach",
++            "role": "tennis_coach"
++        })
 +        
-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-+        
-+        data = response.json()
-+        assert data["prenom"] == "TEST_MinimalUser"
-+        assert data["email"] == unique_email
-+        # Optional fields should be None or default
-+        assert data.get("classement") is None or data.get("classement") == ""
-+        assert data.get("residenceFiscale") is None or data.get("residenceFiscale") == ""
-+        
-+        print(f"✓ Created user with minimal fields: {data['prenom']}")
-+    
-+    def test_update_existing_user(self, unique_email):
-+        """Test updating an existing user via onboarding endpoint"""
-+        # First create user
-+        create_payload = {
-+            "prenom": "TEST_UpdateUser",
-+            "email": unique_email,
-+            "classement": "100",
-+            "residenceFiscale": "France"
-+        }
-+        
-+        create_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=create_payload)
-+        assert create_response.status_code == 200
-+        
-+        # Update user with same email
-+        update_payload = {
-+            "prenom": "TEST_UpdateUser",
-+            "email": unique_email,
-+            "classement": "50",  # Updated ranking
-+            "residenceFiscale": "Suisse"  # Updated residence
-+        }
-+        
-+        update_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=update_payload)
-+        assert update_response.status_code == 200
-+        
-+        data = update_response.json()
-+        assert data["classement"] == "50", f"classement should be updated to '50', got '{data.get('classement')}'"
-+        assert data["residenceFiscale"] == "Suisse", f"residenceFiscale should be updated to 'Suisse', got '{data.get('residenceFiscale')}'"
-+        
-+        # Verify via GET
-+        get_response = requests.get(f"{BASE_URL}/api/users/profile/email/{unique_email}")
-+        assert get_response.status_code == 200
-+        get_data = get_response.json()
-+        assert get_data["classement"] == "50"
-+        assert get_data["residenceFiscale"] == "Suisse"
-+        
-+        print(f"✓ Updated user: classement 100→50, residenceFiscale France→Suisse")
-+    
-+    def test_create_user_missing_required_fields(self):
-+        """Test that creating user without required fields fails"""
-+        # Missing prenom
-+        payload = {
-+            "email": "test@test.com"
-+        }
-+        
-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
-+        
-+        # Should fail with 422 (validation error)
-+        assert response.status_code == 422, f"Expected 422 for missing prenom, got {response.status_code}"
-+        
-+        print(f"✓ Correctly rejects request without required 'prenom' field")
-+
-+
-+class TestUserProfileByEmail:
-+    """Test /api/users/profile/email/{email} endpoint"""
-+    
-+    @pytest.fixture
-+    def test_user(self):
-+        """Create a test user and return its data"""
-+        unique_email = f"TEST_profile_{uuid.uuid4().hex[:8]}@test.com"
-+        payload = {
-+            "prenom": "TEST_ProfileUser",
-+            "email": unique_email,
-+            "classement": "75",
-+            "residenceFiscale": "Dubaï",
-+            "circuits": ["WTA"],
-+            "niveaux": ["1000"],
-+            "onboardingCompleted": True
-+        }
-+        
-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
 +        assert response.status_code == 200
-+        return response.json()
-+    
-+    def test_get_profile_by_email_success(self, test_user):
-+        """Test getting user profile by email returns all fields"""
-+        email = test_user["email"]
-+        
-+        response = requests.get(f"{BASE_URL}/api/users/profile/email/{email}")
-+        
-+        # Status code assertion
-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-+        
-+        # Data assertions - verify all fields are returned
 +        data = response.json()
-+        assert data["id"] == test_user["id"], "id should match"
-+        assert data["prenom"] == "TEST_ProfileUser", f"prenom should be 'TEST_ProfileUser', got '{data.get('prenom')}'"
-+        assert data["email"] == email, f"email should match"
-+        assert data["classement"] == "75", f"classement should be '75', got '{data.get('classement')}'"
-+        assert data["residenceFiscale"] == "Dubaï", f"residenceFiscale should be 'Dubaï', got '{data.get('residenceFiscale')}'"
-+        assert data["circuits"] == ["WTA"], f"circuits should be ['WTA'], got '{data.get('circuits')}'"
-+        assert data["onboardingCompleted"] == True, "onboardingCompleted should be True"
-+        
-+        # Verify timestamps exist
-+        assert "createdAt" in data, "createdAt should be present"
-+        assert "updatedAt" in data, "updatedAt should be present"
-+        
-+        print(f"✓ Retrieved profile by email: {data['prenom']} (#{data['classement']}) - {data['residenceFiscale']}")
++        # Should return the same invitation
++        assert data["id"] == TestInvitationCreate.created_invitation_id
++        print("✓ Duplicate invitation returns existing one")
 +    
-+    def test_get_profile_by_email_not_found(self):
-+        """Test getting profile for non-existent email returns 404"""
-+        fake_email = f"nonexistent_{uuid.uuid4().hex}@test.com"
++    def test_create_invitation_different_roles(self):
++        """Create invitations with different roles"""
++        roles = ["physical_coach", "physio", "agent", "family", "other"]
 +        
-+        response = requests.get(f"{BASE_URL}/api/users/profile/email/{fake_email}")
-+        
-+        assert response.status_code == 404, f"Expected 404 for non-existent email, got {response.status_code}"
-+        
-+        print(f"✓ Correctly returns 404 for non-existent email")
++        for role in roles:
++            test_email = f"{TEST_EMAIL_PREFIX}{role}_{TEST_TIMESTAMP}@test.com"
++            response = requests.post(f"{BASE_URL}/api/invitations/create", json={
++                "playerId": TEST_PLAYER_ID,
++                "inviteeEmail": test_email,
++                "inviteeName": f"Test {role}",
++                "role": role
++            })
++            
++            assert response.status_code == 200, f"Failed for role {role}: {response.text}"
++            data = response.json()
++            assert data["role"] == role
++            print(f"✓ Created invitation for role: {role}")
 +    
-+    def test_get_profile_by_email_special_characters(self):
-+        """Test getting profile with special characters in email"""
-+        # Create user with special email
-+        special_email = f"TEST_special+tag_{uuid.uuid4().hex[:6]}@test.com"
-+        payload = {
-+            "prenom": "TEST_SpecialEmail",
-+            "email": special_email
-+        }
++    def test_create_invitation_invalid_email(self):
++        """Invalid email should fail validation"""
++        response = requests.post(f"{BASE_URL}/api/invitations/create", json={
++            "playerId": TEST_PLAYER_ID,
++            "inviteeEmail": "invalid-email",
++            "role": "tennis_coach"
++        })
 +        
-+        create_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
-+        assert create_response.status_code == 200
-+        
-+        # URL encode the email for the GET request
-+        import urllib.parse
-+        encoded_email = urllib.parse.quote(special_email, safe='')
-+        
-+        response = requests.get(f"{BASE_URL}/api/users/profile/email/{encoded_email}")
-+        
-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-+        
-+        data = response.json()
-+        assert data["email"] == special_email
-+        
-+        print(f"✓ Handles special characters in email correctly")
++        assert response.status_code == 422, f"Expected 422 for invalid email, got {response.status_code}"
++        print("✓ Invalid email rejected with 422")
 +
 +
-+class TestIntegration:
-+    """Integration tests for user profile and documents flow"""
++class TestInvitationGetByToken:
++    """Test GET /api/invitations/token/{token} endpoint"""
 +    
-+    def test_full_user_flow(self):
-+        """Test complete user onboarding and profile retrieval flow"""
-+        unique_email = f"TEST_integration_{uuid.uuid4().hex[:8]}@test.com"
++    def test_get_invitation_by_token_success(self):
++        """Get invitation details by valid token"""
++        token = TestInvitationCreate.created_token
 +        
-+        # Step 1: Create user via onboarding
-+        create_payload = {
-+            "prenom": "TEST_IntegrationUser",
-+            "email": unique_email,
-+            "classement": "25",
-+            "residenceFiscale": "Monaco",
-+            "circuits": ["ATP", "ITF"],
-+            "niveaux": ["250", "500", "1000"],
-+            "onboardingCompleted": False,
-+            "onboardingStep": 3
-+        }
++        response = requests.get(f"{BASE_URL}/api/invitations/token/{token}")
 +        
-+        create_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=create_payload)
-+        assert create_response.status_code == 200
-+        user_id = create_response.json()["id"]
-+        print(f"  Step 1: Created user with id {user_id}")
-+        
-+        # Step 2: Retrieve profile by email
-+        get_response = requests.get(f"{BASE_URL}/api/users/profile/email/{unique_email}")
-+        assert get_response.status_code == 200
-+        profile = get_response.json()
-+        assert profile["id"] == user_id
-+        assert profile["classement"] == "25"
-+        assert profile["residenceFiscale"] == "Monaco"
-+        print(f"  Step 2: Retrieved profile - {profile['prenom']} (#{profile['classement']})")
-+        
-+        # Step 3: Update user (complete onboarding)
-+        update_payload = {
-+            "prenom": "TEST_IntegrationUser",
-+            "email": unique_email,
-+            "classement": "20",  # Improved ranking
-+            "residenceFiscale": "Monaco",
-+            "circuits": ["ATP", "ITF"],
-+            "niveaux": ["250", "500", "1000"],
-+            "onboardingCompleted": True,
-+            "onboardingStep": 7
-+        }
-+        
-+        update_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=update_payload)
-+        assert update_response.status_code == 200
-+        updated_profile = update_response.json()
-+        assert updated_profile["classement"] == "20"
-+        assert updated_profile["onboardingCompleted"] == True
-+        print(f"  Step 3: Updated profile - classement now #{updated_profile['classement']}, onboarding complete")
-+        
-+        # Step 4: Verify update via GET
-+        verify_response = requests.get(f"{BASE_URL}/api/users/profile/email/{unique_email}")
-+        assert verify_response.status_code == 200
-+        final_profile = verify_response.json()
-+        assert final_profile["classement"] == "20"
-+        assert final_profile["onboardingCompleted"] == True
-+        print(f"  Step 4: Verified final profile state")
-+        
-+        print(f"✓ Full user flow completed successfully")
-+    
-+    def test_documents_and_categories_available(self):
-+        """Test that documents stats and categories are available"""
-+        # Get categories
-+        cat_response = requests.get(f"{BASE_URL}/api/documents/categories")
-+        assert cat_response.status_code == 200
-+        categories = cat_response.json()["categories"]
-+        print(f"  Categories available: {len(categories)}")
-+        
-+        # Get stats
-+        stats_response = requests.get(f"{BASE_URL}/api/documents/stats")
-+        assert stats_response.status_code == 200
-+        stats = stats_response.json()
-+        print(f"  Documents stats: {stats['totalCount']} docs, {stats['totalAmount']}€")
-+        
-+        print(f"✓ Documents endpoints working correctly")
-+
-+
-+# Test with specific test email from requirements
-+class TestSpecificUser:
-+    """Test with the specific test email provided"""
-+    
-+    def test_create_or_get_romain_user(self):
-+        """Test creating/updating user with test email romain@test.com"""
-+        test_email = "romain@test.com"
-+        
-+        # Create/update user
-+        payload = {
-+            "prenom": "Romain",
-+            "email": test_email,
-+            "classement": "45",
-+            "residenceFiscale": "Monaco",
-+            "circuits": ["ATP"],
-+            "onboardingCompleted": True
-+        }
-+        
-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
 +        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
 +        
 +        data = response.json()
-+        assert data["email"] == test_email
-+        assert data["prenom"] == "Romain"
-+        assert data["classement"] == "45"
-+        assert data["residenceFiscale"] == "Monaco"
++        assert data["token"] == token
++        assert data["playerId"] == TEST_PLAYER_ID
++        assert data["status"] == "pending"
++        assert "playerName" in data
++        assert "expiresAt" in data
++        print(f"✓ Retrieved invitation by token: {data['id']}")
++    
++    def test_get_invitation_invalid_token(self):
++        """Invalid token should return 404"""
++        response = requests.get(f"{BASE_URL}/api/invitations/token/invalid_token_12345")
 +        
-+        print(f"✓ User romain@test.com created/updated successfully")
-+        
-+        # Verify via GET
-+        get_response = requests.get(f"{BASE_URL}/api/users/profile/email/{test_email}")
-+        assert get_response.status_code == 200
-+        
-+        profile = get_response.json()
-+        assert profile["residenceFiscale"] == "Monaco", f"residenceFiscale should be 'Monaco', got '{profile.get('residenceFiscale')}'"
-+        
-+        print(f"✓ Profile retrieved: {profile['prenom']} (#{profile['classement']}) - {profile['residenceFiscale']}")
++        assert response.status_code == 404, f"Expected 404, got {response.status_code}"
++        print("✓ Invalid token returns 404")
 +
 +
++class TestInvitationMarkViewed:
++    """Test POST /api/invitations/token/{token}/view endpoint"""
++    
++    def test_mark_invitation_viewed(self):
++        """Mark invitation as viewed"""
++        token = TestInvitationCreate.created_token
++        
++        response = requests.post(f"{BASE_URL}/api/invitations/token/{token}/view")
++        
++        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
++        
++        data = response.json()
++        assert data["success"] == True
++        print(f"✓ Marked invitation as viewed, updated: {data.get('updated')}")
++    
++    def test_mark_viewed_already_viewed(self):
++        """Marking already viewed invitation should succeed but not update"""
++        token = TestInvitationCreate.created_token
++        
++        response = requests.post(f"{BASE_URL}/api/invitations/token/{token}/view")
++        
++        assert response.status_code == 200
++        data = response.json()
++        assert data["success"] == True
++        assert data["updated"] == False  # Already viewed
++        print("✓ Already viewed invitation returns updated=False")
++    
++    def test_verify_viewed_at_set(self):
++        """Verify viewedAt is set after marking viewed"""
++        token = TestInvitationCreate.created_token
++        
++        response = requests.get(f"{BASE_URL}/api/invitations/token/{token}")
++        
++        assert response.status_code == 200
++        data = response.json()
++        assert data["viewedAt"] is not None, "viewedAt should be set"
++        print(f"✓ viewedAt is set: {data['viewedAt']}")
++
++
++class TestInvitationPlayerList:
++    """Test GET /api/invitations/player/{player_id} endpoint"""
++    
++    def test_get_player_invitations(self):
++        """Get all invitations for a player"""
++        response = requests.get(f"{BASE_URL}/api/invitations/player/{TEST_PLAYER_ID}")
++        
++        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
++        
++        data = response.json()
++        assert "invitations" in data
++        assert isinstance(data["invitations"], list)
++        assert len(data["invitations"]) > 0, "Should have at least one invitation"
++        
++        # Verify structure of first invitation
++        inv = data["invitations"][0]
++        assert "id" in inv
++        assert "token" in inv
++        assert "playerId" in inv
++        assert "status" in inv
++        
++        print(f"✓ Retrieved {len(data['invitations'])} invitations for player")
++
++
++class TestInvitationResend:
++    """Test POST /api/invitations/{id}/resend endpoint"""
++    
++    def test_resend_invitation(self):
++        """Resend an invitation (extends expiry)"""
++        invitation_id = TestInvitationCreate.created_invitation_id
++        
++        response = requests.post(f"{BASE_URL}/api/invitations/{invitation_id}/resend")
++        
++        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
++        
++        data = response.json()
++        assert data["success"] == True
++        assert "message" in data
++        print(f"✓ Resent invitation: {data['message']}")
++    
++    def test_verify_reminder_count_incremented(self):
++        """Verify reminderCount is incremented after resend"""
++        token = TestInvitationCreate.created_token
++        
++        response = requests.get(f"{BASE_URL}/api/invitations/token/{token}")
++        
++        assert response.status_code == 200
++        data = response.json()
++        assert data["reminderCount"] >= 1, "reminderCount should be at least 1"
++        print(f"✓ reminderCount is {data['reminderCount']}")
++    
++    def test_resend_invalid_id(self):
++        """Resend with invalid ID should return 400 or 404"""
++        response = requests.post(f"{BASE_URL}/api/invitations/invalid_id/resend")
++        
++        assert response.status_code in [400, 404], f"Expected 400 or 404, got {response.status_code}"
++        print("✓ Invalid ID returns error")
++
++
++class TestInvitationCancel:
++    """Test POST /api/invitations/{id}/cancel endpoint"""
++    
++    def test_cancel_invitation(self):
++        """Cancel a pending invitation"""
++        # Create a new invitation to cancel
++        test_email = f"{TEST_EMAIL_PREFIX}cancel_{TEST_TIMESTAMP}@test.com"
++        
++        create_response = requests.post(f"{BASE_URL}/api/invitations/create", json={
++            "playerId": TEST_PLAYER_ID,
++            "inviteeEmail": test_email,
++            "inviteeName": "To Cancel",
++            "role": "other"
++        })
++        
++        assert create_response.status_code == 200
++        invitation_id = create_response.json()["id"]
++        
++        # Cancel it
++        response = requests.post(f"{BASE_URL}/api/invitations/{invitation_id}/cancel")
++        
++        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
++        
++        data = response.json()
++        assert data["success"] == True
++        print(f"✓ Cancelled invitation: {data['message']}")
++        
++        TestInvitationCancel.cancelled_id = invitation_id
++    
++    def test_verify_cancelled_status(self):
++        """Verify invitation status is cancelled"""
++        response = requests.get(f"{BASE_URL}/api/invitations/player/{TEST_PLAYER_ID}")
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        cancelled_inv = next((inv for inv in data["invitations"] if inv["id"] == TestInvitationCancel.cancelled_id), None)
++        assert cancelled_inv is not None
++        assert cancelled_inv["status"] == "cancelled"
++        print("✓ Invitation status is 'cancelled'")
++    
++    def test_cancel_already_cancelled(self):
++        """Cancelling already cancelled invitation should fail"""
++        response = requests.post(f"{BASE_URL}/api/invitations/{TestInvitationCancel.cancelled_id}/cancel")
++        
++        assert response.status_code == 404, f"Expected 404, got {response.status_code}"
++        print("✓ Already cancelled invitation returns 404")
++
++
++class TestStaffSignup:
++    """Test POST /api/invitations/signup endpoint"""
++    
++    def test_signup_with_valid_token(self):
++        """Sign up as staff member with valid invitation token"""
++        # Create a fresh invitation for signup
++        test_email = f"{TEST_EMAIL_PREFIX}signup_{TEST_TIMESTAMP}@test.com"
++        
++        create_response = requests.post(f"{BASE_URL}/api/invitations/create", json={
++            "playerId": TEST_PLAYER_ID,
++            "inviteeEmail": test_email,
++            "inviteeName": "New Staff",
++            "role": "physio"
++        })
++        
++        assert create_response.status_code == 200
++        token = create_response.json()["token"]
++        
++        # Sign up
++        response = requests.post(f"{BASE_URL}/api/invitations/signup", json={
++            "invitationToken": token,
++            "firstName": "Test",
++            "lastName": "Staff",
++            "phone": "+33612345678",
++            "password": "SecurePassword123!"
++        })
++        
++        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
++        
++        data = response.json()
++        assert data["success"] == True
++        assert "staff" in data
++        assert "authToken" in data
++        
++        staff = data["staff"]
++        assert staff["email"] == test_email
++        assert staff["firstName"] == "Test"
++        assert staff["lastName"] == "Staff"
++        assert staff["role"] == "physio"
++        assert staff["status"] == "active"
++        assert "permissions" in staff
++        
++        print(f"✓ Staff signup successful: {staff['id']}")
++        
++        TestStaffSignup.created_staff_id = staff["id"]
++        TestStaffSignup.signup_token = token
++    
++    def test_signup_invalid_token(self):
++        """Signup with invalid token should fail"""
++        response = requests.post(f"{BASE_URL}/api/invitations/signup", json={
++            "invitationToken": "invalid_token_12345",
++            "firstName": "Test",
++            "password": "Password123!"
++        })
++        
++        assert response.status_code == 400, f"Expected 400, got {response.status_code}"
++        print("✓ Invalid token returns 400")
++    
++    def test_signup_already_used_token(self):
++        """Signup with already used token should fail"""
++        response = requests.post(f"{BASE_URL}/api/invitations/signup", json={
++            "invitationToken": TestStaffSignup.signup_token,
++            "firstName": "Another",
++            "password": "Password123!"
++        })
++        
++        assert response.status_code == 400, f"Expected 400, got {response.status_code}"
++        print("✓ Already used token returns 400")
++    
++    def test_verify_invitation_accepted(self):
++        """Verify invitation status is accepted after signup"""
++        response = requests.get(f"{BASE_URL}/api/invitations/player/{TEST_PLAYER_ID}")
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        # Find the invitation that was used for signup
++        accepted_inv = next((inv for inv in data["invitations"] 
++                           if inv["token"] == TestStaffSignup.signup_token), None)
++        
++        assert accepted_inv is not None
++        assert accepted_inv["status"] == "accepted"
++        assert accepted_inv["acceptedAt"] is not None
++        print("✓ Invitation status is 'accepted'")
++
++
++class TestStaffList:
++    """Test GET /api/invitations/staff/player/{player_id} endpoint"""
++    
++    def test_get_player_staff(self):
++        """Get all active staff members for a player"""
++        response = requests.get(f"{BASE_URL}/api/invitations/staff/player/{TEST_PLAYER_ID}")
++        
++        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
++        
++        data = response.json()
++        assert "staff" in data
++        assert isinstance(data["staff"], list)
++        
++        if len(data["staff"]) > 0:
++            staff = data["staff"][0]
++            assert "id" in staff
++            assert "email" in staff
++            assert "firstName" in staff
++            assert "role" in staff
++            assert "permissions" in staff
++            assert "status" in staff
++        
++        print(f"✓ Retrieved {len(data['staff'])} staff members for player")
++
++
++class TestStaffRemove:
++    """Test DELETE /api/invitations/staff/{staff_id} endpoint"""
++    
++    def test_remove_staff_member(self):
++        """Remove a staff member (soft delete)"""
++        staff_id = TestStaffSignup.created_staff_id
++        
++        response = requests.delete(f"{BASE_URL}/api/invitations/staff/{staff_id}")
++        
++        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
++        
++        data = response.json()
++        assert data["success"] == True
++        print(f"✓ Removed staff member: {data['message']}")
++    
++    def test_verify_staff_removed(self):
++        """Verify staff member is no longer in active list"""
++        response = requests.get(f"{BASE_URL}/api/invitations/staff/player/{TEST_PLAYER_ID}")
++        
++        assert response.status_code == 200
++        data = response.json()
++        
++        # Staff should not be in the list (status != 'removed')
++        removed_staff = next((s for s in data["staff"] 
++                             if s["id"] == TestStaffSignup.created_staff_id), None)
++        
++        assert removed_staff is None, "Removed staff should not appear in active list"
++        print("✓ Removed staff not in active list")
++    
++    def test_remove_invalid_id(self):
++        """Remove with invalid ID should return error"""
++        response = requests.delete(f"{BASE_URL}/api/invitations/staff/invalid_id")
++        
++        assert response.status_code in [400, 404], f"Expected 400 or 404, got {response.status_code}"
++        print("✓ Invalid staff ID returns error")
++
++
++class TestInvitationPermissions:
++    """Test role-based permissions in staff signup"""
++    
++    def test_tennis_coach_permissions(self):
++        """Verify tennis coach gets correct default permissions"""
++        test_email = f"{TEST_EMAIL_PREFIX}coach_perm_{TEST_TIMESTAMP}@test.com"
++        
++        # Create invitation
++        create_response = requests.post(f"{BASE_URL}/api/invitations/create", json={
++            "playerId": TEST_PLAYER_ID,
++            "inviteeEmail": test_email,
++            "role": "tennis_coach"
++        })
++        
++        assert create_response.status_code == 200
++        token = create_response.json()["token"]
++        
++        # Signup
++        signup_response = requests.post(f"{BASE_URL}/api/invitations/signup", json={
++            "invitationToken": token,
++            "firstName": "Coach",
++            "password": "Password123!"
++        })
++        
++        assert signup_response.status_code == 200
++        staff = signup_response.json()["staff"]
++        
++        permissions = staff["permissions"]
++        assert permissions["canViewCalendar"] == True
++        assert permissions["canEditCalendar"] == True
++        assert permissions["canViewDocuments"] == True
++        assert permissions["canUploadDocuments"] == True
++        assert permissions["canViewFinances"] == False
++        assert permissions["canManageInvoices"] == False
++        
++        print("✓ Tennis coach has correct permissions")
++        
++        # Cleanup
++        requests.delete(f"{BASE_URL}/api/invitations/staff/{staff['id']}")
++    
++    def test_agent_permissions(self):
++        """Verify agent gets full permissions"""
++        test_email = f"{TEST_EMAIL_PREFIX}agent_perm_{TEST_TIMESTAMP}@test.com"
++        
++        # Create invitation
++        create_response = requests.post(f"{BASE_URL}/api/invitations/create", json={
++            "playerId": TEST_PLAYER_ID,
++            "inviteeEmail": test_email,
++            "role": "agent"
++        })
++        
++        assert create_response.status_code == 200
++        token = create_response.json()["token"]
++        
++        # Signup
++        signup_response = requests.post(f"{BASE_URL}/api/invitations/signup", json={
++            "invitationToken": token,
++            "firstName": "Agent",
++            "password": "Password123!"
++        })
++        
++        assert signup_response.status_code == 200
++        staff = signup_response.json()["staff"]
++        
++        permissions = staff["permissions"]
++        assert permissions["canViewCalendar"] == True
++        assert permissions["canEditCalendar"] == True
++        assert permissions["canViewDocuments"] == True
++        assert permissions["canUploadDocuments"] == True
++        assert permissions["canViewFinances"] == True
++        assert permissions["canManageInvoices"] == True
++        
++        print("✓ Agent has full permissions")
++        
++        # Cleanup
++        requests.delete(f"{BASE_URL}/api/invitations/staff/{staff['id']}")
++
++
++# Run tests in order
 +if __name__ == "__main__":
 +    pytest.main([__file__, "-v", "--tb=short"])
 diff --git a/model.patch b/model.patch
-index d4945d5f..b79b829a 100644
+index a449f6d5..03c92364 100644
 --- a/model.patch
 +++ b/model.patch
-@@ -1,662 +0,0 @@
+@@ -1,1127 +0,0 @@
+-diff --git a/backend/tests/test_user_and_documents.py b/backend/tests/test_user_and_documents.py
+-new file mode 100644
+-index 00000000..a8925bc3
+---- /dev/null
+-+++ b/backend/tests/test_user_and_documents.py
+-@@ -0,0 +1,446 @@
+-+"""
+-+Test suite for User Profile and Documents endpoints
+-+Tests the following endpoints:
+-+- GET /api/documents/stats - Document statistics
+-+- GET /api/documents/categories - List of categories
+-+- POST /api/users/onboarding - Create/update user with prenom, email, classement, residenceFiscale
+-+- GET /api/users/profile/email/{email} - Get user profile by email
+-+"""
+-+
+-+import pytest
+-+import requests
+-+import os
+-+import uuid
+-+from datetime import datetime
+-+
+-+# Get BASE_URL from environment
+-+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://tennis-nexus.preview.emergentagent.com').rstrip('/')
+-+
+-+
+-+class TestDocumentsStats:
+-+    """Test /api/documents/stats endpoint"""
+-+    
+-+    def test_get_documents_stats_success(self):
+-+        """Test that /api/documents/stats returns valid statistics"""
+-+        response = requests.get(f"{BASE_URL}/api/documents/stats")
+-+        
+-+        # Status code assertion
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+-+        
+-+        # Data assertions
+-+        data = response.json()
+-+        assert "totalCount" in data, "Response should contain 'totalCount'"
+-+        assert "totalAmount" in data, "Response should contain 'totalAmount'"
+-+        assert "byCategory" in data, "Response should contain 'byCategory'"
+-+        
+-+        # Type assertions
+-+        assert isinstance(data["totalCount"], int), "totalCount should be an integer"
+-+        assert isinstance(data["totalAmount"], (int, float)), "totalAmount should be a number"
+-+        assert isinstance(data["byCategory"], dict), "byCategory should be a dictionary"
+-+        
+-+        print(f"✓ Documents stats: {data['totalCount']} documents, {data['totalAmount']}€ total")
+-+    
+-+    def test_get_documents_stats_with_user_filter(self):
+-+        """Test /api/documents/stats with userId filter"""
+-+        response = requests.get(f"{BASE_URL}/api/documents/stats", params={"userId": "test_user_123"})
+-+        
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+-+        
+-+        data = response.json()
+-+        assert "totalCount" in data
+-+        assert "totalAmount" in data
+-+        assert "byCategory" in data
+-+        
+-+        print(f"✓ Documents stats with userId filter works")
+-+    
+-+    def test_get_documents_stats_with_date_filter(self):
+-+        """Test /api/documents/stats with date filters"""
+-+        response = requests.get(f"{BASE_URL}/api/documents/stats", params={
+-+            "startDate": "01/01/2024",
+-+            "endDate": "31/12/2024"
+-+        })
+-+        
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+-+        
+-+        data = response.json()
+-+        assert "totalCount" in data
+-+        assert "totalAmount" in data
+-+        
+-+        print(f"✓ Documents stats with date filter works")
+-+
+-+
+-+class TestDocumentsCategories:
+-+    """Test /api/documents/categories endpoint"""
+-+    
+-+    def test_get_categories_success(self):
+-+        """Test that /api/documents/categories returns valid categories list"""
+-+        response = requests.get(f"{BASE_URL}/api/documents/categories")
+-+        
+-+        # Status code assertion
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+-+        
+-+        # Data assertions
+-+        data = response.json()
+-+        assert "categories" in data, "Response should contain 'categories'"
+-+        assert isinstance(data["categories"], list), "categories should be a list"
+-+        assert len(data["categories"]) > 0, "categories list should not be empty"
+-+        
+-+        # Verify category structure
+-+        for category in data["categories"]:
+-+            assert "id" in category, "Each category should have 'id'"
+-+            assert "label" in category, "Each category should have 'label'"
+-+            assert "icon" in category, "Each category should have 'icon'"
+-+        
+-+        # Verify expected categories exist
+-+        category_ids = [c["id"] for c in data["categories"]]
+-+        expected_categories = ["travel", "accommodation", "restaurant", "medical", "equipment", "services", "other"]
+-+        
+-+        for expected in expected_categories:
+-+            assert expected in category_ids, f"Category '{expected}' should be in the list"
+-+        
+-+        print(f"✓ Categories endpoint returns {len(data['categories'])} categories: {category_ids}")
+-+    
+-+    def test_categories_have_correct_labels(self):
+-+        """Test that categories have correct French labels"""
+-+        response = requests.get(f"{BASE_URL}/api/documents/categories")
+-+        
+-+        assert response.status_code == 200
+-+        
+-+        data = response.json()
+-+        categories = {c["id"]: c["label"] for c in data["categories"]}
+-+        
+-+        # Verify French labels
+-+        expected_labels = {
+-+            "travel": "Transport",
+-+            "accommodation": "Hébergement",
+-+            "restaurant": "Restauration",
+-+            "medical": "Médical",
+-+            "equipment": "Matériel",
+-+            "services": "Services",
+-+            "other": "Autre"
+-+        }
+-+        
+-+        for cat_id, expected_label in expected_labels.items():
+-+            assert categories.get(cat_id) == expected_label, f"Category '{cat_id}' should have label '{expected_label}', got '{categories.get(cat_id)}'"
+-+        
+-+        print(f"✓ All category labels are correct in French")
+-+
+-+
+-+class TestUserOnboarding:
+-+    """Test /api/users/onboarding endpoint"""
+-+    
+-+    @pytest.fixture
+-+    def unique_email(self):
+-+        """Generate unique email for each test"""
+-+        return f"TEST_user_{uuid.uuid4().hex[:8]}@test.com"
+-+    
+-+    def test_create_user_with_all_fields(self, unique_email):
+-+        """Test creating a new user with all required fields including residenceFiscale"""
+-+        payload = {
+-+            "prenom": "TEST_Romain",
+-+            "email": unique_email,
+-+            "classement": "45",
+-+            "residenceFiscale": "Monaco",
+-+            "circuits": ["ATP"],
+-+            "niveaux": ["250", "500"],
+-+            "onboardingCompleted": True,
+-+            "onboardingStep": 7
+-+        }
+-+        
+-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
+-+        
+-+        # Status code assertion
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+-+        
+-+        # Data assertions
+-+        data = response.json()
+-+        assert "id" in data, "Response should contain 'id'"
+-+        assert data["prenom"] == "TEST_Romain", f"prenom should be 'TEST_Romain', got '{data.get('prenom')}'"
+-+        assert data["email"] == unique_email, f"email should be '{unique_email}', got '{data.get('email')}'"
+-+        assert data["classement"] == "45", f"classement should be '45', got '{data.get('classement')}'"
+-+        assert data["residenceFiscale"] == "Monaco", f"residenceFiscale should be 'Monaco', got '{data.get('residenceFiscale')}'"
+-+        assert data["circuits"] == ["ATP"], f"circuits should be ['ATP'], got '{data.get('circuits')}'"
+-+        assert data["onboardingCompleted"] == True, "onboardingCompleted should be True"
+-+        
+-+        print(f"✓ Created user with all fields: {data['prenom']} (#{data['classement']}) - {data['residenceFiscale']}")
+-+        
+-+        # Cleanup - verify user exists via GET
+-+        get_response = requests.get(f"{BASE_URL}/api/users/profile/email/{unique_email}")
+-+        assert get_response.status_code == 200, "User should be retrievable after creation"
+-+        
+-+        return data
+-+    
+-+    def test_create_user_minimal_fields(self, unique_email):
+-+        """Test creating a user with only required fields"""
+-+        payload = {
+-+            "prenom": "TEST_MinimalUser",
+-+            "email": unique_email
+-+        }
+-+        
+-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
+-+        
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+-+        
+-+        data = response.json()
+-+        assert data["prenom"] == "TEST_MinimalUser"
+-+        assert data["email"] == unique_email
+-+        # Optional fields should be None or default
+-+        assert data.get("classement") is None or data.get("classement") == ""
+-+        assert data.get("residenceFiscale") is None or data.get("residenceFiscale") == ""
+-+        
+-+        print(f"✓ Created user with minimal fields: {data['prenom']}")
+-+    
+-+    def test_update_existing_user(self, unique_email):
+-+        """Test updating an existing user via onboarding endpoint"""
+-+        # First create user
+-+        create_payload = {
+-+            "prenom": "TEST_UpdateUser",
+-+            "email": unique_email,
+-+            "classement": "100",
+-+            "residenceFiscale": "France"
+-+        }
+-+        
+-+        create_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=create_payload)
+-+        assert create_response.status_code == 200
+-+        
+-+        # Update user with same email
+-+        update_payload = {
+-+            "prenom": "TEST_UpdateUser",
+-+            "email": unique_email,
+-+            "classement": "50",  # Updated ranking
+-+            "residenceFiscale": "Suisse"  # Updated residence
+-+        }
+-+        
+-+        update_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=update_payload)
+-+        assert update_response.status_code == 200
+-+        
+-+        data = update_response.json()
+-+        assert data["classement"] == "50", f"classement should be updated to '50', got '{data.get('classement')}'"
+-+        assert data["residenceFiscale"] == "Suisse", f"residenceFiscale should be updated to 'Suisse', got '{data.get('residenceFiscale')}'"
+-+        
+-+        # Verify via GET
+-+        get_response = requests.get(f"{BASE_URL}/api/users/profile/email/{unique_email}")
+-+        assert get_response.status_code == 200
+-+        get_data = get_response.json()
+-+        assert get_data["classement"] == "50"
+-+        assert get_data["residenceFiscale"] == "Suisse"
+-+        
+-+        print(f"✓ Updated user: classement 100→50, residenceFiscale France→Suisse")
+-+    
+-+    def test_create_user_missing_required_fields(self):
+-+        """Test that creating user without required fields fails"""
+-+        # Missing prenom
+-+        payload = {
+-+            "email": "test@test.com"
+-+        }
+-+        
+-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
+-+        
+-+        # Should fail with 422 (validation error)
+-+        assert response.status_code == 422, f"Expected 422 for missing prenom, got {response.status_code}"
+-+        
+-+        print(f"✓ Correctly rejects request without required 'prenom' field")
+-+
+-+
+-+class TestUserProfileByEmail:
+-+    """Test /api/users/profile/email/{email} endpoint"""
+-+    
+-+    @pytest.fixture
+-+    def test_user(self):
+-+        """Create a test user and return its data"""
+-+        unique_email = f"TEST_profile_{uuid.uuid4().hex[:8]}@test.com"
+-+        payload = {
+-+            "prenom": "TEST_ProfileUser",
+-+            "email": unique_email,
+-+            "classement": "75",
+-+            "residenceFiscale": "Dubaï",
+-+            "circuits": ["WTA"],
+-+            "niveaux": ["1000"],
+-+            "onboardingCompleted": True
+-+        }
+-+        
+-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
+-+        assert response.status_code == 200
+-+        return response.json()
+-+    
+-+    def test_get_profile_by_email_success(self, test_user):
+-+        """Test getting user profile by email returns all fields"""
+-+        email = test_user["email"]
+-+        
+-+        response = requests.get(f"{BASE_URL}/api/users/profile/email/{email}")
+-+        
+-+        # Status code assertion
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+-+        
+-+        # Data assertions - verify all fields are returned
+-+        data = response.json()
+-+        assert data["id"] == test_user["id"], "id should match"
+-+        assert data["prenom"] == "TEST_ProfileUser", f"prenom should be 'TEST_ProfileUser', got '{data.get('prenom')}'"
+-+        assert data["email"] == email, f"email should match"
+-+        assert data["classement"] == "75", f"classement should be '75', got '{data.get('classement')}'"
+-+        assert data["residenceFiscale"] == "Dubaï", f"residenceFiscale should be 'Dubaï', got '{data.get('residenceFiscale')}'"
+-+        assert data["circuits"] == ["WTA"], f"circuits should be ['WTA'], got '{data.get('circuits')}'"
+-+        assert data["onboardingCompleted"] == True, "onboardingCompleted should be True"
+-+        
+-+        # Verify timestamps exist
+-+        assert "createdAt" in data, "createdAt should be present"
+-+        assert "updatedAt" in data, "updatedAt should be present"
+-+        
+-+        print(f"✓ Retrieved profile by email: {data['prenom']} (#{data['classement']}) - {data['residenceFiscale']}")
+-+    
+-+    def test_get_profile_by_email_not_found(self):
+-+        """Test getting profile for non-existent email returns 404"""
+-+        fake_email = f"nonexistent_{uuid.uuid4().hex}@test.com"
+-+        
+-+        response = requests.get(f"{BASE_URL}/api/users/profile/email/{fake_email}")
+-+        
+-+        assert response.status_code == 404, f"Expected 404 for non-existent email, got {response.status_code}"
+-+        
+-+        print(f"✓ Correctly returns 404 for non-existent email")
+-+    
+-+    def test_get_profile_by_email_special_characters(self):
+-+        """Test getting profile with special characters in email"""
+-+        # Create user with special email
+-+        special_email = f"TEST_special+tag_{uuid.uuid4().hex[:6]}@test.com"
+-+        payload = {
+-+            "prenom": "TEST_SpecialEmail",
+-+            "email": special_email
+-+        }
+-+        
+-+        create_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
+-+        assert create_response.status_code == 200
+-+        
+-+        # URL encode the email for the GET request
+-+        import urllib.parse
+-+        encoded_email = urllib.parse.quote(special_email, safe='')
+-+        
+-+        response = requests.get(f"{BASE_URL}/api/users/profile/email/{encoded_email}")
+-+        
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+-+        
+-+        data = response.json()
+-+        assert data["email"] == special_email
+-+        
+-+        print(f"✓ Handles special characters in email correctly")
+-+
+-+
+-+class TestIntegration:
+-+    """Integration tests for user profile and documents flow"""
+-+    
+-+    def test_full_user_flow(self):
+-+        """Test complete user onboarding and profile retrieval flow"""
+-+        unique_email = f"TEST_integration_{uuid.uuid4().hex[:8]}@test.com"
+-+        
+-+        # Step 1: Create user via onboarding
+-+        create_payload = {
+-+            "prenom": "TEST_IntegrationUser",
+-+            "email": unique_email,
+-+            "classement": "25",
+-+            "residenceFiscale": "Monaco",
+-+            "circuits": ["ATP", "ITF"],
+-+            "niveaux": ["250", "500", "1000"],
+-+            "onboardingCompleted": False,
+-+            "onboardingStep": 3
+-+        }
+-+        
+-+        create_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=create_payload)
+-+        assert create_response.status_code == 200
+-+        user_id = create_response.json()["id"]
+-+        print(f"  Step 1: Created user with id {user_id}")
+-+        
+-+        # Step 2: Retrieve profile by email
+-+        get_response = requests.get(f"{BASE_URL}/api/users/profile/email/{unique_email}")
+-+        assert get_response.status_code == 200
+-+        profile = get_response.json()
+-+        assert profile["id"] == user_id
+-+        assert profile["classement"] == "25"
+-+        assert profile["residenceFiscale"] == "Monaco"
+-+        print(f"  Step 2: Retrieved profile - {profile['prenom']} (#{profile['classement']})")
+-+        
+-+        # Step 3: Update user (complete onboarding)
+-+        update_payload = {
+-+            "prenom": "TEST_IntegrationUser",
+-+            "email": unique_email,
+-+            "classement": "20",  # Improved ranking
+-+            "residenceFiscale": "Monaco",
+-+            "circuits": ["ATP", "ITF"],
+-+            "niveaux": ["250", "500", "1000"],
+-+            "onboardingCompleted": True,
+-+            "onboardingStep": 7
+-+        }
+-+        
+-+        update_response = requests.post(f"{BASE_URL}/api/users/onboarding", json=update_payload)
+-+        assert update_response.status_code == 200
+-+        updated_profile = update_response.json()
+-+        assert updated_profile["classement"] == "20"
+-+        assert updated_profile["onboardingCompleted"] == True
+-+        print(f"  Step 3: Updated profile - classement now #{updated_profile['classement']}, onboarding complete")
+-+        
+-+        # Step 4: Verify update via GET
+-+        verify_response = requests.get(f"{BASE_URL}/api/users/profile/email/{unique_email}")
+-+        assert verify_response.status_code == 200
+-+        final_profile = verify_response.json()
+-+        assert final_profile["classement"] == "20"
+-+        assert final_profile["onboardingCompleted"] == True
+-+        print(f"  Step 4: Verified final profile state")
+-+        
+-+        print(f"✓ Full user flow completed successfully")
+-+    
+-+    def test_documents_and_categories_available(self):
+-+        """Test that documents stats and categories are available"""
+-+        # Get categories
+-+        cat_response = requests.get(f"{BASE_URL}/api/documents/categories")
+-+        assert cat_response.status_code == 200
+-+        categories = cat_response.json()["categories"]
+-+        print(f"  Categories available: {len(categories)}")
+-+        
+-+        # Get stats
+-+        stats_response = requests.get(f"{BASE_URL}/api/documents/stats")
+-+        assert stats_response.status_code == 200
+-+        stats = stats_response.json()
+-+        print(f"  Documents stats: {stats['totalCount']} docs, {stats['totalAmount']}€")
+-+        
+-+        print(f"✓ Documents endpoints working correctly")
+-+
+-+
+-+# Test with specific test email from requirements
+-+class TestSpecificUser:
+-+    """Test with the specific test email provided"""
+-+    
+-+    def test_create_or_get_romain_user(self):
+-+        """Test creating/updating user with test email romain@test.com"""
+-+        test_email = "romain@test.com"
+-+        
+-+        # Create/update user
+-+        payload = {
+-+            "prenom": "Romain",
+-+            "email": test_email,
+-+            "classement": "45",
+-+            "residenceFiscale": "Monaco",
+-+            "circuits": ["ATP"],
+-+            "onboardingCompleted": True
+-+        }
+-+        
+-+        response = requests.post(f"{BASE_URL}/api/users/onboarding", json=payload)
+-+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+-+        
+-+        data = response.json()
+-+        assert data["email"] == test_email
+-+        assert data["prenom"] == "Romain"
+-+        assert data["classement"] == "45"
+-+        assert data["residenceFiscale"] == "Monaco"
+-+        
+-+        print(f"✓ User romain@test.com created/updated successfully")
+-+        
+-+        # Verify via GET
+-+        get_response = requests.get(f"{BASE_URL}/api/users/profile/email/{test_email}")
+-+        assert get_response.status_code == 200
+-+        
+-+        profile = get_response.json()
+-+        assert profile["residenceFiscale"] == "Monaco", f"residenceFiscale should be 'Monaco', got '{profile.get('residenceFiscale')}'"
+-+        
+-+        print(f"✓ Profile retrieved: {profile['prenom']} (#{profile['classement']}) - {profile['residenceFiscale']}")
+-+
+-+
+-+if __name__ == "__main__":
+-+    pytest.main([__file__, "-v", "--tb=short"])
 -diff --git a/model.patch b/model.patch
--index 75427be9..e69de29b 100644
+-index d4945d5f..b79b829a 100644
 ---- a/model.patch
 -+++ b/model.patch
--@@ -1,657 +0,0 @@
---diff --git a/backend/tests/test_ocr_endpoints.py b/backend/tests/test_ocr_endpoints.py
---new file mode 100644
---index 00000000..9e210d86
------ /dev/null
---+++ b/backend/tests/test_ocr_endpoints.py
---@@ -0,0 +1,417 @@
---+"""
---+OCR Endpoints Test Suite
---+Tests for invoice/document analysis endpoints:
---+- POST /api/invoices/analyze-base64 - Base64 encoded image/PDF analysis
---+- POST /api/documents/analyze - Legacy endpoint for image analysis
---+- GET /api/documents/categories - Returns available categories
---+- POST /api/invoices/upload - Multipart form upload endpoint
---+"""
---+
---+import pytest
---+import requests
---+import os
---+import base64
---+from PIL import Image, ImageDraw
---+import io
---+
---+# Get BASE_URL from environment
---+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
---+if not BASE_URL:
---+    BASE_URL = "https://tennis-nexus.preview.emergentagent.com"
---+
---+
---+def create_test_receipt_image(text_content: str) -> bytes:
---+    """Create a test receipt image with given text content"""
---+    img = Image.new('RGB', (400, 500), color='white')
---+    draw = ImageDraw.Draw(img)
---+    
---+    y_position = 20
---+    for line in text_content.strip().split('\n'):
---+        draw.text((20, y_position), line, fill='black')
---+        y_position += 20
---+    
---+    buffer = io.BytesIO()
---+    img.save(buffer, format='PNG')
---+    buffer.seek(0)
---+    return buffer.read()
---+
---+
---+def create_test_receipt_base64(text_content: str) -> str:
---+    """Create a test receipt image and return as base64"""
---+    image_bytes = create_test_receipt_image(text_content)
---+    return base64.b64encode(image_bytes).decode('utf-8')
---+
---+
---+class TestHealthEndpoint:
---+    """Health check endpoint tests"""
---+    
---+    def test_health_check(self):
---+        """Test that health endpoint returns healthy status"""
---+        response = requests.get(f"{BASE_URL}/api/health")
---+        assert response.status_code == 200
---+        data = response.json()
---+        assert data["status"] == "healthy"
---+        assert "service" in data
---+
---+
---+class TestCategoriesEndpoint:
---+    """Categories endpoint tests"""
---+    
---+    def test_get_categories(self):
---+        """Test GET /api/documents/categories returns all categories"""
---+        response = requests.get(f"{BASE_URL}/api/documents/categories")
---+        assert response.status_code == 200
---+        
---+        data = response.json()
---+        assert "categories" in data
---+        categories = data["categories"]
---+        
---+        # Verify expected categories exist
---+        category_ids = [c["id"] for c in categories]
---+        expected_ids = ["travel", "accommodation", "restaurant", "medical", "equipment", "services", "other"]
---+        
---+        for expected_id in expected_ids:
---+            assert expected_id in category_ids, f"Missing category: {expected_id}"
---+        
---+        # Verify each category has required fields
---+        for cat in categories:
---+            assert "id" in cat
---+            assert "label" in cat
---+            assert "icon" in cat
---+
---+
---+class TestInvoiceAnalyzeBase64Endpoint:
---+    """Tests for POST /api/invoices/analyze-base64 endpoint"""
---+    
---+    def test_analyze_restaurant_receipt(self):
---+        """Test OCR extraction from restaurant receipt"""
---+        receipt_text = """
---+RESTAURANT LE TENNIS
---+123 Rue du Sport
---+75001 Paris
---+
---+Date: 15/01/2026
---+
---+Menu du jour         15.00 EUR
---+Boisson              3.50 EUR
---+Dessert              6.00 EUR
---+
---+------------------------
---+TOTAL TTC           24.50 EUR
---+------------------------
---+"""
---+        base64_image = create_test_receipt_base64(receipt_text)
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/analyze-base64",
---+            json={"image_base64": base64_image, "filename": "restaurant_receipt.png"}
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        # Verify success
---+        assert data["success"] == True
---+        assert data["data"] is not None
---+        
---+        # Verify extracted data
---+        invoice_data = data["data"]
---+        assert invoice_data["montantTotal"] == 24.5
---+        assert invoice_data["dateFacture"] == "15/01/2026"
---+        assert invoice_data["fournisseur"] == "RESTAURANT LE TENNIS"
---+        assert invoice_data["categorie"] == "Restauration"
---+        assert invoice_data["confidence"] >= 0.7
---+        
---+        # Verify line items
---+        assert invoice_data["lignes"] is not None
---+        assert len(invoice_data["lignes"]) >= 1
---+    
---+    def test_analyze_hotel_receipt_with_ht_tva(self):
---+        """Test OCR extraction with HT/TVA breakdown"""
---+        receipt_text = """
---+HOTEL HILTON PARIS
---+Avenue des Champs-Elysees
---+75008 Paris
---+
---+Date: 20/01/2026
---+Facture N: HTL-2026-001
---+
---+Chambre Double      180.00 EUR
---+Petit-dejeuner       25.00 EUR
---+Parking              15.00 EUR
---+
---+------------------------
---+Sous-total HT       183.33 EUR
---+TVA (20%)            36.67 EUR
---+------------------------
---+TOTAL TTC           220.00 EUR
---+------------------------
---+"""
---+        base64_image = create_test_receipt_base64(receipt_text)
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/analyze-base64",
---+            json={"image_base64": base64_image, "filename": "hotel_receipt.png"}
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        assert data["success"] == True
---+        invoice_data = data["data"]
---+        
---+        # Verify amounts
---+        assert invoice_data["montantTotal"] == 220.0
---+        assert invoice_data["montantHT"] == 183.33
---+        assert invoice_data["montantTVA"] == 36.67
---+        
---+        # Verify HT + TVA = TTC (within tolerance)
---+        if invoice_data["montantHT"] and invoice_data["montantTVA"]:
---+            calculated = invoice_data["montantHT"] + invoice_data["montantTVA"]
---+            assert abs(calculated - invoice_data["montantTotal"]) < 0.10
---+        
---+        # Verify category detection
---+        assert invoice_data["categorie"] == "Hébergement"
---+        
---+        # Verify invoice number
---+        assert invoice_data["numeroFacture"] == "HTL-2026-001"
---+    
---+    def test_analyze_medical_receipt(self):
---+        """Test OCR extraction from medical receipt"""
---+        receipt_text = """
---+PHARMACIE CENTRALE
---+45 Boulevard de la Sante
---+75013 Paris
---+
---+Date: 10/01/2026
---+
---+Medicament A         12.50 EUR
---+Medicament B          8.00 EUR
---+Pansements            4.50 EUR
---+
---+------------------------
---+TOTAL                25.00 EUR
---+------------------------
---+"""
---+        base64_image = create_test_receipt_base64(receipt_text)
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/analyze-base64",
---+            json={"image_base64": base64_image, "filename": "pharmacy_receipt.png"}
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        assert data["success"] == True
---+        invoice_data = data["data"]
---+        
---+        # Verify medical category detection
---+        assert invoice_data["categorie"] == "Médical"
---+        assert invoice_data["montantTotal"] == 25.0
---+    
---+    def test_analyze_travel_receipt(self):
---+        """Test OCR extraction from travel receipt"""
---+        receipt_text = """
---+AIR FRANCE
---+Billet Electronique
---+
---+Date: 05/01/2026
---+Vol: AF1234
---+
---+Paris CDG -> Rotterdam
---+Classe Economique
---+
---+------------------------
---+TOTAL TTC           285.00 EUR
---+------------------------
---+"""
---+        base64_image = create_test_receipt_base64(receipt_text)
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/analyze-base64",
---+            json={"image_base64": base64_image, "filename": "flight_ticket.png"}
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        assert data["success"] == True
---+        invoice_data = data["data"]
---+        
---+        # Verify transport category detection
---+        assert invoice_data["categorie"] == "Transport"
---+        assert invoice_data["montantTotal"] == 285.0
---+    
---+    def test_invalid_base64(self):
---+        """Test error handling for invalid base64"""
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/analyze-base64",
---+            json={"image_base64": "invalid_base64_data!!!", "filename": "test.png"}
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        assert data["success"] == False
---+        assert data["error"] is not None
---+
---+
---+class TestDocumentsAnalyzeEndpoint:
---+    """Tests for legacy POST /api/documents/analyze endpoint"""
---+    
---+    def test_legacy_analyze_endpoint(self):
---+        """Test legacy endpoint returns old format"""
---+        receipt_text = """
---+RESTAURANT TEST
---+Date: 01/01/2026
---+TOTAL: 50.00 EUR
---+"""
---+        base64_image = create_test_receipt_base64(receipt_text)
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/documents/analyze",
---+            json={"image_base64": base64_image, "filename": "test.png"}
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        # Verify legacy format fields
---+        assert "success" in data
---+        assert "amount" in data
---+        assert "date" in data
---+        assert "category" in data
---+        assert "merchant" in data
---+        assert "confidence" in data
---+        assert "needsReview" in data
---+
---+
---+class TestInvoiceUploadEndpoint:
---+    """Tests for POST /api/invoices/upload multipart endpoint"""
---+    
---+    def test_upload_png_image(self):
---+        """Test multipart upload with PNG image"""
---+        receipt_text = """
---+TEST STORE
---+Date: 25/01/2026
---+TOTAL: 99.99 EUR
---+"""
---+        image_bytes = create_test_receipt_image(receipt_text)
---+        
---+        files = {
---+            'file': ('test_receipt.png', image_bytes, 'image/png')
---+        }
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/upload",
---+            files=files
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        assert data["success"] == True
---+        assert data["data"] is not None
---+        assert data["data"]["montantTotal"] == 99.99
---+        assert data["data"]["fileType"] == "image"
---+    
---+    def test_upload_jpeg_image(self):
---+        """Test multipart upload with JPEG image"""
---+        receipt_text = """
---+JPEG TEST STORE
---+Date: 26/01/2026
---+TOTAL: 75.50 EUR
---+"""
---+        # Create JPEG image
---+        img = Image.new('RGB', (400, 300), color='white')
---+        draw = ImageDraw.Draw(img)
---+        y_position = 20
---+        for line in receipt_text.strip().split('\n'):
---+            draw.text((20, y_position), line, fill='black')
---+            y_position += 20
---+        
---+        buffer = io.BytesIO()
---+        img.save(buffer, format='JPEG', quality=90)
---+        buffer.seek(0)
---+        image_bytes = buffer.read()
---+        
---+        files = {
---+            'file': ('test_receipt.jpg', image_bytes, 'image/jpeg')
---+        }
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/upload",
---+            files=files
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        assert data["success"] == True
---+        assert data["data"]["montantTotal"] == 75.5
---+    
---+    def test_upload_empty_file(self):
---+        """Test error handling for empty file"""
---+        files = {
---+            'file': ('empty.png', b'', 'image/png')
---+        }
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/upload",
---+            files=files
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        assert data["success"] == False
---+        assert "vide" in data["error"].lower() or "empty" in data["error"].lower()
---+
---+
---+class TestOCRDataValidation:
---+    """Tests for OCR data validation rules"""
---+    
---+    def test_confidence_score_range(self):
---+        """Test that confidence score is between 0 and 1"""
---+        receipt_text = """
---+CLEAR RECEIPT
---+Date: 01/01/2026
---+TOTAL: 100.00 EUR
---+"""
---+        base64_image = create_test_receipt_base64(receipt_text)
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/analyze-base64",
---+            json={"image_base64": base64_image, "filename": "test.png"}
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        if data["success"]:
---+            confidence = data["data"]["confidence"]
---+            assert 0 <= confidence <= 1
---+    
---+    def test_needs_review_flag(self):
---+        """Test that needsReview flag is set appropriately"""
---+        receipt_text = """
---+CLEAR RECEIPT
---+Date: 01/01/2026
---+TOTAL: 100.00 EUR
---+"""
---+        base64_image = create_test_receipt_base64(receipt_text)
---+        
---+        response = requests.post(
---+            f"{BASE_URL}/api/invoices/analyze-base64",
---+            json={"image_base64": base64_image, "filename": "test.png"}
---+        )
---+        
---+        assert response.status_code == 200
---+        data = response.json()
---+        
---+        if data["success"]:
---+            assert "needsReview" in data["data"]
---+            assert isinstance(data["data"]["needsReview"], bool)
---+
---+
---+if __name__ == "__main__":
---+    pytest.main([__file__, "-v", "--tb=short"])
+-@@ -1,662 +0,0 @@
 --diff --git a/model.patch b/model.patch
---index d320bdda..55c66a54 100644
+--index 75427be9..e69de29b 100644
 ----- a/model.patch
 --+++ b/model.patch
---@@ -1,221 +0,0 @@
+--@@ -1,657 +0,0 @@
+---diff --git a/backend/tests/test_ocr_endpoints.py b/backend/tests/test_ocr_endpoints.py
+---new file mode 100644
+---index 00000000..9e210d86
+------ /dev/null
+---+++ b/backend/tests/test_ocr_endpoints.py
+---@@ -0,0 +1,417 @@
+---+"""
+---+OCR Endpoints Test Suite
+---+Tests for invoice/document analysis endpoints:
+---+- POST /api/invoices/analyze-base64 - Base64 encoded image/PDF analysis
+---+- POST /api/documents/analyze - Legacy endpoint for image analysis
+---+- GET /api/documents/categories - Returns available categories
+---+- POST /api/invoices/upload - Multipart form upload endpoint
+---+"""
+---+
+---+import pytest
+---+import requests
+---+import os
+---+import base64
+---+from PIL import Image, ImageDraw
+---+import io
+---+
+---+# Get BASE_URL from environment
+---+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+---+if not BASE_URL:
+---+    BASE_URL = "https://tennis-nexus.preview.emergentagent.com"
+---+
+---+
+---+def create_test_receipt_image(text_content: str) -> bytes:
+---+    """Create a test receipt image with given text content"""
+---+    img = Image.new('RGB', (400, 500), color='white')
+---+    draw = ImageDraw.Draw(img)
+---+    
+---+    y_position = 20
+---+    for line in text_content.strip().split('\n'):
+---+        draw.text((20, y_position), line, fill='black')
+---+        y_position += 20
+---+    
+---+    buffer = io.BytesIO()
+---+    img.save(buffer, format='PNG')
+---+    buffer.seek(0)
+---+    return buffer.read()
+---+
+---+
+---+def create_test_receipt_base64(text_content: str) -> str:
+---+    """Create a test receipt image and return as base64"""
+---+    image_bytes = create_test_receipt_image(text_content)
+---+    return base64.b64encode(image_bytes).decode('utf-8')
+---+
+---+
+---+class TestHealthEndpoint:
+---+    """Health check endpoint tests"""
+---+    
+---+    def test_health_check(self):
+---+        """Test that health endpoint returns healthy status"""
+---+        response = requests.get(f"{BASE_URL}/api/health")
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        assert data["status"] == "healthy"
+---+        assert "service" in data
+---+
+---+
+---+class TestCategoriesEndpoint:
+---+    """Categories endpoint tests"""
+---+    
+---+    def test_get_categories(self):
+---+        """Test GET /api/documents/categories returns all categories"""
+---+        response = requests.get(f"{BASE_URL}/api/documents/categories")
+---+        assert response.status_code == 200
+---+        
+---+        data = response.json()
+---+        assert "categories" in data
+---+        categories = data["categories"]
+---+        
+---+        # Verify expected categories exist
+---+        category_ids = [c["id"] for c in categories]
+---+        expected_ids = ["travel", "accommodation", "restaurant", "medical", "equipment", "services", "other"]
+---+        
+---+        for expected_id in expected_ids:
+---+            assert expected_id in category_ids, f"Missing category: {expected_id}"
+---+        
+---+        # Verify each category has required fields
+---+        for cat in categories:
+---+            assert "id" in cat
+---+            assert "label" in cat
+---+            assert "icon" in cat
+---+
+---+
+---+class TestInvoiceAnalyzeBase64Endpoint:
+---+    """Tests for POST /api/invoices/analyze-base64 endpoint"""
+---+    
+---+    def test_analyze_restaurant_receipt(self):
+---+        """Test OCR extraction from restaurant receipt"""
+---+        receipt_text = """
+---+RESTAURANT LE TENNIS
+---+123 Rue du Sport
+---+75001 Paris
+---+
+---+Date: 15/01/2026
+---+
+---+Menu du jour         15.00 EUR
+---+Boisson              3.50 EUR
+---+Dessert              6.00 EUR
+---+
+---+------------------------
+---+TOTAL TTC           24.50 EUR
+---+------------------------
+---+"""
+---+        base64_image = create_test_receipt_base64(receipt_text)
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/analyze-base64",
+---+            json={"image_base64": base64_image, "filename": "restaurant_receipt.png"}
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        # Verify success
+---+        assert data["success"] == True
+---+        assert data["data"] is not None
+---+        
+---+        # Verify extracted data
+---+        invoice_data = data["data"]
+---+        assert invoice_data["montantTotal"] == 24.5
+---+        assert invoice_data["dateFacture"] == "15/01/2026"
+---+        assert invoice_data["fournisseur"] == "RESTAURANT LE TENNIS"
+---+        assert invoice_data["categorie"] == "Restauration"
+---+        assert invoice_data["confidence"] >= 0.7
+---+        
+---+        # Verify line items
+---+        assert invoice_data["lignes"] is not None
+---+        assert len(invoice_data["lignes"]) >= 1
+---+    
+---+    def test_analyze_hotel_receipt_with_ht_tva(self):
+---+        """Test OCR extraction with HT/TVA breakdown"""
+---+        receipt_text = """
+---+HOTEL HILTON PARIS
+---+Avenue des Champs-Elysees
+---+75008 Paris
+---+
+---+Date: 20/01/2026
+---+Facture N: HTL-2026-001
+---+
+---+Chambre Double      180.00 EUR
+---+Petit-dejeuner       25.00 EUR
+---+Parking              15.00 EUR
+---+
+---+------------------------
+---+Sous-total HT       183.33 EUR
+---+TVA (20%)            36.67 EUR
+---+------------------------
+---+TOTAL TTC           220.00 EUR
+---+------------------------
+---+"""
+---+        base64_image = create_test_receipt_base64(receipt_text)
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/analyze-base64",
+---+            json={"image_base64": base64_image, "filename": "hotel_receipt.png"}
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        assert data["success"] == True
+---+        invoice_data = data["data"]
+---+        
+---+        # Verify amounts
+---+        assert invoice_data["montantTotal"] == 220.0
+---+        assert invoice_data["montantHT"] == 183.33
+---+        assert invoice_data["montantTVA"] == 36.67
+---+        
+---+        # Verify HT + TVA = TTC (within tolerance)
+---+        if invoice_data["montantHT"] and invoice_data["montantTVA"]:
+---+            calculated = invoice_data["montantHT"] + invoice_data["montantTVA"]
+---+            assert abs(calculated - invoice_data["montantTotal"]) < 0.10
+---+        
+---+        # Verify category detection
+---+        assert invoice_data["categorie"] == "Hébergement"
+---+        
+---+        # Verify invoice number
+---+        assert invoice_data["numeroFacture"] == "HTL-2026-001"
+---+    
+---+    def test_analyze_medical_receipt(self):
+---+        """Test OCR extraction from medical receipt"""
+---+        receipt_text = """
+---+PHARMACIE CENTRALE
+---+45 Boulevard de la Sante
+---+75013 Paris
+---+
+---+Date: 10/01/2026
+---+
+---+Medicament A         12.50 EUR
+---+Medicament B          8.00 EUR
+---+Pansements            4.50 EUR
+---+
+---+------------------------
+---+TOTAL                25.00 EUR
+---+------------------------
+---+"""
+---+        base64_image = create_test_receipt_base64(receipt_text)
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/analyze-base64",
+---+            json={"image_base64": base64_image, "filename": "pharmacy_receipt.png"}
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        assert data["success"] == True
+---+        invoice_data = data["data"]
+---+        
+---+        # Verify medical category detection
+---+        assert invoice_data["categorie"] == "Médical"
+---+        assert invoice_data["montantTotal"] == 25.0
+---+    
+---+    def test_analyze_travel_receipt(self):
+---+        """Test OCR extraction from travel receipt"""
+---+        receipt_text = """
+---+AIR FRANCE
+---+Billet Electronique
+---+
+---+Date: 05/01/2026
+---+Vol: AF1234
+---+
+---+Paris CDG -> Rotterdam
+---+Classe Economique
+---+
+---+------------------------
+---+TOTAL TTC           285.00 EUR
+---+------------------------
+---+"""
+---+        base64_image = create_test_receipt_base64(receipt_text)
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/analyze-base64",
+---+            json={"image_base64": base64_image, "filename": "flight_ticket.png"}
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        assert data["success"] == True
+---+        invoice_data = data["data"]
+---+        
+---+        # Verify transport category detection
+---+        assert invoice_data["categorie"] == "Transport"
+---+        assert invoice_data["montantTotal"] == 285.0
+---+    
+---+    def test_invalid_base64(self):
+---+        """Test error handling for invalid base64"""
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/analyze-base64",
+---+            json={"image_base64": "invalid_base64_data!!!", "filename": "test.png"}
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        assert data["success"] == False
+---+        assert data["error"] is not None
+---+
+---+
+---+class TestDocumentsAnalyzeEndpoint:
+---+    """Tests for legacy POST /api/documents/analyze endpoint"""
+---+    
+---+    def test_legacy_analyze_endpoint(self):
+---+        """Test legacy endpoint returns old format"""
+---+        receipt_text = """
+---+RESTAURANT TEST
+---+Date: 01/01/2026
+---+TOTAL: 50.00 EUR
+---+"""
+---+        base64_image = create_test_receipt_base64(receipt_text)
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/documents/analyze",
+---+            json={"image_base64": base64_image, "filename": "test.png"}
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        # Verify legacy format fields
+---+        assert "success" in data
+---+        assert "amount" in data
+---+        assert "date" in data
+---+        assert "category" in data
+---+        assert "merchant" in data
+---+        assert "confidence" in data
+---+        assert "needsReview" in data
+---+
+---+
+---+class TestInvoiceUploadEndpoint:
+---+    """Tests for POST /api/invoices/upload multipart endpoint"""
+---+    
+---+    def test_upload_png_image(self):
+---+        """Test multipart upload with PNG image"""
+---+        receipt_text = """
+---+TEST STORE
+---+Date: 25/01/2026
+---+TOTAL: 99.99 EUR
+---+"""
+---+        image_bytes = create_test_receipt_image(receipt_text)
+---+        
+---+        files = {
+---+            'file': ('test_receipt.png', image_bytes, 'image/png')
+---+        }
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/upload",
+---+            files=files
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        assert data["success"] == True
+---+        assert data["data"] is not None
+---+        assert data["data"]["montantTotal"] == 99.99
+---+        assert data["data"]["fileType"] == "image"
+---+    
+---+    def test_upload_jpeg_image(self):
+---+        """Test multipart upload with JPEG image"""
+---+        receipt_text = """
+---+JPEG TEST STORE
+---+Date: 26/01/2026
+---+TOTAL: 75.50 EUR
+---+"""
+---+        # Create JPEG image
+---+        img = Image.new('RGB', (400, 300), color='white')
+---+        draw = ImageDraw.Draw(img)
+---+        y_position = 20
+---+        for line in receipt_text.strip().split('\n'):
+---+            draw.text((20, y_position), line, fill='black')
+---+            y_position += 20
+---+        
+---+        buffer = io.BytesIO()
+---+        img.save(buffer, format='JPEG', quality=90)
+---+        buffer.seek(0)
+---+        image_bytes = buffer.read()
+---+        
+---+        files = {
+---+            'file': ('test_receipt.jpg', image_bytes, 'image/jpeg')
+---+        }
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/upload",
+---+            files=files
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        assert data["success"] == True
+---+        assert data["data"]["montantTotal"] == 75.5
+---+    
+---+    def test_upload_empty_file(self):
+---+        """Test error handling for empty file"""
+---+        files = {
+---+            'file': ('empty.png', b'', 'image/png')
+---+        }
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/upload",
+---+            files=files
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        assert data["success"] == False
+---+        assert "vide" in data["error"].lower() or "empty" in data["error"].lower()
+---+
+---+
+---+class TestOCRDataValidation:
+---+    """Tests for OCR data validation rules"""
+---+    
+---+    def test_confidence_score_range(self):
+---+        """Test that confidence score is between 0 and 1"""
+---+        receipt_text = """
+---+CLEAR RECEIPT
+---+Date: 01/01/2026
+---+TOTAL: 100.00 EUR
+---+"""
+---+        base64_image = create_test_receipt_base64(receipt_text)
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/analyze-base64",
+---+            json={"image_base64": base64_image, "filename": "test.png"}
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        if data["success"]:
+---+            confidence = data["data"]["confidence"]
+---+            assert 0 <= confidence <= 1
+---+    
+---+    def test_needs_review_flag(self):
+---+        """Test that needsReview flag is set appropriately"""
+---+        receipt_text = """
+---+CLEAR RECEIPT
+---+Date: 01/01/2026
+---+TOTAL: 100.00 EUR
+---+"""
+---+        base64_image = create_test_receipt_base64(receipt_text)
+---+        
+---+        response = requests.post(
+---+            f"{BASE_URL}/api/invoices/analyze-base64",
+---+            json={"image_base64": base64_image, "filename": "test.png"}
+---+        )
+---+        
+---+        assert response.status_code == 200
+---+        data = response.json()
+---+        
+---+        if data["success"]:
+---+            assert "needsReview" in data["data"]
+---+            assert isinstance(data["data"]["needsReview"], bool)
+---+
+---+
+---+if __name__ == "__main__":
+---+    pytest.main([__file__, "-v", "--tb=short"])
 ---diff --git a/model.patch b/model.patch
----index 35c5e30..e69de29 100644
+---index d320bdda..55c66a54 100644
 ------ a/model.patch
 ---+++ b/model.patch
----@@ -1,216 +0,0 @@
-----diff --git a/frontend/app/(tabs)/index.tsx b/frontend/app/(tabs)/index.tsx
-----index d991aed..d68a36c 100644
-------- a/frontend/app/(tabs)/index.tsx
-----+++ b/frontend/app/(tabs)/index.tsx
-----@@ -137,34 +137,6 @@ export default function CalendarScreenV1() {
-----     return events.filter(e => e.date === date);
-----   };
-----   
------  // Get tournament events for calendar marks
------  const tournamentMarks = useMemo(() => {
------    const marks: Record<string, any> = {};
------    
------    weekTournaments.forEach(week => {
------      // Mark tournaments that have registrations
------      week.registrations.forEach(reg => {
------        const tournament = week.tournaments.find(t => t.id === reg.tournamentId);
------        if (tournament) {
------          // Mark all days of the tournament
------          let currentDate = new Date(tournament.startDate);
------          const endDate = new Date(tournament.endDate);
------          
------          while (currentDate <= endDate) {
------            const dateStr = currentDate.toISOString().split('T')[0];
------            marks[dateStr] = {
------              marked: true,
------              dotColor: EVENT_CATEGORIES.tournament.color,
------            };
------            currentDate.setDate(currentDate.getDate() + 1);
------          }
------        }
------      });
------    });
------    
------    return marks;
------  }, [weekTournaments]);
------  
-----   // Combine all marks for calendar
-----   const calendarMarks = useMemo(() => {
-----     const marks: Record<string, any> = {};
+---@@ -1,221 +0,0 @@
 ----diff --git a/model.patch b/model.patch
-----index 4a7a74b..e69de29 100644
+----index 35c5e30..e69de29 100644
 ------- a/model.patch
 ----+++ b/model.patch
-----@@ -1,172 +0,0 @@
+----@@ -1,216 +0,0 @@
+-----diff --git a/frontend/app/(tabs)/index.tsx b/frontend/app/(tabs)/index.tsx
+-----index d991aed..d68a36c 100644
+-------- a/frontend/app/(tabs)/index.tsx
+-----+++ b/frontend/app/(tabs)/index.tsx
+-----@@ -137,34 +137,6 @@ export default function CalendarScreenV1() {
+-----     return events.filter(e => e.date === date);
+-----   };
+-----   
+------  // Get tournament events for calendar marks
+------  const tournamentMarks = useMemo(() => {
+------    const marks: Record<string, any> = {};
+------    
+------    weekTournaments.forEach(week => {
+------      // Mark tournaments that have registrations
+------      week.registrations.forEach(reg => {
+------        const tournament = week.tournaments.find(t => t.id === reg.tournamentId);
+------        if (tournament) {
+------          // Mark all days of the tournament
+------          let currentDate = new Date(tournament.startDate);
+------          const endDate = new Date(tournament.endDate);
+------          
+------          while (currentDate <= endDate) {
+------            const dateStr = currentDate.toISOString().split('T')[0];
+------            marks[dateStr] = {
+------              marked: true,
+------              dotColor: EVENT_CATEGORIES.tournament.color,
+------            };
+------            currentDate.setDate(currentDate.getDate() + 1);
+------          }
+------        }
+------      });
+------    });
+------    
+------    return marks;
+------  }, [weekTournaments]);
+------  
+-----   // Combine all marks for calendar
+-----   const calendarMarks = useMemo(() => {
+-----     const marks: Record<string, any> = {};
 -----diff --git a/model.patch b/model.patch
------index 0fd24bc..e69de29 100644
+-----index 4a7a74b..e69de29 100644
 -------- a/model.patch
 -----+++ b/model.patch
------@@ -1,167 +0,0 @@
+-----@@ -1,172 +0,0 @@
 ------diff --git a/model.patch b/model.patch
-------index 99cd841..e69de29 100644
+------index 0fd24bc..e69de29 100644
 --------- a/model.patch
 ------+++ b/model.patch
-------@@ -1,162 +0,0 @@
--------diff --git a/frontend/src/data/tournamentsV1.ts b/frontend/src/data/tournamentsV1.ts
--------index d26dc58..05952f3 100644
----------- a/frontend/src/data/tournamentsV1.ts
--------+++ b/frontend/src/data/tournamentsV1.ts
--------@@ -111,8 +111,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
--------         endDate: '2026-02-15'
--------       }
--------     ],
---------    selectedTournamentId: null,
---------    status: 'none',
--------+    registrations: [],
--------     hiddenTournamentIds: []
--------   },
--------   {
--------@@ -150,8 +149,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
--------         endDate: '2026-02-22'
--------       }
--------     ],
---------    selectedTournamentId: null,
---------    status: 'none',
--------+    registrations: [],
--------     hiddenTournamentIds: []
--------   },
--------   {
--------@@ -203,8 +201,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
--------         endDate: '2026-03-01'
--------       }
--------     ],
---------    selectedTournamentId: null,
---------    status: 'none',
--------+    registrations: [],
--------     hiddenTournamentIds: []
--------   }
-------- ];
+------@@ -1,167 +0,0 @@
 -------diff --git a/model.patch b/model.patch
--------index 6854bbc..e69de29 100644
+-------index 99cd841..e69de29 100644
 ---------- a/model.patch
 -------+++ b/model.patch
--------@@ -1,123 +0,0 @@
+-------@@ -1,162 +0,0 @@
 --------diff --git a/frontend/src/data/tournamentsV1.ts b/frontend/src/data/tournamentsV1.ts
---------index deb4eb5..d44e8a8 100644
+--------index d26dc58..05952f3 100644
 ----------- a/frontend/src/data/tournamentsV1.ts
 --------+++ b/frontend/src/data/tournamentsV1.ts
---------@@ -107,7 +107,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+--------@@ -111,8 +111,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+--------         endDate: '2026-02-15'
 --------       }
 --------     ],
---------     selectedTournamentId: null,
----------    status: 'none'
---------+    status: 'none',
---------+    hiddenTournamentIds: []
+---------    selectedTournamentId: null,
+---------    status: 'none',
+--------+    registrations: [],
+--------     hiddenTournamentIds: []
 --------   },
 --------   {
---------     weekNumber: 8,
---------@@ -145,7 +146,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+--------@@ -150,8 +149,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+--------         endDate: '2026-02-22'
 --------       }
 --------     ],
---------     selectedTournamentId: null,
----------    status: 'none'
---------+    status: 'none',
---------+    hiddenTournamentIds: []
+---------    selectedTournamentId: null,
+---------    status: 'none',
+--------+    registrations: [],
+--------     hiddenTournamentIds: []
 --------   },
 --------   {
---------     weekNumber: 9,
---------@@ -197,7 +199,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+--------@@ -203,8 +201,7 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+--------         endDate: '2026-03-01'
 --------       }
 --------     ],
---------     selectedTournamentId: null,
----------    status: 'none'
---------+    status: 'none',
---------+    hiddenTournamentIds: []
+---------    selectedTournamentId: null,
+---------    status: 'none',
+--------+    registrations: [],
+--------     hiddenTournamentIds: []
 --------   }
 -------- ];
--------- 
 --------diff --git a/model.patch b/model.patch
---------index 6835f28..e69de29 100644
+--------index 6854bbc..e69de29 100644
 ----------- a/model.patch
 --------+++ b/model.patch
---------@@ -1,84 +0,0 @@
----------diff --git a/frontend/app/(tabs)/index.tsx b/frontend/app/(tabs)/index.tsx
----------index 0cd8d99..eb92923 100644
------------- a/frontend/app/(tabs)/index.tsx
----------+++ b/frontend/app/(tabs)/index.tsx
----------@@ -204,21 +204,65 @@ export default function CalendarScreen() {
----------   };
+--------@@ -1,123 +0,0 @@
+---------diff --git a/frontend/src/data/tournamentsV1.ts b/frontend/src/data/tournamentsV1.ts
+---------index deb4eb5..d44e8a8 100644
+------------ a/frontend/src/data/tournamentsV1.ts
+---------+++ b/frontend/src/data/tournamentsV1.ts
+---------@@ -107,7 +107,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+---------       }
+---------     ],
+---------     selectedTournamentId: null,
+----------    status: 'none'
+---------+    status: 'none',
+---------+    hiddenTournamentIds: []
+---------   },
+---------   {
+---------     weekNumber: 8,
+---------@@ -145,7 +146,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+---------       }
+---------     ],
+---------     selectedTournamentId: null,
+----------    status: 'none'
+---------+    status: 'none',
+---------+    hiddenTournamentIds: []
+---------   },
+---------   {
+---------     weekNumber: 9,
+---------@@ -197,7 +199,8 @@ export const ATP_TOURNAMENTS_FEB_2026: WeekTournaments[] = [
+---------       }
+---------     ],
+---------     selectedTournamentId: null,
+----------    status: 'none'
+---------+    status: 'none',
+---------+    hiddenTournamentIds: []
+---------   }
+--------- ];
 --------- 
----------   const handleAddEvent = () => {
-----------    if (!newEvent.title || !newEvent.date) return;
-----------    const event: CalendarEvent = {
-----------      id: `new-${Date.now()}`,
-----------      type: newEvent.type as EventType,
-----------      title: newEvent.title,
-----------      date: newEvent.date,
-----------      time: newEvent.time,
-----------      location: newEvent.location,
-----------      status: newEvent.status as 'pending' | 'confirmed' | 'cancelled',
-----------      priority: newEvent.priority as 'high' | 'medium' | 'low',
-----------      description: newEvent.description,
-----------    };
-----------    addEvent(event);
----------+    if (!newEvent.title || !newEvent.date) {
----------+      Alert.alert('Erreur', 'Veuillez remplir le titre et la date');
----------+      return;
----------+    }
----------+
----------+    addEvent({
----------+      ...newEvent,
----------+      id: `event-${Date.now()}`,
----------+    } as CalendarEvent);
----------+
----------     setShowAddModal(false);
-----------    setNewEvent({ type: 'training', title: '', date: '', time: '', location: '', status: 'pending', priority: 'medium' });
----------+    setNewEvent({
----------+      type: 'training',
----------+      title: '',
----------+      date: '',
----------+      time: '',
----------+      location: '',
----------+      status: 'pending',
----------+      priority: 'medium',
----------+    });
----------+    setLocationSearch('');
----------+  };
----------+
----------+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
----------+    if (Platform.OS === 'android') {
----------+      setShowDatePicker(false);
----------+    }
----------+    if (date) {
----------+      setSelectedDateObj(date);
----------+      const dateStr = date.toISOString().split('T')[0];
----------+      setNewEvent({ ...newEvent, date: dateStr });
----------+    }
----------+  };
----------+
----------+  const handleTimeChange = (event: DateTimePickerEvent, time?: Date) => {
----------+    if (Platform.OS === 'android') {
----------+      setShowTimePicker(false);
----------+    }
----------+    if (time) {
----------+      setSelectedTimeObj(time);
----------+      const hours = time.getHours().toString().padStart(2, '0');
----------+      const minutes = time.getMinutes().toString().padStart(2, '0');
----------+      setNewEvent({ ...newEvent, time: `${hours}:${minutes}` });
----------+    }
----------+  };
----------+
----------+  const filteredLocations = useMemo(() => {
----------+    if (!locationSearch || locationSearch.length < 2) return [];
----------+    const search = locationSearch.toLowerCase();
----------+    return popularLocations.filter(
----------+      loc => loc.name.toLowerCase().includes(search) || 
----------+             loc.address.toLowerCase().includes(search)
----------+    ).slice(0, 5);
----------+  }, [locationSearch]);
----------+
----------+  const selectLocation = (loc: typeof popularLocations[0]) => {
----------+    setNewEvent({ ...newEvent, location: loc.name });
----------+    setLocationSearch(loc.name);
----------+    setShowLocationSuggestions(false);
----------   };
---------- 
----------   const navigateWeek = (direction: number) => {
---diff --git a/test_reports/pytest/pytest_ocr_results.xml b/test_reports/pytest/pytest_ocr_results.xml
---new file mode 100644
---index 00000000..1752be50
------ /dev/null
---+++ b/test_reports/pytest/pytest_ocr_results.xml
---@@ -0,0 +1 @@
---+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="13" time="90.269" timestamp="2026-02-07T01:00:41.043110+00:00" hostname="agent-env-24a390a2-c85b-4aae-bc11-cc703c705b78"><testcase classname="tests.test_ocr_endpoints.TestHealthEndpoint" name="test_health_check" time="0.475" /><testcase classname="tests.test_ocr_endpoints.TestCategoriesEndpoint" name="test_get_categories" time="0.445" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_restaurant_receipt" time="15.286" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_hotel_receipt_with_ht_tva" time="16.429" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_medical_receipt" time="13.692" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_travel_receipt" time="8.300" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_invalid_base64" time="0.460" /><testcase classname="tests.test_ocr_endpoints.TestDocumentsAnalyzeEndpoint" name="test_legacy_analyze_endpoint" time="7.364" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_png_image" time="7.056" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_jpeg_image" time="6.149" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_empty_file" time="0.471" /><testcase classname="tests.test_ocr_endpoints.TestOCRDataValidation" name="test_confidence_score_range" time="7.220" /><testcase classname="tests.test_ocr_endpoints.TestOCRDataValidation" name="test_needs_review_flag" time="6.837" /></testsuite></testsuites>
---\ No newline at end of file
-diff --git a/test_reports/pytest/pytest_user_docs_results.xml b/test_reports/pytest/pytest_user_docs_results.xml
+---------diff --git a/model.patch b/model.patch
+---------index 6835f28..e69de29 100644
+------------ a/model.patch
+---------+++ b/model.patch
+---------@@ -1,84 +0,0 @@
+----------diff --git a/frontend/app/(tabs)/index.tsx b/frontend/app/(tabs)/index.tsx
+----------index 0cd8d99..eb92923 100644
+------------- a/frontend/app/(tabs)/index.tsx
+----------+++ b/frontend/app/(tabs)/index.tsx
+----------@@ -204,21 +204,65 @@ export default function CalendarScreen() {
+----------   };
+---------- 
+----------   const handleAddEvent = () => {
+-----------    if (!newEvent.title || !newEvent.date) return;
+-----------    const event: CalendarEvent = {
+-----------      id: `new-${Date.now()}`,
+-----------      type: newEvent.type as EventType,
+-----------      title: newEvent.title,
+-----------      date: newEvent.date,
+-----------      time: newEvent.time,
+-----------      location: newEvent.location,
+-----------      status: newEvent.status as 'pending' | 'confirmed' | 'cancelled',
+-----------      priority: newEvent.priority as 'high' | 'medium' | 'low',
+-----------      description: newEvent.description,
+-----------    };
+-----------    addEvent(event);
+----------+    if (!newEvent.title || !newEvent.date) {
+----------+      Alert.alert('Erreur', 'Veuillez remplir le titre et la date');
+----------+      return;
+----------+    }
+----------+
+----------+    addEvent({
+----------+      ...newEvent,
+----------+      id: `event-${Date.now()}`,
+----------+    } as CalendarEvent);
+----------+
+----------     setShowAddModal(false);
+-----------    setNewEvent({ type: 'training', title: '', date: '', time: '', location: '', status: 'pending', priority: 'medium' });
+----------+    setNewEvent({
+----------+      type: 'training',
+----------+      title: '',
+----------+      date: '',
+----------+      time: '',
+----------+      location: '',
+----------+      status: 'pending',
+----------+      priority: 'medium',
+----------+    });
+----------+    setLocationSearch('');
+----------+  };
+----------+
+----------+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+----------+    if (Platform.OS === 'android') {
+----------+      setShowDatePicker(false);
+----------+    }
+----------+    if (date) {
+----------+      setSelectedDateObj(date);
+----------+      const dateStr = date.toISOString().split('T')[0];
+----------+      setNewEvent({ ...newEvent, date: dateStr });
+----------+    }
+----------+  };
+----------+
+----------+  const handleTimeChange = (event: DateTimePickerEvent, time?: Date) => {
+----------+    if (Platform.OS === 'android') {
+----------+      setShowTimePicker(false);
+----------+    }
+----------+    if (time) {
+----------+      setSelectedTimeObj(time);
+----------+      const hours = time.getHours().toString().padStart(2, '0');
+----------+      const minutes = time.getMinutes().toString().padStart(2, '0');
+----------+      setNewEvent({ ...newEvent, time: `${hours}:${minutes}` });
+----------+    }
+----------+  };
+----------+
+----------+  const filteredLocations = useMemo(() => {
+----------+    if (!locationSearch || locationSearch.length < 2) return [];
+----------+    const search = locationSearch.toLowerCase();
+----------+    return popularLocations.filter(
+----------+      loc => loc.name.toLowerCase().includes(search) || 
+----------+             loc.address.toLowerCase().includes(search)
+----------+    ).slice(0, 5);
+----------+  }, [locationSearch]);
+----------+
+----------+  const selectLocation = (loc: typeof popularLocations[0]) => {
+----------+    setNewEvent({ ...newEvent, location: loc.name });
+----------+    setLocationSearch(loc.name);
+----------+    setShowLocationSuggestions(false);
+----------   };
+---------- 
+----------   const navigateWeek = (direction: number) => {
+---diff --git a/test_reports/pytest/pytest_ocr_results.xml b/test_reports/pytest/pytest_ocr_results.xml
+---new file mode 100644
+---index 00000000..1752be50
+------ /dev/null
+---+++ b/test_reports/pytest/pytest_ocr_results.xml
+---@@ -0,0 +1 @@
+---+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="13" time="90.269" timestamp="2026-02-07T01:00:41.043110+00:00" hostname="agent-env-24a390a2-c85b-4aae-bc11-cc703c705b78"><testcase classname="tests.test_ocr_endpoints.TestHealthEndpoint" name="test_health_check" time="0.475" /><testcase classname="tests.test_ocr_endpoints.TestCategoriesEndpoint" name="test_get_categories" time="0.445" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_restaurant_receipt" time="15.286" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_hotel_receipt_with_ht_tva" time="16.429" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_medical_receipt" time="13.692" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_analyze_travel_receipt" time="8.300" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceAnalyzeBase64Endpoint" name="test_invalid_base64" time="0.460" /><testcase classname="tests.test_ocr_endpoints.TestDocumentsAnalyzeEndpoint" name="test_legacy_analyze_endpoint" time="7.364" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_png_image" time="7.056" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_jpeg_image" time="6.149" /><testcase classname="tests.test_ocr_endpoints.TestInvoiceUploadEndpoint" name="test_upload_empty_file" time="0.471" /><testcase classname="tests.test_ocr_endpoints.TestOCRDataValidation" name="test_confidence_score_range" time="7.220" /><testcase classname="tests.test_ocr_endpoints.TestOCRDataValidation" name="test_needs_review_flag" time="6.837" /></testsuite></testsuites>
+---\ No newline at end of file
+-diff --git a/test_reports/pytest/pytest_user_docs_results.xml b/test_reports/pytest/pytest_user_docs_results.xml
+-new file mode 100644
+-index 00000000..562dfabf
+---- /dev/null
+-+++ b/test_reports/pytest/pytest_user_docs_results.xml
+-@@ -0,0 +1 @@
+-+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="15" time="13.527" timestamp="2026-02-10T03:38:37.418383+00:00" hostname="agent-env-8b18b3cd-ad3f-437c-b2d5-7dfe0c9630fc"><testcase classname="backend.tests.test_user_and_documents.TestDocumentsStats" name="test_get_documents_stats_success" time="0.480" /><testcase classname="backend.tests.test_user_and_documents.TestDocumentsStats" name="test_get_documents_stats_with_user_filter" time="0.451" /><testcase classname="backend.tests.test_user_and_documents.TestDocumentsStats" name="test_get_documents_stats_with_date_filter" time="0.463" /><testcase classname="backend.tests.test_user_and_documents.TestDocumentsCategories" name="test_get_categories_success" time="0.655" /><testcase classname="backend.tests.test_user_and_documents.TestDocumentsCategories" name="test_categories_have_correct_labels" time="0.460" /><testcase classname="backend.tests.test_user_and_documents.TestUserOnboarding" name="test_create_user_with_all_fields" time="0.803" /><testcase classname="backend.tests.test_user_and_documents.TestUserOnboarding" name="test_create_user_minimal_fields" time="0.767" /><testcase classname="backend.tests.test_user_and_documents.TestUserOnboarding" name="test_update_existing_user" time="1.531" /><testcase classname="backend.tests.test_user_and_documents.TestUserOnboarding" name="test_create_user_missing_required_fields" time="0.737" /><testcase classname="backend.tests.test_user_and_documents.TestUserProfileByEmail" name="test_get_profile_by_email_success" time="0.703" /><testcase classname="backend.tests.test_user_and_documents.TestUserProfileByEmail" name="test_get_profile_by_email_not_found" time="0.442" /><testcase classname="backend.tests.test_user_and_documents.TestUserProfileByEmail" name="test_get_profile_by_email_special_characters" time="0.815" /><testcase classname="backend.tests.test_user_and_documents.TestIntegration" name="test_full_user_flow" time="2.081" /><testcase classname="backend.tests.test_user_and_documents.TestIntegration" name="test_documents_and_categories_available" time="1.427" /><testcase classname="backend.tests.test_user_and_documents.TestSpecificUser" name="test_create_or_get_romain_user" time="1.627" /></testsuite></testsuites>
+-\ No newline at end of file
+diff --git a/test_reports/pytest/pytest_invitation_results.xml b/test_reports/pytest/pytest_invitation_results.xml
 new file mode 100644
-index 00000000..562dfabf
+index 00000000..5e0b4374
 --- /dev/null
-+++ b/test_reports/pytest/pytest_user_docs_results.xml
++++ b/test_reports/pytest/pytest_invitation_results.xml
 @@ -0,0 +1 @@
-+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="15" time="13.527" timestamp="2026-02-10T03:38:37.418383+00:00" hostname="agent-env-8b18b3cd-ad3f-437c-b2d5-7dfe0c9630fc"><testcase classname="backend.tests.test_user_and_documents.TestDocumentsStats" name="test_get_documents_stats_success" time="0.480" /><testcase classname="backend.tests.test_user_and_documents.TestDocumentsStats" name="test_get_documents_stats_with_user_filter" time="0.451" /><testcase classname="backend.tests.test_user_and_documents.TestDocumentsStats" name="test_get_documents_stats_with_date_filter" time="0.463" /><testcase classname="backend.tests.test_user_and_documents.TestDocumentsCategories" name="test_get_categories_success" time="0.655" /><testcase classname="backend.tests.test_user_and_documents.TestDocumentsCategories" name="test_categories_have_correct_labels" time="0.460" /><testcase classname="backend.tests.test_user_and_documents.TestUserOnboarding" name="test_create_user_with_all_fields" time="0.803" /><testcase classname="backend.tests.test_user_and_documents.TestUserOnboarding" name="test_create_user_minimal_fields" time="0.767" /><testcase classname="backend.tests.test_user_and_documents.TestUserOnboarding" name="test_update_existing_user" time="1.531" /><testcase classname="backend.tests.test_user_and_documents.TestUserOnboarding" name="test_create_user_missing_required_fields" time="0.737" /><testcase classname="backend.tests.test_user_and_documents.TestUserProfileByEmail" name="test_get_profile_by_email_success" time="0.703" /><testcase classname="backend.tests.test_user_and_documents.TestUserProfileByEmail" name="test_get_profile_by_email_not_found" time="0.442" /><testcase classname="backend.tests.test_user_and_documents.TestUserProfileByEmail" name="test_get_profile_by_email_special_characters" time="0.815" /><testcase classname="backend.tests.test_user_and_documents.TestIntegration" name="test_full_user_flow" time="2.081" /><testcase classname="backend.tests.test_user_and_documents.TestIntegration" name="test_documents_and_categories_available" time="1.427" /><testcase classname="backend.tests.test_user_and_documents.TestSpecificUser" name="test_create_or_get_romain_user" time="1.627" /></testsuite></testsuites>
++<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="26" time="18.575" timestamp="2026-02-10T03:59:14.771261+00:00" hostname="agent-env-8b18b3cd-ad3f-437c-b2d5-7dfe0c9630fc"><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationCreate" name="test_create_invitation_success" time="0.495" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationCreate" name="test_create_invitation_duplicate_returns_existing" time="0.820" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationCreate" name="test_create_invitation_different_roles" time="2.895" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationCreate" name="test_create_invitation_invalid_email" time="0.458" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationGetByToken" name="test_get_invitation_by_token_success" time="0.446" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationGetByToken" name="test_get_invitation_invalid_token" time="0.480" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationMarkViewed" name="test_mark_invitation_viewed" time="0.456" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationMarkViewed" name="test_mark_viewed_already_viewed" time="0.342" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationMarkViewed" name="test_verify_viewed_at_set" time="0.444" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationPlayerList" name="test_get_player_invitations" time="0.344" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationResend" name="test_resend_invitation" time="0.455" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationResend" name="test_verify_reminder_count_incremented" time="0.447" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationResend" name="test_resend_invalid_id" time="0.355" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationCancel" name="test_cancel_invitation" time="1.216" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationCancel" name="test_verify_cancelled_status" time="0.459" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationCancel" name="test_cancel_already_cancelled" time="0.661" /><testcase classname="backend.tests.test_invitation_endpoints.TestStaffSignup" name="test_signup_with_valid_token" time="1.236" /><testcase classname="backend.tests.test_invitation_endpoints.TestStaffSignup" name="test_signup_invalid_token" time="0.460" /><testcase classname="backend.tests.test_invitation_endpoints.TestStaffSignup" name="test_signup_already_used_token" time="0.358" /><testcase classname="backend.tests.test_invitation_endpoints.TestStaffSignup" name="test_verify_invitation_accepted" time="0.344" /><testcase classname="backend.tests.test_invitation_endpoints.TestStaffList" name="test_get_player_staff" time="0.656" /><testcase classname="backend.tests.test_invitation_endpoints.TestStaffRemove" name="test_remove_staff_member" time="0.357" /><testcase classname="backend.tests.test_invitation_endpoints.TestStaffRemove" name="test_verify_staff_removed" time="0.344" /><testcase classname="backend.tests.test_invitation_endpoints.TestStaffRemove" name="test_remove_invalid_id" time="0.812" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationPermissions" name="test_tennis_coach_permissions" time="1.886" /><testcase classname="backend.tests.test_invitation_endpoints.TestInvitationPermissions" name="test_agent_permissions" time="1.248" /></testsuite></testsuites>
 \ No newline at end of file
