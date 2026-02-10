@@ -1,0 +1,59 @@
+{
+  "summary": "Backend API testing completed successfully for user profile and documents endpoints. All 15 tests passed. The route ordering fix in documents.py and residenceFiscale field addition in user_routes.py are working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_user_and_documents.py",
+    "/app/test_reports/pytest/pytest_user_docs_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Route ordering in documents.py is now correct - /stats and /categories are defined before /{document_id}",
+    "residenceFiscale field is properly handled in OnboardingData model and serialized in user response",
+    "All user profile fields (prenom, email, classement, residenceFiscale, circuits, etc.) are correctly persisted and retrieved"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_user_and_documents.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 15/15 tests passed",
+    "frontend": "N/A - Backend only testing requested"
+  },
+  "test_credentials": {
+    "test_email": "romain@test.com"
+  },
+  "seed_data_creation": "Created multiple TEST_ prefixed users for testing, including romain@test.com with classement=45 and residenceFiscale=Monaco",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend endpoints fully tested: GET /api/documents/stats (returns totalCount, totalAmount, byCategory), GET /api/documents/categories (returns 7 categories with French labels), POST /api/users/onboarding (creates/updates user with all fields including residenceFiscale), GET /api/users/profile/email/{email} (returns full user profile). All endpoints working correctly.",
+  "features_tested": {
+    "GET /api/documents/stats": {
+      "status": "PASS",
+      "details": "Returns totalCount, totalAmount, byCategory. Supports userId, startDate, endDate filters."
+    },
+    "GET /api/documents/categories": {
+      "status": "PASS",
+      "details": "Returns 7 categories: travel, accommodation, restaurant, medical, equipment, services, other with French labels"
+    },
+    "POST /api/users/onboarding": {
+      "status": "PASS",
+      "details": "Creates new user or updates existing user by email. Supports all fields: prenom, email, classement, residenceFiscale, circuits, niveaux, onboardingCompleted, onboardingStep"
+    },
+    "GET /api/users/profile/email/{email}": {
+      "status": "PASS",
+      "details": "Returns full user profile with all fields including residenceFiscale. Returns 404 for non-existent email."
+    }
+  },
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  },
+  "rca_of_issues": "No issues found - route ordering fix and residenceFiscale field addition are working correctly"
+}
