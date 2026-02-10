@@ -712,19 +712,3 @@ async def export_documents_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
-
-
-@router.get("/documents/categories")
-async def get_categories():
-    """Return available categories"""
-    return {
-        "categories": [
-            {"id": "travel", "label": "Transport", "icon": "airplane"},
-            {"id": "accommodation", "label": "Hébergement", "icon": "bed"},
-            {"id": "restaurant", "label": "Restauration", "icon": "restaurant"},
-            {"id": "medical", "label": "Médical", "icon": "medkit"},
-            {"id": "equipment", "label": "Matériel", "icon": "tennisball"},
-            {"id": "services", "label": "Services", "icon": "briefcase"},
-            {"id": "other", "label": "Autre", "icon": "document"}
-        ]
-    }
