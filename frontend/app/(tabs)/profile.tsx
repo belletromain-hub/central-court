@@ -135,14 +135,12 @@ export default function ProfileScreen() {
     try {
       setIsLoadingProfile(true);
       
-      // Load team and travel from local storage
-      const [teamData, travelData, savedEmail] = await Promise.all([
-        AsyncStorage.getItem(TEAM_STORAGE_KEY),
+      // Load travel from local storage
+      const [travelData, savedEmail] = await Promise.all([
         AsyncStorage.getItem(TRAVEL_STORAGE_KEY),
         AsyncStorage.getItem(USER_EMAIL_KEY),
       ]);
       
-      if (teamData) setTeam(JSON.parse(teamData));
       if (travelData) setTravelDays(JSON.parse(travelData));
       
       // Try to load profile from backend
@@ -151,6 +149,40 @@ export default function ProfileScreen() {
           const response = await api.get(`/api/users/profile/email/${encodeURIComponent(savedEmail)}`);
           if (response.data) {
             setUserProfile(response.data);
+            
+            // Load team members and invitations from backend
+            try {
+              const [staffResponse, invitationsResponse] = await Promise.all([
+                api.get(`/api/invitations/staff/player/${response.data.id}`),
+                api.get(`/api/invitations/player/${response.data.id}`)
+              ]);
+              
+              // Combine active staff and pending invitations for display
+              const activeStaff = (staffResponse.data.staff || []).map((s: any) => ({
+                id: s.id,
+                name: `${s.firstName}${s.lastName ? ' ' + s.lastName : ''}`,
+                email: s.email,
+                role: s.role,
+                addedAt: s.joinedAt,
+                status: 'active',
+              }));
+              
+              const pendingInvitations = (invitationsResponse.data.invitations || [])
+                .filter((inv: any) => inv.status === 'pending')
+                .map((inv: any) => ({
+                  id: inv.id,
+                  name: inv.inviteeName || inv.inviteeEmail.split('@')[0],
+                  email: inv.inviteeEmail,
+                  role: inv.role,
+                  addedAt: inv.sentAt,
+                  status: 'pending',
+                  invitationId: inv.id,
+                }));
+              
+              setTeam([...activeStaff, ...pendingInvitations]);
+            } catch (e) {
+              console.log('Could not load staff/invitations from backend');
+            }
           }
         } catch (e) {
           console.log('Profile not found in backend');
@@ -165,7 +197,7 @@ export default function ProfileScreen() {
   
   const saveTeam = async (newTeam: TeamMember[]) => {
     setTeam(newTeam);
-    await AsyncStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(newTeam));
+    // No longer saving to AsyncStorage - using backend instead
   };
   
   const openEditProfile = () => {
