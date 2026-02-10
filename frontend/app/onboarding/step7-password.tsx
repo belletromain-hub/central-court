@@ -14,11 +14,12 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import OnboardingProgressBar from '../../src/components/OnboardingProgressBar';
-import { saveOnboardingStep, getOnboardingData, clearOnboardingData } from '../../src/utils/onboardingStorage';
-import api from '../../src/services/api';
+import { saveOnboardingStep, getOnboardingData } from '../../src/utils/onboardingStorage';
 
 const USER_EMAIL_KEY = '@central_court_user_email';
+const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 const COLORS = {
   primary: '#2D5016',
