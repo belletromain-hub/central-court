@@ -382,6 +382,17 @@ export default function CalendarScreen() {
           <Text style={styles.tournamentLocation}>{firstTournament.city}, {firstTournament.country}</Text>
         </View>
         
+        {firstTournament.prizeMoney > 0 && (
+          <View style={styles.prizeRow}>
+            <Ionicons name="cash-outline" size={14} color="#1e3c72" />
+            <Text style={styles.weekPrizeText}>
+              {firstTournament.prizeMoney >= 1000000
+                ? `${(firstTournament.prizeMoney / 1000000).toFixed(1)}M`
+                : `${(firstTournament.prizeMoney / 1000).toFixed(0)}K`} {firstTournament.currency}
+            </Text>
+          </View>
+        )}
+        
         {registeredTournaments.length > 0 && (
           <View style={styles.registrationBadge}>
             <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
@@ -725,6 +736,8 @@ const styles = StyleSheet.create({
   tournamentLocation: { fontSize: 12, color: '#666', flex: 1 },
   registrationBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 4 },
   registrationText: { fontSize: 12, color: '#4CAF50', fontWeight: '500' },
+  prizeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 4 },
+  weekPrizeText: { fontSize: 13, fontWeight: '600', color: '#1e3c72' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, maxHeight: '80%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
