@@ -277,6 +277,30 @@ export default function ProfileScreen() {
 
   const getRoleInfo = (roleId: string) => STAFF_ROLES.find(r => r.id === roleId) || STAFF_ROLES[5];
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Déconnexion',
+      'Voulez-vous vraiment vous déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Se déconnecter',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem(USER_EMAIL_KEY);
+              await AsyncStorage.removeItem('onboarding_completed');
+              await AsyncStorage.removeItem('onboarding_data');
+              router.replace('/onboarding');
+            } catch (e) {
+              console.error('Error during logout:', e);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // ============ RENDER HELPERS ============
 
   const renderCircuitBadges = () => {
@@ -437,6 +461,11 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/onboarding')}>
               <Ionicons name="refresh-outline" size={20} color="#1e3c72" />
               <Text style={styles.actionText}>Refaire l'onboarding</Text>
+              <Ionicons name="chevron-forward" size={18} color="#999" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={handleLogout} data-testid="btn-logout">
+              <Ionicons name="log-out-outline" size={20} color="#E53935" />
+              <Text style={[styles.actionText, { color: '#E53935' }]}>Se déconnecter</Text>
               <Ionicons name="chevron-forward" size={18} color="#999" />
             </TouchableOpacity>
           </View>
