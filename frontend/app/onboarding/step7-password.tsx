@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingProgressBar from '../../src/components/OnboardingProgressBar';
 import { saveOnboardingStep, getOnboardingData, clearOnboardingData } from '../../src/utils/onboardingStorage';
+import api from '../../src/services/api';
+
+const USER_EMAIL_KEY = '@central_court_user_email';
 
 const COLORS = {
   primary: '#2D5016',
@@ -60,30 +64,58 @@ export default function Step7Password() {
     
     setIsCreating(true);
     
-    // Save password (in real app, hash it)
-    await saveOnboardingStep(7, { password: password });
-    
-    // Get all data
-    const userData = await getOnboardingData();
-    console.log('User created:', userData);
-    
-    // Show success animation
-    setShowSuccess(true);
-    Animated.spring(successAnim, {
-      toValue: 1,
-      friction: 4,
-      useNativeDriver: true,
-    }).start();
-    
-    // Navigate to main app after delay
-    setTimeout(async () => {
-      // Clear onboarding data
-      await clearOnboardingData();
-      // Mark as completed
-      await AsyncStorage.setItem('onboarding_completed', 'true');
-      // Navigate to main app
-      router.replace('/(tabs)');
-    }, 2000);
+    try {
+      // Save password locally
+      await saveOnboardingStep(7, { password: password });
+      
+      // Get all onboarding data
+      const userData = await getOnboardingData();
+      console.log('Saving user to backend:', userData);
+      
+      // Send to backend API - this is the SINGLE SOURCE OF TRUTH
+      const response = await api.post('/api/users/onboarding', {
+        prenom: userData.prenom || '',
+        email: userData.email || '',
+        dateNaissance: userData.dateNaissance || null,
+        circuits: userData.circuits || [],
+        niveaux: userData.niveaux || [],
+        classement: userData.classement || null,
+        onboardingCompleted: true,
+        onboardingStep: 7,
+      });
+      
+      console.log('User saved to backend:', response.data);
+      
+      // Store email for future session lookups
+      if (userData.email) {
+        await AsyncStorage.setItem(USER_EMAIL_KEY, userData.email);
+      }
+      
+      // Show success animation
+      setShowSuccess(true);
+      Animated.spring(successAnim, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }).start();
+      
+      // Navigate to main app after delay
+      setTimeout(async () => {
+        // Mark as completed in local storage
+        await AsyncStorage.setItem('onboarding_completed', 'true');
+        // Keep onboarding data for circuits display (don't clear completely)
+        // Navigate to main app
+        router.replace('/(tabs)');
+      }, 2000);
+      
+    } catch (error: any) {
+      console.error('Error creating account:', error);
+      Alert.alert(
+        'Erreur',
+        error.response?.data?.detail || 'Impossible de créer le compte. Veuillez réessayer.'
+      );
+      setIsCreating(false);
+    }
   };
   
   if (showSuccess) {
