@@ -45,7 +45,7 @@ import {
 } from '../../src/data/eventsV1';
 
 const USER_EMAIL_KEY = 'user_email';
-const USER_CIRCUITS_KEY = 'user_circuits';
+const ONBOARDING_DATA_KEY = 'onboarding_data';
 
 // Configure French locale
 LocaleConfig.locales['fr'] = {
