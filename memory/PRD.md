@@ -46,7 +46,9 @@ Construire une application professionnelle de tennis pour les joueurs profession
 - ✅ AppleTimePicker - Sélecteur d'heure avec minutes toutes les 5 min
 - ✅ AppleDatePicker - Sélecteur de date sans saisie manuelle
 - ✅ AppleOptionPicker - Sélecteur d'options générique
+- ✅ AppleDatePickerFR - Sélecteur de date format français (JJ/MM/AAAA)
 - ✅ Intégration dans le modal d'ajout d'événement
+- ✅ **Intégration dans l'onboarding step 2 (date de naissance)**
 
 #### 6. Onboarding Initial (7 étapes)
 - ✅ Step 1: Prénom
