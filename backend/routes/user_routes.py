@@ -195,6 +195,47 @@ async def update_onboarding(user_id: str, data: OnboardingUpdate):
     return serialize_user(user)
 
 
+class ProfileUpdate(BaseModel):
+    classement: Optional[str] = None
+    email: Optional[str] = None
+    residenceFiscale: Optional[str] = None
+    prenom: Optional[str] = None
+
+
+@router.put("/profile/{user_id}", response_model=UserProfile)
+async def update_profile(user_id: str, data: ProfileUpdate):
+    """Update user profile fields"""
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not initialized")
+    
+    try:
+        object_id = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+    
+    # Build update dict with only non-None values
+    update_dict = {}
+    for key, value in data.dict().items():
+        if value is not None:
+            update_dict[key] = value
+    
+    if not update_dict:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    update_dict["updatedAt"] = datetime.now(timezone.utc)
+    
+    result = await db.users.update_one(
+        {"_id": object_id},
+        {"$set": update_dict}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user = await db.users.find_one({"_id": object_id})
+    return serialize_user(user)
+
+
 @router.get("/profile/{user_id}", response_model=UserProfile)
 async def get_profile(user_id: str):
     """Get user profile by ID"""
