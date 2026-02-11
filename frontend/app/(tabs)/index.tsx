@@ -600,11 +600,11 @@ export default function CalendarScreen() {
         {/* Tournament weeks */}
         <View style={styles.tournamentsSection}>
           <Text style={styles.sectionTitle}>Prochains tournois</Text>
-          {tournamentWeeks.length === 0 ? (
-            <Text style={styles.noTournamentsText}>Aucun tournoi disponible</Text>
+          {futureTournamentWeeks.length === 0 ? (
+            <Text style={styles.noTournamentsText}>Aucun tournoi à venir</Text>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weeksScroll}>
-              {tournamentWeeks.slice(0, 10).map(week => renderTournamentWeekCard(week))}
+              {futureTournamentWeeks.slice(0, 15).map(week => renderTournamentWeekCard(week))}
             </ScrollView>
           )}
         </View>
