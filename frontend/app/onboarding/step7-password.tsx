@@ -64,6 +64,7 @@ export default function Step7Password() {
     if (!allCriteriaValid || isCreating) return;
     
     setIsCreating(true);
+    let success = false;
     
     try {
       // Save password locally
@@ -75,7 +76,6 @@ export default function Step7Password() {
       
       if (!userData || !userData.email || !userData.prenom) {
         Alert.alert('Erreur', 'Données d\'inscription incomplètes. Veuillez recommencer l\'onboarding.');
-        setIsCreating(false);
         return;
       }
       
@@ -96,6 +96,9 @@ export default function Step7Password() {
       
       // Store email for future session lookups
       await AsyncStorage.setItem(USER_EMAIL_KEY, userData.email);
+      
+      // Mark success to prevent resetting isCreating
+      success = true;
       
       // Show success animation
       setShowSuccess(true);
@@ -118,8 +121,7 @@ export default function Step7Password() {
         || 'Impossible de créer le compte. Veuillez réessayer.';
       Alert.alert('Erreur', message);
     } finally {
-      // Reset only if not showing success (success navigates away)
-      if (!showSuccess) {
+      if (!success) {
         setIsCreating(false);
       }
     }
