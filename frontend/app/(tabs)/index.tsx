@@ -867,6 +867,11 @@ export default function CalendarScreen() {
                         {tournament.city}, {tournament.country}
                       </Text>
                     </View>
+                    <View style={[styles.categoryBadgeModal, { backgroundColor: getCategoryColor(tournament.category) + '18' }]}>
+                      <Text style={[styles.categoryTextModal, { color: getCategoryColor(tournament.category) }]}>
+                        {getCategoryLabel(tournament.category)}
+                      </Text>
+                    </View>
                   </View>
                   <Text style={styles.tournamentDetailMeta}>
                     {tournament.startDate ? new Date(tournament.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : ''} - {tournament.endDate ? new Date(tournament.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
