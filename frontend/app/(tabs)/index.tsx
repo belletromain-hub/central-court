@@ -899,25 +899,44 @@ export default function CalendarScreen() {
                     </TouchableOpacity>
                   ) : (
                     <>
-                      {/* Registration buttons */}
+                      {/* Registration buttons - simplified state machine */}
                       <View style={styles.registrationButtons}>
-                        {['interested', 'pending', 'participating'].map(status => (
-                          <TouchableOpacity
-                            key={status}
-                            style={[
-                              styles.statusBtn,
-                              tournament.registration?.status === status && styles.statusBtnActive
-                            ]}
-                            onPress={() => handleRegisterTournament(tournament.id, status)}
-                          >
-                            <Text style={[
-                              styles.statusBtnText,
-                              tournament.registration?.status === status && styles.statusBtnTextActive
-                            ]}>
-                              {TOURNAMENT_STATUS_LABELS[status]?.label || status}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                        {tournament.registration?.status === 'pending' ? (
+                          // From pending: only "Participant" or "Décliné"
+                          <>
+                            <TouchableOpacity
+                              style={[styles.statusBtn, { backgroundColor: '#4CAF50' + '20', borderWidth: 1, borderColor: '#4CAF50' }]}
+                              onPress={() => handleRegisterTournament(tournament.id, 'participating')}
+                            >
+                              <Text style={[styles.statusBtnText, { color: '#4CAF50' }]}>Participant</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.statusBtn, { backgroundColor: '#F44336' + '20', borderWidth: 1, borderColor: '#F44336' }]}
+                              onPress={() => handleRegisterTournament(tournament.id, 'declined')}
+                            >
+                              <Text style={[styles.statusBtnText, { color: '#F44336' }]}>Décliné</Text>
+                            </TouchableOpacity>
+                          </>
+                        ) : (
+                          // Default: interested / pending / participating
+                          ['interested', 'pending', 'participating'].map(status => (
+                            <TouchableOpacity
+                              key={status}
+                              style={[
+                                styles.statusBtn,
+                                tournament.registration?.status === status && styles.statusBtnActive
+                              ]}
+                              onPress={() => handleRegisterTournament(tournament.id, status)}
+                            >
+                              <Text style={[
+                                styles.statusBtnText,
+                                tournament.registration?.status === status && styles.statusBtnTextActive
+                              ]}>
+                                {TOURNAMENT_STATUS_LABELS[status]?.label || status}
+                              </Text>
+                            </TouchableOpacity>
+                          ))
+                        )}
                       </View>
                       
                       <TouchableOpacity
