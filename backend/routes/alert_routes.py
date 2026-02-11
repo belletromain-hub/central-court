@@ -103,14 +103,22 @@ async def mark_all_read():
 async def generate_alerts():
     """Generate alerts based on tournament registrations and missing bookings.
     Also sends email notifications for high-priority alerts."""
-    # Get active registrations
+    # Get active registrations with projection
     registrations = await db.tournament_registrations.find(
         {"status": {"$in": ["participating", "accepted", "pending"]}},
-        {"_id": 0}
-    ).to_list(100)
+        {"_id": 0, "tournamentId": 1, "status": 1}
+    ).limit(100).to_list(100)
 
     if not registrations:
         return {"generated": 0}
+
+    # Batch fetch tournaments (fix N+1 query)
+    tournament_ids = [r["tournamentId"] for r in registrations]
+    tournaments_list = await db.tournaments.find(
+        {"id": {"$in": tournament_ids}},
+        {"_id": 0, "id": 1, "name": 1, "city": 1, "country": 1, "startDate": 1, "endDate": 1}
+    ).to_list(100)
+    tournaments_map = {t["id"]: t for t in tournaments_list}
 
     # Get events with projection and limit
     events = await db.events.find(
@@ -121,7 +129,7 @@ async def generate_alerts():
     new_alerts = []
 
     for reg in registrations:
-        tournament = await db.tournaments.find_one({"id": reg["tournamentId"]}, {"_id": 0})
+        tournament = tournaments_map.get(reg["tournamentId"])
         if not tournament:
             continue
 
