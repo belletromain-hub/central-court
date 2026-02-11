@@ -1097,6 +1097,59 @@ export default function CalendarScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Conflict Detection Modal */}
+      <Modal visible={showConflictModal} animationType="fade" transparent>
+        <View style={styles.conflictOverlay}>
+          <View style={styles.conflictCard}>
+            <View style={styles.conflictHeader}>
+              <Ionicons name="warning" size={32} color="#FF9800" />
+              <Text style={styles.conflictTitle}>Conflit d'agenda</Text>
+            </View>
+            
+            <Text style={styles.conflictSubtitle}>
+              {conflictData?.totalConflicts || 0} conflit{(conflictData?.totalConflicts || 0) > 1 ? 's' : ''} détecté{(conflictData?.totalConflicts || 0) > 1 ? 's' : ''}
+            </Text>
+            
+            <ScrollView style={styles.conflictList}>
+              {conflictData?.conflictingTournaments?.map((ct: any) => (
+                <View key={ct.id} style={styles.conflictItem}>
+                  <Ionicons name="trophy-outline" size={18} color="#FF9800" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.conflictItemName}>{ct.name}</Text>
+                    <Text style={styles.conflictItemMeta}>
+                      {ct.startDate ? new Date(ct.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} - 
+                      {ct.endDate ? new Date(ct.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
+                      {ct.status ? ` (${TOURNAMENT_STATUS_LABELS[ct.status]?.label || ct.status})` : ''}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              
+              {conflictData?.calendarEvents?.map((ev: any, i: number) => (
+                <View key={ev.id || i} style={styles.conflictItem}>
+                  <Ionicons name="calendar-outline" size={18} color="#2196F3" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.conflictItemName}>{ev.title}</Text>
+                    <Text style={styles.conflictItemMeta}>
+                      {ev.date} {ev.time ? `à ${ev.time}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.conflictActions}>
+              <TouchableOpacity style={styles.conflictProceedBtn} onPress={handleConflictProceed}>
+                <Text style={styles.conflictProceedText}>Continuer quand même</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.conflictCancelBtn} onPress={handleConflictCancel}>
+                <Text style={styles.conflictCancelText}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
