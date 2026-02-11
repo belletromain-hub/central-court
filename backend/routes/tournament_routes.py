@@ -49,6 +49,108 @@ def serialize_tournament(t: dict) -> dict:
     }
 
 
+@router.get("/conflicts/{tournament_id}")
+async def check_tournament_conflicts(tournament_id: str):
+    """Check if a tournament conflicts with calendar events"""
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    t_start = tournament.get("startDate")
+    t_end = tournament.get("endDate")
+    if not t_start or not t_end:
+        return {"conflicts": [], "count": 0}
+    
+    # Add 1 day buffer before and after
+    from datetime import timedelta
+    if isinstance(t_start, str):
+        t_start = datetime.fromisoformat(t_start)
+    if isinstance(t_end, str):
+        t_end = datetime.fromisoformat(t_end)
+    
+    buffer_start = t_start - timedelta(days=1)
+    buffer_end = t_end + timedelta(days=1)
+    
+    # Find overlapping events
+    events = await db.events.find({
+        "$or": [
+            {"date": {"$gte": buffer_start.isoformat()[:10], "$lte": buffer_end.isoformat()[:10]}},
+        ]
+    }, {"_id": 0}).to_list(100)
+    
+    # Also check string date comparisons
+    if not events:
+        all_events = await db.events.find({}, {"_id": 0}).to_list(500)
+        events = []
+        bs = buffer_start.strftime("%Y-%m-%d")
+        be = buffer_end.strftime("%Y-%m-%d")
+        for ev in all_events:
+            ev_date = ev.get("date", "")
+            if isinstance(ev_date, str) and bs <= ev_date[:10] <= be:
+                events.append(ev)
+    
+    # Also check for other tournaments in the same period that are registered
+    conflicting_tournaments = []
+    regs = await db.tournament_registrations.find(
+        {"status": {"$in": ["pending", "participating", "interested"]}},
+        {"_id": 0}
+    ).to_list(200)
+    
+    registered_ids = {r["tournamentId"] for r in regs}
+    
+    if registered_ids:
+        other_tournaments = await db.tournaments.find(
+            {"id": {"$in": list(registered_ids), "$ne": tournament_id}},
+            {"_id": 0}
+        ).to_list(200)
+        
+        for ot in other_tournaments:
+            ot_start = ot.get("startDate")
+            ot_end = ot.get("endDate")
+            if not ot_start or not ot_end:
+                continue
+            if isinstance(ot_start, str):
+                ot_start = datetime.fromisoformat(ot_start)
+            if isinstance(ot_end, str):
+                ot_end = datetime.fromisoformat(ot_end)
+            
+            # Check overlap
+            if ot_start <= t_end and ot_end >= t_start:
+                reg_status = next((r["status"] for r in regs if r["tournamentId"] == ot.get("id")), None)
+                conflicting_tournaments.append({
+                    "id": ot.get("id"),
+                    "name": ot.get("name"),
+                    "startDate": ot.get("startDate").isoformat() if hasattr(ot.get("startDate"), 'isoformat') else ot.get("startDate"),
+                    "endDate": ot.get("endDate").isoformat() if hasattr(ot.get("endDate"), 'isoformat') else ot.get("endDate"),
+                    "status": reg_status,
+                    "type": "tournament",
+                })
+    
+    # Format events
+    formatted_events = []
+    for ev in events:
+        formatted_events.append({
+            "id": ev.get("id", ""),
+            "title": ev.get("title", ""),
+            "date": ev.get("date", ""),
+            "time": ev.get("time", ""),
+            "type": ev.get("type", "other"),
+            "location": ev.get("location", ""),
+        })
+    
+    return {
+        "tournament": {
+            "id": tournament.get("id"),
+            "name": tournament.get("name"),
+            "startDate": tournament.get("startDate").isoformat() if hasattr(tournament.get("startDate"), 'isoformat') else tournament.get("startDate"),
+            "endDate": tournament.get("endDate").isoformat() if hasattr(tournament.get("endDate"), 'isoformat') else tournament.get("endDate"),
+        },
+        "calendarEvents": formatted_events,
+        "conflictingTournaments": conflicting_tournaments,
+        "totalConflicts": len(formatted_events) + len(conflicting_tournaments),
+    }
+
+
 @router.get("")
 async def list_tournaments(
     circuits: Optional[str] = Query(None, description="Comma-separated circuit filter: ATP,WTA,ITF"),
