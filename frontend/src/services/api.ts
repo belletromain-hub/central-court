@@ -78,6 +78,11 @@ export const hideTournament = (tournamentId: string) =>
     body: JSON.stringify({ tournamentId }),
   });
 
+export const unhideTournament = (tournamentId: string) =>
+  apiFetch<any>(`/api/tournaments/hide/${tournamentId}`, {
+    method: 'DELETE',
+  });
+
 // ── Alerts / Notifications ──
 export const fetchAlerts = (unreadOnly = false) =>
   apiFetch<any[]>(unreadOnly ? '/api/alerts?unread_only=true' : '/api/alerts');
