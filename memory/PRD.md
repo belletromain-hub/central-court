@@ -1,52 +1,39 @@
 # Le Court Central - PRD
 
 ## Original Problem Statement
-Application professionnelle de tennis avec:
-- Backend FastAPI modulaire + MongoDB
-- Frontend React Native (Expo) avec TypeScript
-- Calendrier dynamique, gestion de profil, OCR, invitations staff, tournois
-
-## Architecture
-- **Frontend:** React Native, Expo, Expo Router, TypeScript, Axios
-- **Backend:** Python, FastAPI, Motor (async MongoDB), Pydantic v2
-- **Database:** MongoDB
+Application professionnelle de tennis: FastAPI + MongoDB + React Native (Expo)
 
 ## Completed Features (Feb 2026)
 
 ### Core
-- User onboarding (7 steps), profile edit, logout
-- Staff invitation system, OCR document processing
+- User onboarding (7 steps), profile edit, logout, staff invitations, OCR
 
-### Phase 1 — Tournament Display
-- Country flags (45+ countries), future-only filtering, "Pas intéressé" hide/unhide
+### Tournaments (Phase 1-3)
+- Country flags, future-only filtering, "Pas intéressé" hide/unhide
+- Multi-filter: surface, level, prize money, country
+- Category badges (ATP 500, Masters 1000, Grand Chelem)
+- Simplified statuses: pending → Participant/Décliné
+- Conflict detection: GET /api/tournaments/conflicts/{id}
 
-### Phase 2 — Tournament Filters & Statuses
-- Multi-filter: surface, level, prize money, country (with flags)
-- Category badges (ATP 500, Masters 1000, Grand Chelem, etc.)
-- Simplified statuses: pending → Participant/Décliné only
-- Terminal states (participating/declined) → "Réinitialiser le statut"
-- Current status indicator with colored icon
-- Reactive modal via useMemo (selectedWeek derived from tournamentWeeks)
-
-### Phase 3 — Conflict Detection
-- Backend: GET /api/tournaments/conflicts/{id} detects overlapping calendar events + registered tournaments
-- Frontend: Conflict modal with warning, list of conflicts, "Continuer quand même" / "Annuler"
-- Bidirectional: dallas ↔ rotterdam correctly detected
-- 1-day buffer before/after tournament dates
-- Declined tournaments excluded from conflicts
+### Documents - NEW REDESIGN
+- Monthly view with slider (prev/next month)
+- Monthly total with category breakdown (progress bars + percentages)
+- Receipts grouped by day (Aujourd'hui, Hier, date)
+- Category icons: Transport, Hébergement, Restauration, Médical, Équipement, Services, Autre
+- FAB camera button for quick receipt scanning
+- OCR integration (OpenAI Vision) with verification modal
+- Upload: camera, gallery, PDF file picker
+- Document detail modal with delete
+- "Voir tout" toggle for category list
 
 ## Key API Endpoints
 - POST /api/users/onboarding, PUT /api/users/profile/{user_id}
-- GET /api/tournaments/weeks?circuits=ATP
-- GET /api/tournaments/conflicts/{tournament_id} ← NEW
-- POST /api/tournaments/register, POST /api/tournaments/hide, DELETE /api/tournaments/hide/{id}
+- GET /api/tournaments/weeks, /conflicts/{id}, /register, /hide
+- GET /api/documents, POST /api/documents, PUT/DELETE /api/documents/{id}
+- POST /api/invoices/analyze-base64 (OCR)
 
 ## Backlog
 ### P1
-- Document filtering by date in vault
-- PDF export on frontend
-
+- PDF export of documents
 ### P2
-- Invitation emails via Resend
-- Push notifications
-- Tournament registration deadline reminders
+- Invitation emails via Resend, push notifications, deadline reminders
