@@ -729,9 +729,12 @@ export default function CalendarScreen() {
             <TouchableOpacity
               style={[styles.filterToggle, activeFilterCount > 0 && styles.filterToggleActive]}
               onPress={() => setShowFilters(!showFilters)}
+              data-testid="filter-toggle"
             >
               <Ionicons name="filter" size={16} color={activeFilterCount > 0 ? '#fff' : '#1e3c72'} />
-              {activeFilterCount > 0 && <Text style={styles.filterCount}>{activeFilterCount}</Text>}
+              <Text style={{ fontSize: 13, fontWeight: '600', color: activeFilterCount > 0 ? '#fff' : '#1e3c72' }}>
+                Filtres{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </Text>
             </TouchableOpacity>
           </View>
 
