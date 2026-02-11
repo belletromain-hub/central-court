@@ -524,19 +524,8 @@ export default function DocumentsScreen() {
               <Text style={s.fieldLabel}>Fournisseur</Text>
               <TextInput style={s.input} value={editedFournisseur} onChangeText={setEditedFournisseur} placeholder="Nom du fournisseur" />
 
-              <Text style={s.fieldLabel}>Montant TTC</Text>
+              <Text style={s.fieldLabel}>Montant</Text>
               <TextInput style={s.input} value={editedMontant} onChangeText={setEditedMontant} placeholder="0.00" keyboardType="decimal-pad" />
-
-              <View style={s.rowInputs}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.fieldLabel}>Montant HT</Text>
-                  <TextInput style={s.input} value={editedMontantHT} onChangeText={setEditedMontantHT} placeholder="--" keyboardType="decimal-pad" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.fieldLabel}>TVA</Text>
-                  <TextInput style={s.input} value={editedMontantTVA} onChangeText={setEditedMontantTVA} placeholder="--" keyboardType="decimal-pad" />
-                </View>
-              </View>
 
               <Text style={s.fieldLabel}>Date</Text>
               <TextInput style={s.input} value={editedDate} onChangeText={setEditedDate} placeholder="AAAA-MM-JJ" />
