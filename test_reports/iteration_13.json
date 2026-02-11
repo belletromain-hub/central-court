@@ -1,0 +1,75 @@
+{
+  "summary": "Backend API testing completed for Phase 2 tournament optimizations. All 25 tests passed. Validated: (1) GET /api/tournaments returns category field for level badges (ATP 250, ATP 500, Masters 1000, Grand Slam, etc.), (2) POST /api/tournaments/register correctly sets 'pending' status, (3) Status transitions from 'pending' to 'participating' and 'declined' work correctly, (4) GET /api/tournaments/weeks returns category and surface fields for all tournaments, (5) POST /api/tournaments/hide and DELETE /api/tournaments/hide/{id} work correctly with hidden=true/false reflected in /weeks response.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_tournament_phase2.py",
+    "/app/test_reports/pytest/pytest_phase2_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "All Phase 2 tournament optimization backend endpoints are working correctly",
+    "Category field properly included in both /api/tournaments and /api/tournaments/weeks responses",
+    "Valid ATP categories: ATP 250 (31), ATP 500 (14), Masters 1000 (9), Grand Slam (4), ATP Finals (1), Team Event (1)",
+    "Status transitions (interested → pending → participating/declined) work correctly",
+    "Hide/unhide endpoints properly update hidden field in /weeks response",
+    "Hiding a tournament removes existing registration as expected"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_tournament_phase2.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 25/25 tests passed",
+    "frontend": "N/A - Backend only testing requested"
+  },
+  "test_credentials": {},
+  "seed_data_creation": "Used existing tournaments: australian-open-2026 (registration tests), dubai-2026 (hide/unhide tests), indian-wells-2026 (status transition tests). State cleaned up after tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 2 tournament optimizations fully tested. Key findings: (1) Category field exists and contains valid levels (ATP 250, ATP 500, Masters 1000, Grand Slam, ATP Finals, Team Event), (2) Surface field exists in /weeks (Hard, Clay, Grass, Carpet), (3) Registration status transitions work: interested → pending → participating/declined, (4) Hide/unhide endpoints work correctly with proper hidden=true/false reflection in /weeks.",
+  "features_tested": {
+    "GET /api/tournaments?circuits=ATP with category field": {
+      "status": "PASS",
+      "details": "Returns category field for all tournaments. Categories: ATP 250 (31), ATP 500 (14), Masters 1000 (9), Grand Slam (4), ATP Finals (1), Team Event (1)"
+    },
+    "POST /api/tournaments/register with status='pending'": {
+      "status": "PASS",
+      "details": "Returns {success: true, status: 'pending'}, status persists in /weeks response"
+    },
+    "POST /api/tournaments/register 'pending' → 'participating'": {
+      "status": "PASS",
+      "details": "Status transition works correctly, persists in /weeks"
+    },
+    "POST /api/tournaments/register 'pending' → 'declined'": {
+      "status": "PASS",
+      "details": "Status transition works correctly, persists in /weeks"
+    },
+    "GET /api/tournaments/weeks with category field": {
+      "status": "PASS",
+      "details": "All tournaments in weeks response have category field with valid values"
+    },
+    "GET /api/tournaments/weeks with surface field": {
+      "status": "PASS",
+      "details": "All tournaments have surface field (Hard, Clay, Grass, Carpet)"
+    },
+    "POST /api/tournaments/hide": {
+      "status": "PASS",
+      "details": "Returns {success: true}, tournament shows hidden=true in /weeks"
+    },
+    "DELETE /api/tournaments/hide/{id}": {
+      "status": "PASS",
+      "details": "Returns {success: true}, tournament shows hidden=false in /weeks"
+    }
+  },
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}
