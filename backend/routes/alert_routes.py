@@ -112,8 +112,10 @@ async def generate_alerts():
     if not registrations:
         return {"generated": 0}
 
-    # Get all events
-    events = await db.events.find({}, {"_id": 0}).to_list(500)
+    # Get events with projection and limit
+    events = await db.events.find(
+        {}, {"_id": 0, "id": 1, "title": 1, "date": 1, "time": 1, "type": 1, "tournamentId": 1}
+    ).limit(200).to_list(200)
 
     today = datetime.now(timezone.utc).date()
     new_alerts = []

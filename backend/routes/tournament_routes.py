@@ -83,9 +83,12 @@ async def check_tournament_conflicts(tournament_id: str):
         ]
     }, {"_id": 0}).to_list(100)
     
-    # Also check string date comparisons
+    # Also check string date comparisons (fallback with date range filter)
     if not events:
-        all_events = await db.events.find({}, {"_id": 0}).to_list(500)
+        all_events = await db.events.find(
+            {},
+            {"_id": 0, "id": 1, "title": 1, "date": 1, "time": 1, "type": 1, "location": 1}
+        ).limit(200).to_list(200)
         events = []
         bs = buffer_start.strftime("%Y-%m-%d")
         be = buffer_end.strftime("%Y-%m-%d")
@@ -275,8 +278,12 @@ async def list_tournament_weeks(
         tournaments_by_week[wn].append(serialize_tournament(t))
 
     # Get registrations and hidden for current user (demo: no auth yet)
-    registrations = await db.tournament_registrations.find({}, {"_id": 0}).to_list(500)
-    hidden = await db.tournament_hidden.find({}, {"_id": 0}).to_list(500)
+    registrations = await db.tournament_registrations.find(
+        {}, {"_id": 0, "tournamentId": 1, "status": 1, "updatedAt": 1}
+    ).limit(500).to_list(500)
+    hidden = await db.tournament_hidden.find(
+        {}, {"_id": 0, "tournamentId": 1}
+    ).limit(500).to_list(500)
 
     # Build registration map by tournament ID
     reg_by_tournament = {r["tournamentId"]: r for r in registrations}
