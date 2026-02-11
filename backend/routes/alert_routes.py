@@ -133,7 +133,13 @@ async def generate_alerts():
         if not tournament:
             continue
 
-        start = datetime.strptime(tournament["startDate"], "%Y-%m-%d").date()
+        start_raw = tournament.get("startDate")
+        if isinstance(start_raw, datetime):
+            start = start_raw.date()
+        elif isinstance(start_raw, str):
+            start = datetime.strptime(start_raw, "%Y-%m-%d").date()
+        else:
+            continue
         days_until = (start - today).days
         if days_until <= 0 or days_until > 14:
             continue
