@@ -538,6 +538,13 @@ export default function CalendarScreen() {
           </Text>
         </View>
         
+        {/* Category/Level badge */}
+        <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(firstTournament.category) + '18' }]}>
+          <Text style={[styles.categoryText, { color: getCategoryColor(firstTournament.category) }]}>
+            {getCategoryLabel(firstTournament.category)}
+          </Text>
+        </View>
+        
         <Text style={styles.tournamentName} numberOfLines={1}>
           {firstTournament.name}
         </Text>
