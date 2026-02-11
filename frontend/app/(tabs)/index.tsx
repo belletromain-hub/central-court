@@ -430,7 +430,9 @@ export default function CalendarScreen() {
               {firstTournament.surface}
             </Text>
           </View>
-          <Text style={styles.tournamentLocation}>{firstTournament.city}, {firstTournament.country}</Text>
+          <Text style={styles.tournamentLocation}>
+            {getFlagEmoji(firstTournament.country)} {firstTournament.city}
+          </Text>
         </View>
         
         {firstTournament.prizeMoney > 0 && (
