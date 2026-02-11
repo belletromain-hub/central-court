@@ -41,23 +41,89 @@ async def root():
 <title>Le Court Central</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1e3c72;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center}
-.card{background:#fff;border-radius:24px;padding:48px 32px;max-width:400px;width:90%;text-align:center;color:#1a1a1a;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
-h1{font-size:28px;margin-bottom:8px;color:#1e3c72}
-.emoji{font-size:48px;margin-bottom:16px}
-.sub{color:#666;font-size:15px;margin-bottom:32px;line-height:1.5}
-.btn{display:inline-block;background:#1e3c72;color:#fff;padding:14px 32px;border-radius:14px;text-decoration:none;font-weight:600;font-size:16px;margin:6px}
-.btn.secondary{background:#f0f0f0;color:#1e3c72}
-.status{margin-top:24px;padding:12px;background:#e8f5e9;border-radius:10px;color:#2e7d32;font-size:13px;font-weight:500}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border-radius:28px;padding:40px 28px;max-width:420px;width:100%;text-align:center;color:#1a1a1a;box-shadow:0 24px 80px rgba(0,0,0,0.25)}
+.logo{font-size:56px;margin-bottom:12px}
+h1{font-size:26px;color:#1e3c72;margin-bottom:6px}
+.tagline{color:#888;font-size:14px;margin-bottom:28px}
+.steps{text-align:left;margin:0 auto 28px;max-width:320px}
+.step{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+.step-num{width:28px;height:28px;border-radius:14px;background:#1e3c72;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;margin-top:2px}
+.step-content h3{font-size:15px;color:#1a1a1a;margin-bottom:3px}
+.step-content p{font-size:13px;color:#888;line-height:1.4}
+.stores{display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
+.store-btn{display:flex;align-items:center;gap:8px;background:#000;color:#fff;padding:10px 18px;border-radius:12px;text-decoration:none;font-size:13px;font-weight:500}
+.store-btn svg{width:20px;height:20px;fill:#fff}
+.store-btn.android{background:#3DDC84}
+.store-btn.android svg{fill:#fff}
+.open-btn{display:block;background:#1e3c72;color:#fff;padding:16px;border-radius:14px;text-decoration:none;font-weight:700;font-size:16px;margin:20px auto 0;max-width:320px}
+.open-btn:hover{background:#2a5298}
+.divider{height:1px;background:#eee;margin:24px 0}
+.status{display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;color:#2e7d32}
+.status-dot{width:8px;height:8px;border-radius:4px;background:#4CAF50}
+.note{font-size:11px;color:#bbb;margin-top:16px;line-height:1.4}
 </style>
 </head>
 <body>
 <div class="card">
-<div class="emoji">🎾</div>
-<h1>Le Court Central</h1>
-<p class="sub">Application mobile pour joueurs de tennis professionnels.<br>Gérez vos tournois, documents et calendrier.</p>
-<a class="btn" href="exp://serve-preview.ngrok.io">Ouvrir dans Expo Go</a>
-<div class="status">API en ligne</div>
+  <div class="logo">🎾</div>
+  <h1>Le Court Central</h1>
+  <p class="tagline">Tournois, documents & calendrier pour joueurs pro</p>
+
+  <div class="divider"></div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Installer Expo Go</h3>
+        <p>Téléchargez l'app gratuite Expo Go sur votre téléphone</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Ouvrir l'application</h3>
+        <p>Cliquez sur le bouton ci-dessous ou scannez le QR code depuis Expo Go</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Créer votre profil</h3>
+        <p>Choisissez vos circuits (ATP, WTA, ITF) et commencez</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="stores">
+    <a class="store-btn" href="https://apps.apple.com/app/expo-go/id982107779" target="_blank">
+      <svg viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+      App Store
+    </a>
+    <a class="store-btn android" href="https://play.google.com/store/apps/details?id=host.exp.exponent" target="_blank">
+      <svg viewBox="0 0 24 24"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.61 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+      Play Store
+    </a>
+  </div>
+
+  <a class="open-btn" href="exp://serve-preview.ngrok.io">
+    Ouvrir Le Court Central
+  </a>
+
+  <div class="divider"></div>
+
+  <div class="status">
+    <div class="status-dot"></div>
+    API en ligne — v1.0
+  </div>
+
+  <p class="note">
+    Version de développement. Pour un accès sans Expo Go,
+    sauvegardez le code sur GitHub puis utilisez
+    <a href="https://docs.expo.dev/build/introduction/" style="color:#1e3c72" target="_blank">EAS Build</a>
+    pour générer l'APK/IPA.
+  </p>
 </div>
 </body>
 </html>"""
