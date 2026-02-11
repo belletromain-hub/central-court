@@ -194,6 +194,20 @@ export default function CalendarScreen() {
 
   // ============ HELPERS ============
 
+  // Filter to only show future tournament weeks
+  const futureTournamentWeeks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return tournamentWeeks.filter(week => {
+      if (!week?.tournaments?.length) return false;
+      // Keep week if at least one tournament hasn't ended yet
+      return week.tournaments.some(t => {
+        if (!t?.endDate) return true;
+        return new Date(t.endDate) >= today;
+      });
+    });
+  }, [tournamentWeeks]);
+
   const getEventsForDate = useCallback((date: string): CalendarEvent[] => {
     return events.filter(e => e.date === date);
   }, [events]);
