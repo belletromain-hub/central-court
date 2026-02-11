@@ -73,10 +73,16 @@ export default function Step7Password() {
       const userData = await getOnboardingData();
       console.log('Saving user to backend:', userData);
       
-      // Send to backend API - this is the SINGLE SOURCE OF TRUTH
+      if (!userData || !userData.email || !userData.prenom) {
+        Alert.alert('Erreur', 'Données d\'inscription incomplètes. Veuillez recommencer l\'onboarding.');
+        setIsCreating(false);
+        return;
+      }
+      
+      // Send to backend API
       const response = await axios.post(`${API_URL}/api/users/onboarding`, {
-        prenom: userData.prenom || '',
-        email: userData.email || '',
+        prenom: userData.prenom,
+        email: userData.email,
         dateNaissance: userData.dateNaissance || null,
         circuits: userData.circuits || [],
         niveaux: userData.niveaux || userData.niveauxTournois || [],
@@ -84,38 +90,38 @@ export default function Step7Password() {
         residenceFiscale: userData.residenceFiscale || null,
         onboardingCompleted: true,
         onboardingStep: 7,
-      });
+      }, { timeout: 15000 });
       
       console.log('User saved to backend:', response.data);
       
       // Store email for future session lookups
-      if (userData.email) {
-        await AsyncStorage.setItem(USER_EMAIL_KEY, userData.email);
-      }
+      await AsyncStorage.setItem(USER_EMAIL_KEY, userData.email);
       
       // Show success animation
       setShowSuccess(true);
       Animated.spring(successAnim, {
         toValue: 1,
         friction: 4,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
       
       // Navigate to main app after delay
       setTimeout(async () => {
-        // Mark as completed in local storage
         await AsyncStorage.setItem('onboarding_completed', 'true');
-        // Navigate to main app
         router.replace('/(tabs)');
       }, 2000);
       
     } catch (error: any) {
       console.error('Error creating account:', error);
-      Alert.alert(
-        'Erreur',
-        error.response?.data?.detail || 'Impossible de créer le compte. Veuillez réessayer.'
-      );
-      setIsCreating(false);
+      const message = error.response?.data?.detail 
+        || error.message 
+        || 'Impossible de créer le compte. Veuillez réessayer.';
+      Alert.alert('Erreur', message);
+    } finally {
+      // Reset only if not showing success (success navigates away)
+      if (!showSuccess) {
+        setIsCreating(false);
+      }
     }
   };
   
