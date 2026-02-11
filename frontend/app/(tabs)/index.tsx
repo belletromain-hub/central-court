@@ -431,7 +431,7 @@ export default function CalendarScreen() {
     try {
       await apiRegisterTournament(tournamentId, status);
       
-      // Update local state
+      // Update local state immediately for reactive UI
       setTournamentWeeks(prev => {
         if (!Array.isArray(prev)) return prev;
         return prev.map(week => ({
@@ -443,8 +443,6 @@ export default function CalendarScreen() {
           )
         }));
       });
-      
-      Alert.alert('Succès', 'Inscription mise à jour');
     } catch (e) {
       console.error('Registration failed:', e);
       Alert.alert('Erreur', 'Échec de l\'inscription');
