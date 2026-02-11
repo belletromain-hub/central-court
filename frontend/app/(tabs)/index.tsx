@@ -327,6 +327,40 @@ export default function CalendarScreen() {
     }
   };
 
+  const handleHideTournament = async (tournamentId: string) => {
+    try {
+      await apiHideTournament(tournamentId);
+      setTournamentWeeks(prev =>
+        prev.map(week => ({
+          ...week,
+          tournaments: week.tournaments.map(t =>
+            t.id === tournamentId ? { ...t, hidden: true, registration: undefined } : t
+          ),
+        }))
+      );
+    } catch (e) {
+      console.error('Hide failed:', e);
+      Alert.alert('Erreur', 'Échec du masquage');
+    }
+  };
+
+  const handleUnhideTournament = async (tournamentId: string) => {
+    try {
+      await apiUnhideTournament(tournamentId);
+      setTournamentWeeks(prev =>
+        prev.map(week => ({
+          ...week,
+          tournaments: week.tournaments.map(t =>
+            t.id === tournamentId ? { ...t, hidden: false } : t
+          ),
+        }))
+      );
+    } catch (e) {
+      console.error('Unhide failed:', e);
+      Alert.alert('Erreur', 'Échec du rétablissement');
+    }
+  };
+
   const handleAddEvent = async () => {
     if (!newEventTitle.trim() || !selectedDate) {
       Alert.alert('Erreur', 'Veuillez remplir le titre');
