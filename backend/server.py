@@ -29,6 +29,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.responses import HTMLResponse
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    return """<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Le Court Central</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1e3c72;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:24px;padding:48px 32px;max-width:400px;width:90%;text-align:center;color:#1a1a1a;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+h1{font-size:28px;margin-bottom:8px;color:#1e3c72}
+.emoji{font-size:48px;margin-bottom:16px}
+.sub{color:#666;font-size:15px;margin-bottom:32px;line-height:1.5}
+.btn{display:inline-block;background:#1e3c72;color:#fff;padding:14px 32px;border-radius:14px;text-decoration:none;font-weight:600;font-size:16px;margin:6px}
+.btn.secondary{background:#f0f0f0;color:#1e3c72}
+.status{margin-top:24px;padding:12px;background:#e8f5e9;border-radius:10px;color:#2e7d32;font-size:13px;font-weight:500}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="emoji">🎾</div>
+<h1>Le Court Central</h1>
+<p class="sub">Application mobile pour joueurs de tennis professionnels.<br>Gérez vos tournois, documents et calendrier.</p>
+<a class="btn" href="exp://serve-preview.ngrok.io">Ouvrir dans Expo Go</a>
+<div class="status">API en ligne</div>
+</div>
+</body>
+</html>"""
+
 # MongoDB
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.getenv("DB_NAME", "central_court")
