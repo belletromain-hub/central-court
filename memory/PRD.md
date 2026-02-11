@@ -12,39 +12,33 @@ Application professionnelle de tennis avec:
 - **Backend:** Python, FastAPI, Motor (async MongoDB), Pydantic v2
 - **Database:** MongoDB (collections: users, documents, invitations, tournaments, tournament_registrations, tournament_hidden)
 - **AI/ML:** OpenAI Vision API (gpt-4o) for OCR
-- **3rd Party:** Resend (planned), reportlab (PDF)
 
 ## Completed Features
 - User onboarding (7 steps) with account creation
 - Profile page with edit + logout
 - Staff invitation system
-- Tournament database (228 tournaments)
+- Tournament database (228 tournaments: 60 ATP, 52 WTA, 116 ITF)
 - OCR document processing + modular vault
 - Calendar with event creation
 
 ## Phase 1 Tournament Optimizations (Feb 2026)
-1. **Country flags** - Emoji flags (45+ countries) on tournament cards and detail modal
-2. **Future tournaments only** - Past tournaments filtered out from the scroll list
-3. **"Pas intéressé" option** - Hide/unhide tournaments via backend API + UI toggle
-4. **Country flag utility** - `src/utils/countryFlags.ts` with mapping for all tournament countries
+1. Country flags (45+ countries) on tournament cards and modal
+2. Future tournaments only (past filtered out)
+3. "Pas intéressé" hide/unhide with backend API
 
-## Bug Fixes (Feb 2026)
-- Account creation 422: Pydantic v2 classement coercion (int→str)
-- Profile edit: api.ts missing default export
-- Expo Go tunnel: Fixed EXPO_PACKAGER_PROXY_URL pointing to dead tunnel
-- Step7 robustness: null safety, timeout, useNativeDriver web fix
+## Phase 2 Tournament Optimizations (Feb 2026)
+1. **Filtres multi-critères** : Surface (Hard/Clay/Grass/Carpet), Niveau (Grand Chelem, Masters 1000, ATP 500, ATP 250, etc.), Prize Money (>5M, 1M-5M, 500K-1M, <500K), Pays (avec drapeaux)
+2. **Badges de niveau** : Affichés en couleur sur les cartes (ATP 500 bleu, Masters 1000 rouge, Grand Chelem doré, etc.)
+3. **Statuts simplifiés** : Depuis "En attente" (pending), seuls "Participant" et "Décliné" sont proposés
+4. **Modal réactif** : selectedWeek dérivé via useMemo pour mise à jour en temps réel
 
 ## Key API Endpoints
 - POST /api/users/onboarding, PUT /api/users/profile/{user_id}
-- GET /api/tournaments/weeks?circuits=ATP
+- GET /api/tournaments/weeks?circuits=ATP (with category, surface, prizeMoney)
 - POST /api/tournaments/hide, DELETE /api/tournaments/hide/{id}
-- POST /api/tournaments/register
+- POST /api/tournaments/register (status: interested/pending/participating/declined)
 
 ## Backlog
-### Phase 2 (Tournament Optimizations)
-- Statuts simplifiés (pending → registered/declined)
-- Groupement par semaine amélioré
-
 ### Phase 3 (Tournament Optimizations)
 - Détection de conflits avec le calendrier
 
