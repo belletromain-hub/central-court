@@ -28,6 +28,7 @@ import {
   registerTournament as apiRegisterTournament,
   hideTournament as apiHideTournament,
   unhideTournament as apiUnhideTournament,
+  checkTournamentConflicts,
 } from '../../src/services/api';
 
 // ============ CONSTANTS ============
