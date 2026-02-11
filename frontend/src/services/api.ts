@@ -102,6 +102,10 @@ export const markAllAlertsRead = () =>
 export const generateAlerts = () =>
   apiFetch<any>('/api/alerts/generate', { method: 'POST' });
 
+// ── Conflicts ──
+export const checkTournamentConflicts = (tournamentId: string) =>
+  apiFetch<any>(`/api/tournaments/conflicts/${tournamentId}`);
+
 // ── Preferences ──
 export const fetchPreferences = () => apiFetch<any>('/api/preferences');
 
