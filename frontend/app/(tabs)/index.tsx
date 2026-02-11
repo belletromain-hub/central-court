@@ -225,6 +225,11 @@ export default function CalendarScreen() {
   const [filterCountry, setFilterCountry] = useState<string | null>(null);
   const [filterPrizeRange, setFilterPrizeRange] = useState(0); // index in PRIZE_RANGES
 
+  // Conflict detection state
+  const [conflictData, setConflictData] = useState<any>(null);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [pendingRegistration, setPendingRegistration] = useState<{tournamentId: string, status: string} | null>(null);
+
   // ============ DATA LOADING ============
 
   // Load user circuits from onboarding
