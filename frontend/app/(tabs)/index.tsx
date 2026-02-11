@@ -283,19 +283,48 @@ export default function CalendarScreen() {
 
   // ============ HELPERS ============
 
-  // Filter to only show future tournament weeks
+  // Filter to only show future tournament weeks + apply user filters
   const futureTournamentWeeks = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const prizeRange = PRIZE_RANGES[filterPrizeRange];
+    
     return tournamentWeeks.filter(week => {
       if (!week?.tournaments?.length) return false;
-      // Keep week if at least one tournament hasn't ended yet
+      // Keep week if at least one tournament matches all filters
       return week.tournaments.some(t => {
         if (!t?.endDate) return true;
-        return new Date(t.endDate) >= today;
+        // Future only
+        if (new Date(t.endDate) < today) return false;
+        // Surface filter
+        if (filterSurface && normalizeSurface(t.surface) !== filterSurface) return false;
+        // Level filter
+        if (filterLevel && getCategoryLabel(t.category) !== filterLevel) return false;
+        // Country filter
+        if (filterCountry && t.country !== filterCountry) return false;
+        // Prize money filter
+        if (prizeRange && prizeRange.min > 0) {
+          if ((t.prizeMoney || 0) < prizeRange.min) return false;
+        }
+        if (prizeRange && prizeRange.max < Infinity) {
+          if ((t.prizeMoney || 0) > prizeRange.max) return false;
+        }
+        return true;
       });
     });
+  }, [tournamentWeeks, filterSurface, filterLevel, filterCountry, filterPrizeRange]);
+
+  // Available countries from tournaments (for filter dropdown)
+  const availableCountries = useMemo(() => {
+    const countries = new Set<string>();
+    tournamentWeeks.forEach(w => w.tournaments?.forEach(t => {
+      if (t.country) countries.add(t.country);
+    }));
+    return Array.from(countries).sort();
   }, [tournamentWeeks]);
+
+  // Count active filters
+  const activeFilterCount = [filterSurface, filterLevel, filterCountry, filterPrizeRange > 0 ? 'x' : null].filter(Boolean).length;
 
   const getEventsForDate = useCallback((date: string): CalendarEvent[] => {
     return events.filter(e => e.date === date);
