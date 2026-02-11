@@ -57,7 +57,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: stri
 
 const OCR_CATEGORIES = ['Transport', 'Hébergement', 'Restauration', 'Médical', 'Matériel', 'Services', 'Autre'];
 
-const getCatConfig = (cat: string) => CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['Autre'];
+const getCatConfig = (cat: string) => CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['other'] || { label: cat || 'Autre', icon: 'document', color: '#757575' };
 
 // ============ COMPONENT ============
 
