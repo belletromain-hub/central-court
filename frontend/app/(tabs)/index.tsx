@@ -211,6 +211,13 @@ export default function CalendarScreen() {
   const [newEventTime, setNewEventTime] = useState('');
   const [newEventLocation, setNewEventLocation] = useState('');
 
+  // Filters state
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterSurface, setFilterSurface] = useState<string | null>(null);
+  const [filterLevel, setFilterLevel] = useState<string | null>(null);
+  const [filterCountry, setFilterCountry] = useState<string | null>(null);
+  const [filterPrizeRange, setFilterPrizeRange] = useState(0); // index in PRIZE_RANGES
+
   // ============ DATA LOADING ============
 
   // Load user circuits from onboarding
