@@ -203,7 +203,13 @@ export default function CalendarScreen() {
   // Modal state
   const [showTournamentModal, setShowTournamentModal] = useState(false);
   const [showAddEventModal, setShowAddEventModal] = useState(false);
-  const [selectedWeek, setSelectedWeek] = useState<TournamentWeek | null>(null);
+  const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null);
+  
+  // Derive selectedWeek from reactive state so modal updates in real-time
+  const selectedWeek = useMemo(() => {
+    if (selectedWeekNumber === null) return null;
+    return tournamentWeeks.find(w => w.weekNumber === selectedWeekNumber) || null;
+  }, [selectedWeekNumber, tournamentWeeks]);
   
   // New event form
   const [newEventTitle, setNewEventTitle] = useState('');
