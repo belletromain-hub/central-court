@@ -9,7 +9,7 @@ Application professionnelle de tennis avec:
 
 ## Architecture
 - **Frontend:** React Native, Expo, Expo Router, TypeScript, Axios
-- **Backend:** Python, FastAPI, Motor (async MongoDB), Pydantic
+- **Backend:** Python, FastAPI, Motor (async MongoDB), Pydantic v2
 - **Database:** MongoDB (collections: users, documents, invitations, tournaments, tournament_registrations, tournament_hidden)
 - **AI/ML:** OpenAI Vision API (gpt-4o) for OCR
 - **3rd Party:** Resend (planned), reportlab (PDF)
@@ -26,13 +26,16 @@ Application professionnelle de tennis avec:
 - Document management (vault) with modular components
 
 ## Bug Fixes Completed (Feb 2026)
-1. Account creation: Fixed API call in step7-password.tsx, added residenceFiscale
-2. Logout: Added "Se deconnecter" button in profile.tsx
-3. Profile edit saving: Fixed api.ts missing default export (axios instance)
-4. Prize money display: Added to tournament week cards in index.tsx
+1. **Account creation 422 error**: Root cause was Pydantic v2 rejecting `classement: 150` (number) instead of `"150"` (string). Fixed both frontend (String conversion) and backend (field_validator for coercion)
+2. **Logout**: Added "Se deconnecter" button in profile.tsx
+3. **Profile edit saving**: Fixed api.ts missing default export (axios instance)
+4. **Prize money display**: Added to tournament week cards in index.tsx (format K/M)
+5. **Null safety**: Added null check for userData in step7-password.tsx
+6. **useNativeDriver**: Fixed for web compatibility in step7 success animation
+7. **Error handling**: Added finally block with proper isCreating reset
 
 ## Key API Endpoints
-- POST /api/users/onboarding - Create user
+- POST /api/users/onboarding - Create user (accepts int or str classement)
 - PUT /api/users/profile/{user_id} - Update profile
 - GET /api/users/profile/email/{email} - Get profile by email
 - GET /api/tournaments?circuits=ATP - List tournaments
