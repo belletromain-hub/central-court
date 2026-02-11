@@ -434,6 +434,26 @@ export default function CalendarScreen() {
   // ============ ACTIONS ============
 
   const handleRegisterTournament = async (tournamentId: string, status: string) => {
+    // For advancing statuses (pending/participating), check for conflicts first
+    if (status === 'pending' || status === 'participating') {
+      try {
+        const conflicts = await checkTournamentConflicts(tournamentId);
+        if (conflicts.totalConflicts > 0) {
+          setConflictData(conflicts);
+          setPendingRegistration({ tournamentId, status });
+          setShowConflictModal(true);
+          return;
+        }
+      } catch (e) {
+        // If conflict check fails, proceed anyway
+        console.warn('Conflict check failed, proceeding:', e);
+      }
+    }
+    
+    await executeRegistration(tournamentId, status);
+  };
+  
+  const executeRegistration = async (tournamentId: string, status: string) => {
     try {
       await apiRegisterTournament(tournamentId, status);
       
@@ -453,6 +473,21 @@ export default function CalendarScreen() {
       console.error('Registration failed:', e);
       Alert.alert('Erreur', 'Échec de l\'inscription');
     }
+  };
+  
+  const handleConflictProceed = async () => {
+    if (pendingRegistration) {
+      await executeRegistration(pendingRegistration.tournamentId, pendingRegistration.status);
+    }
+    setShowConflictModal(false);
+    setConflictData(null);
+    setPendingRegistration(null);
+  };
+  
+  const handleConflictCancel = () => {
+    setShowConflictModal(false);
+    setConflictData(null);
+    setPendingRegistration(null);
   };
 
   const handleHideTournament = async (tournamentId: string) => {
