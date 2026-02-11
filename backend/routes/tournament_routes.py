@@ -59,7 +59,12 @@ async def check_tournament_conflicts(tournament_id: str):
     t_start = tournament.get("startDate")
     t_end = tournament.get("endDate")
     if not t_start or not t_end:
-        return {"conflicts": [], "count": 0}
+        return {
+            "tournament": {"id": tournament.get("id"), "name": tournament.get("name"), "startDate": None, "endDate": None},
+            "calendarEvents": [],
+            "conflictingTournaments": [],
+            "totalConflicts": 0,
+        }
     
     # Add 1 day buffer before and after
     from datetime import timedelta
