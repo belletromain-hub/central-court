@@ -634,17 +634,24 @@ export default function CalendarScreen() {
     const dayEvents = getEventsForDate(selectedDate);
     const week = getWeekForDate(selectedDate);
     
-    const tournamentsForDay = week?.tournaments?.filter(t => 
-      t?.registration && t?.startDate && t?.endDate &&
-      new Date(selectedDate) >= new Date(t.startDate) &&
-      new Date(selectedDate) <= new Date(t.endDate)
-    ) || [];
+    const tournamentsForDay = week?.tournaments?.filter(t => {
+      if (!t?.registration || !t?.startDate || !t?.endDate) return false;
+      // Compare as strings (YYYY-MM-DD) to avoid timezone issues
+      const sd = selectedDate;
+      const tStart = typeof t.startDate === 'string' ? t.startDate.slice(0, 10) : '';
+      const tEnd = typeof t.endDate === 'string' ? t.endDate.slice(0, 10) : '';
+      return sd >= tStart && sd <= tEnd;
+    }) || [];
+    
+    // Parse date parts without timezone offset
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const displayDate = new Date(y, m - 1, d);
     
     return (
       <View style={styles.dayEventsContainer}>
         <View style={styles.dayEventsHeader}>
           <Text style={styles.dayEventsTitle}>
-            {new Date(selectedDate).toLocaleDateString('fr-FR', { 
+            {displayDate.toLocaleDateString('fr-FR', { 
               weekday: 'long', 
               day: 'numeric', 
               month: 'long' 
