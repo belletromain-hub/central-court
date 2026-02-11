@@ -1,0 +1,74 @@
+{
+  "summary": "Backend API testing completed for Phase 1 tournament optimizations. All 22 tests passed. Validated: (1) POST /api/tournaments/hide hides tournament and removes registration, (2) DELETE /api/tournaments/hide/{tournament_id} unhides tournament, (3) GET /api/tournaments/weeks returns weeks with country field for flag mapping, (4) GET /api/tournaments returns tournaments with country, prizeMoney, startDate, endDate fields, (5) Hidden tournaments appear with hidden=true in /weeks response, (6) 90%+ of country names can be mapped to flag emojis.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "N/A - Data issue",
+        "issue": "4 country names in DB don't have flag mappings: 'Great Britain', 'Korea, Rep.', 'Sri Lanka', 'Turkiye'. getFlagEmoji() returns empty string for these.",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_tournament_hide_unhide.py",
+    "/app/test_reports/pytest/pytest_tournament_hide_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Add missing country mappings to countryFlags.ts: 'Great Britain' -> 'GB', 'Korea, Rep.' -> 'KR', 'Sri Lanka' -> 'LK', 'Turkiye' -> 'TR'"
+  ],
+  "critical_code_review_comments": [
+    "All Phase 1 tournament optimization backend endpoints are working correctly",
+    "Hide endpoint correctly removes registration when hiding a tournament",
+    "Unhide endpoint correctly sets hidden=false",
+    "Tournaments in /weeks response include: hidden, registration, country, prizeMoney, startDate, endDate fields",
+    "90% of tournament countries map to flag emojis (37/41 unique countries)"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_tournament_hide_unhide.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 22/22 tests passed",
+    "frontend": "N/A - Backend only testing requested"
+  },
+  "test_credentials": {},
+  "seed_data_creation": "Used existing tournaments: adelaide-2026, brisbane-2026 for hide/unhide testing. State cleaned up after tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 1 tournament optimizations fully tested. Key endpoints: POST /api/tournaments/hide (hides tournament, removes registration), DELETE /api/tournaments/hide/{tournament_id} (unhides), GET /api/tournaments/weeks?circuits=ATP (returns weeks with hidden/registration/country fields), GET /api/tournaments (has country, prizeMoney, startDate, endDate, currency). All tests use REACT_APP_BACKEND_URL=https://serve-preview.preview.emergentagent.com",
+  "features_tested": {
+    "POST /api/tournaments/hide": {
+      "status": "PASS",
+      "details": "Returns {success: true}, removes registration, tournament appears with hidden=true in /weeks"
+    },
+    "DELETE /api/tournaments/hide/{tournament_id}": {
+      "status": "PASS", 
+      "details": "Returns {success: true}, tournament appears with hidden=false in /weeks"
+    },
+    "GET /api/tournaments/weeks?circuits=ATP": {
+      "status": "PASS",
+      "details": "Returns {weeks: [...], totalTournaments: 60}. Tournaments include: country, prizeMoney, startDate, endDate, hidden, registration fields"
+    },
+    "GET /api/tournaments?circuits=ATP": {
+      "status": "PASS",
+      "details": "Returns tournaments with country, prizeMoney, currency, startDate, endDate fields"
+    },
+    "Hidden tournaments in /weeks": {
+      "status": "PASS",
+      "details": "Hidden tournaments correctly show hidden=true, unhidden show hidden=false"
+    },
+    "Country flag mapping": {
+      "status": "PASS",
+      "details": "90% of countries (37/41) map to flag emojis. 4 unmapped: Great Britain, Korea Rep., Sri Lanka, Turkiye"
+    }
+  },
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}
