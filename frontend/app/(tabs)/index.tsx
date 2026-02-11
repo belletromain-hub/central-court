@@ -724,12 +724,116 @@ export default function CalendarScreen() {
 
         {/* Tournament weeks */}
         <View style={styles.tournamentsSection}>
-          <Text style={styles.sectionTitle}>Prochains tournois</Text>
+          <View style={styles.tournamentsSectionHeader}>
+            <Text style={styles.sectionTitle}>Prochains tournois</Text>
+            <TouchableOpacity
+              style={[styles.filterToggle, activeFilterCount > 0 && styles.filterToggleActive]}
+              onPress={() => setShowFilters(!showFilters)}
+            >
+              <Ionicons name="filter" size={16} color={activeFilterCount > 0 ? '#fff' : '#1e3c72'} />
+              {activeFilterCount > 0 && <Text style={styles.filterCount}>{activeFilterCount}</Text>}
+            </TouchableOpacity>
+          </View>
+
+          {/* Filter bar */}
+          {showFilters && (
+            <View style={styles.filtersContainer}>
+              {/* Surface filter */}
+              <Text style={styles.filterLabel}>Surface</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                <TouchableOpacity
+                  style={[styles.filterChip, !filterSurface && styles.filterChipActive]}
+                  onPress={() => setFilterSurface(null)}
+                >
+                  <Text style={[styles.filterChipText, !filterSurface && styles.filterChipTextActive]}>Toutes</Text>
+                </TouchableOpacity>
+                {FILTER_SURFACES.map(s => (
+                  <TouchableOpacity
+                    key={s}
+                    style={[styles.filterChip, filterSurface === s && styles.filterChipActive, filterSurface === s && { backgroundColor: getSurfaceColor(s) }]}
+                    onPress={() => setFilterSurface(filterSurface === s ? null : s)}
+                  >
+                    <Text style={[styles.filterChipText, filterSurface === s && styles.filterChipTextActive]}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Level filter */}
+              <Text style={styles.filterLabel}>Niveau</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                <TouchableOpacity
+                  style={[styles.filterChip, !filterLevel && styles.filterChipActive]}
+                  onPress={() => setFilterLevel(null)}
+                >
+                  <Text style={[styles.filterChipText, !filterLevel && styles.filterChipTextActive]}>Tous</Text>
+                </TouchableOpacity>
+                {FILTER_LEVELS.map(l => (
+                  <TouchableOpacity
+                    key={l}
+                    style={[styles.filterChip, filterLevel === l && styles.filterChipActive, filterLevel === l && { backgroundColor: CATEGORY_COLORS[l] || '#607D8B' }]}
+                    onPress={() => setFilterLevel(filterLevel === l ? null : l)}
+                  >
+                    <Text style={[styles.filterChipText, filterLevel === l && styles.filterChipTextActive]}>{l}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Prize money filter */}
+              <Text style={styles.filterLabel}>Prize Money</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                {PRIZE_RANGES.map((pr, i) => (
+                  <TouchableOpacity
+                    key={pr.label}
+                    style={[styles.filterChip, filterPrizeRange === i && styles.filterChipActive]}
+                    onPress={() => setFilterPrizeRange(filterPrizeRange === i ? 0 : i)}
+                  >
+                    <Text style={[styles.filterChipText, filterPrizeRange === i && styles.filterChipTextActive]}>{pr.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Country filter */}
+              <Text style={styles.filterLabel}>Pays</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                <TouchableOpacity
+                  style={[styles.filterChip, !filterCountry && styles.filterChipActive]}
+                  onPress={() => setFilterCountry(null)}
+                >
+                  <Text style={[styles.filterChipText, !filterCountry && styles.filterChipTextActive]}>Tous</Text>
+                </TouchableOpacity>
+                {availableCountries.map(c => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.filterChip, filterCountry === c && styles.filterChipActive]}
+                    onPress={() => setFilterCountry(filterCountry === c ? null : c)}
+                  >
+                    <Text style={[styles.filterChipText, filterCountry === c && styles.filterChipTextActive]}>
+                      {getFlagEmoji(c)} {c}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Reset all filters */}
+              {activeFilterCount > 0 && (
+                <TouchableOpacity
+                  style={styles.resetFiltersBtn}
+                  onPress={() => { setFilterSurface(null); setFilterLevel(null); setFilterCountry(null); setFilterPrizeRange(0); }}
+                >
+                  <Ionicons name="close-circle" size={16} color="#E53935" />
+                  <Text style={styles.resetFiltersText}>Réinitialiser les filtres</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           {futureTournamentWeeks.length === 0 ? (
-            <Text style={styles.noTournamentsText}>Aucun tournoi à venir</Text>
+            <Text style={styles.noTournamentsText}>
+              {activeFilterCount > 0 ? 'Aucun tournoi ne correspond aux filtres' : 'Aucun tournoi à venir'}
+            </Text>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weeksScroll}>
-              {futureTournamentWeeks.slice(0, 15).map(week => renderTournamentWeekCard(week))}
+              {futureTournamentWeeks.slice(0, 20).map(week => renderTournamentWeekCard(week))}
             </ScrollView>
           )}
         </View>
