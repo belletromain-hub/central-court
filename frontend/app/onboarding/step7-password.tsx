@@ -86,7 +86,7 @@ export default function Step7Password() {
         dateNaissance: userData.dateNaissance || null,
         circuits: userData.circuits || [],
         niveaux: userData.niveaux || userData.niveauxTournois || [],
-        classement: userData.classement || null,
+        classement: userData.classement != null ? String(userData.classement) : null,
         residenceFiscale: userData.residenceFiscale || null,
         onboardingCompleted: true,
         onboardingStep: 7,

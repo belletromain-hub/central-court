@@ -3,8 +3,8 @@ Routes pour l'onboarding utilisateur et la gestion du profil
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Union
 from datetime import datetime, timezone
 from bson import ObjectId
 
