@@ -59,6 +59,88 @@ const SURFACE_COLORS: Record<string, string> = {
   'Indoor Hard': '#1565C0',
 };
 
+// Normalize surfaces for filtering
+const normalizeSurface = (surface: string): string => {
+  if (!surface) return 'Hard';
+  const s = surface.toLowerCase();
+  if (s.includes('clay')) return 'Clay';
+  if (s.includes('grass')) return 'Grass';
+  if (s.includes('carpet')) return 'Carpet';
+  return 'Hard';
+};
+
+// Get surface color for normalized or raw surface
+const getSurfaceColor = (surface: string): string => {
+  return SURFACE_COLORS[surface] || SURFACE_COLORS[normalizeSurface(surface)] || '#666';
+};
+
+// Category display labels
+const CATEGORY_LABELS: Record<string, string> = {
+  'Grand Slam': 'Grand Chelem',
+  'Masters 1000': 'Masters 1000',
+  '1000': 'Masters 1000',
+  'ATP 500': 'ATP 500',
+  '500': 'ATP 500',
+  'ATP 250': 'ATP 250',
+  '250': 'ATP 250',
+  'ATP Finals': 'ATP Finals',
+  'WTA 1000': 'WTA 1000',
+  'WTA 500': 'WTA 500',
+  'WTA 250': 'WTA 250',
+  'WTA Finals': 'WTA Finals',
+  'ITF Futures Series': 'ITF Futures',
+  'ITF Junior Series': 'ITF Juniors',
+  'Team Event': 'Equipe',
+  'Regional Games': 'Jeux Régionaux',
+  'Wheelchair World Team Cup': 'Wheelchair',
+  '100': 'Challenger 100',
+  '175': 'Challenger 175',
+  '50': 'ITF 50',
+};
+
+const getCategoryLabel = (category: string): string => CATEGORY_LABELS[category] || category;
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'Grand Chelem': '#D4AF37',
+  'Masters 1000': '#E53935',
+  'ATP 500': '#1e3c72',
+  'ATP 250': '#2196F3',
+  'ATP Finals': '#FFD700',
+  'WTA 1000': '#E53935',
+  'WTA 500': '#9C27B0',
+  'WTA 250': '#E91E63',
+  'WTA Finals': '#FFD700',
+  'ITF Futures': '#4CAF50',
+  'ITF Juniors': '#8BC34A',
+  'Challenger 100': '#FF9800',
+  'Challenger 175': '#FF9800',
+  'Equipe': '#607D8B',
+};
+
+const getCategoryColor = (category: string): string => {
+  const label = getCategoryLabel(category);
+  return CATEGORY_COLORS[label] || '#607D8B';
+};
+
+// Filter surfaces
+const FILTER_SURFACES = ['Hard', 'Clay', 'Grass', 'Carpet'];
+
+// Filter levels
+const FILTER_LEVELS = [
+  'Grand Chelem', 'Masters 1000', 'ATP 500', 'ATP 250', 'ATP Finals',
+  'WTA 1000', 'WTA 500', 'WTA 250', 'WTA Finals',
+  'Challenger 175', 'Challenger 100', 'ITF Futures',
+];
+
+// Prize money ranges
+const PRIZE_RANGES = [
+  { label: 'Tous', min: 0, max: Infinity },
+  { label: '> 5M', min: 5000000, max: Infinity },
+  { label: '1M - 5M', min: 1000000, max: 5000000 },
+  { label: '500K - 1M', min: 500000, max: 1000000 },
+  { label: '< 500K', min: 0, max: 500000 },
+];
+
 // Configure French locale
 LocaleConfig.locales['fr'] = {
   monthNames: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
