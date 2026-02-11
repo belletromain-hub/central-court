@@ -1138,6 +1138,8 @@ const styles = StyleSheet.create({
   tournamentDetailFlag: { fontSize: 28 },
   notInterestedBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 8 },
   notInterestedText: { fontSize: 13, color: '#999' },
+  currentStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, marginBottom: 2 },
+  currentStatusText: { fontSize: 13, fontWeight: '600', color: '#333' },
   unhideBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 10, backgroundColor: '#e8f0fe', borderRadius: 8 },
   unhideBtnText: { fontSize: 14, color: '#1e3c72', fontWeight: '600' },
   statusBtnText: { fontSize: 12, fontWeight: '600', color: '#666' },
