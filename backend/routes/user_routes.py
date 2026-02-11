@@ -58,6 +58,13 @@ class OnboardingData(BaseModel):
     onboardingCompleted: bool = False
     onboardingStep: int = 1
 
+    @field_validator('classement', mode='before')
+    @classmethod
+    def coerce_classement(cls, v):
+        if v is None:
+            return None
+        return str(v)
+
 
 class OnboardingUpdate(BaseModel):
     prenom: Optional[str] = None
