@@ -6,6 +6,7 @@ export const COUNTRY_CODES: Record<string, string> = {
   'France': 'FR',
   'United Kingdom': 'GB',
   'UK': 'GB',
+  'Great Britain': 'GB',
   'USA': 'US',
   'United States': 'US',
 
@@ -36,6 +37,7 @@ export const COUNTRY_CODES: Record<string, string> = {
   'Sweden': 'SE',
   'Switzerland': 'CH',
   'Turkey': 'TR',
+  'Turkiye': 'TR',
 
   // Americas
   'Argentina': 'AR',
@@ -61,8 +63,10 @@ export const COUNTRY_CODES: Record<string, string> = {
   'Singapore': 'SG',
   'South Korea': 'KR',
   'Korea': 'KR',
+  'Korea, Rep.': 'KR',
   'Taiwan': 'TW',
   'Thailand': 'TH',
+  'Sri Lanka': 'LK',
   'Uzbekistan': 'UZ',
   'Vietnam': 'VN',
 
