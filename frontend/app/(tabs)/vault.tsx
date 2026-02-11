@@ -579,7 +579,7 @@ export default function DocumentsScreen() {
                   </View>
 
                   <View style={s.detailAmountBox}>
-                    <Text style={s.detailAmountLabel}>Montant TTC</Text>
+                    <Text style={s.detailAmountLabel}>Montant</Text>
                     <Text style={s.detailAmount}>
                       {showDocDetail.amount ? `${showDocDetail.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €` : '--'}
                     </Text>
