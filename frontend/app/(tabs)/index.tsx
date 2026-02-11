@@ -19,12 +19,15 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../src/constants/colors';
+import { getFlagEmoji } from '../../src/utils/countryFlags';
 import {
   fetchEvents,
   fetchTournamentWeeks,
   fetchAlerts,
   createEvent as apiCreateEvent,
   registerTournament as apiRegisterTournament,
+  hideTournament as apiHideTournament,
+  unhideTournament as apiUnhideTournament,
 } from '../../src/services/api';
 
 // ============ CONSTANTS ============
