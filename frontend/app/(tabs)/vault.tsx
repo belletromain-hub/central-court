@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Pressable,
   Alert,
   ActivityIndicator,
   RefreshControl,
-  Image,
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,69 +20,44 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import api from '../../src/services/api';
-import { AppleDatePickerFR } from '../../src/components/inputs';
 
 // ============ TYPES ============
 
 interface Document {
   id: string;
   name: string;
-  category: 'travel' | 'invoices' | 'medical' | 'other';
+  category: string;
   type: 'pdf' | 'image';
-  size: string;
   date: string;
   amount?: number;
-  uri?: string;
+  currency?: string;
   fournisseur?: string;
   description?: string;
-}
-
-interface InvoiceData {
-  confidence: number;
-  needsReview: boolean;
-  fournisseur?: string;
-  dateFacture?: string;
-  montantTotal?: number;
-  montantHT?: number;
-  montantTVA?: number;
-  devise?: string;
-  categorie?: string;
+  createdAt?: string;
 }
 
 // ============ CONSTANTS ============
 
-const CATEGORIES = {
-  travel: { label: 'Voyages', icon: 'airplane' as const, color: '#00796b' },
-  invoices: { label: 'Factures', icon: 'receipt' as const, color: '#f57c00' },
-  medical: { label: 'Médical', icon: 'medkit' as const, color: '#c2185b' },
-  other: { label: 'Autres', icon: 'document' as const, color: '#757575' },
+const MONTHS_FR = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
+  'Transport': { label: 'Transport', icon: 'airplane', color: '#00796b' },
+  'travel': { label: 'Transport', icon: 'airplane', color: '#00796b' },
+  'Hébergement': { label: 'Hébergement', icon: 'bed', color: '#1976d2' },
+  'Restauration': { label: 'Restauration', icon: 'restaurant', color: '#e64a19' },
+  'invoices': { label: 'Factures', icon: 'receipt', color: '#f57c00' },
+  'Médical': { label: 'Médical', icon: 'medkit', color: '#c2185b' },
+  'medical': { label: 'Médical', icon: 'medkit', color: '#c2185b' },
+  'Matériel': { label: 'Équipement', icon: 'tennisball', color: '#2e7d32' },
+  'Équipement': { label: 'Équipement', icon: 'tennisball', color: '#2e7d32' },
+  'Services': { label: 'Services', icon: 'construct', color: '#0097a7' },
+  'Autre': { label: 'Autre', icon: 'document', color: '#757575' },
+  'other': { label: 'Autre', icon: 'document', color: '#757575' },
 };
 
-const CATEGORY_MAP: Record<string, Document['category']> = {
-  'Transport': 'travel',
-  'Hébergement': 'travel',
-  'Restauration': 'invoices',
-  'Médical': 'medical',
-  'Matériel': 'invoices',
-  'Services': 'invoices',
-  'Autre': 'other',
-};
+const OCR_CATEGORIES = ['Transport', 'Hébergement', 'Restauration', 'Médical', 'Matériel', 'Services', 'Autre'];
 
-const OCR_CATEGORIES = [
-  { id: 'Transport', label: 'Transport', color: '#00796b' },
-  { id: 'Hébergement', label: 'Hébergement', color: '#1976d2' },
-  { id: 'Restauration', label: 'Restauration', color: '#e64a19' },
-  { id: 'Médical', label: 'Médical', color: '#c2185b' },
-  { id: 'Matériel', label: 'Matériel', color: '#7b1fa2' },
-  { id: 'Services', label: 'Services', color: '#0097a7' },
-  { id: 'Autre', label: 'Autre', color: '#757575' },
-];
-
-const Colors = {
-  primary: '#1e3c72',
-  text: { primary: '#1a1a1a', secondary: '#666', muted: '#999' },
-  background: '#f8f9fa',
-};
+const getCatConfig = (cat: string) => CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['Autre'];
 
 // ============ COMPONENT ============
 
@@ -94,41 +68,81 @@ export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+
+  // Month navigation
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   // Modal states
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showDocDetail, setShowDocDetail] = useState<Document | null>(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   // Upload/OCR state
   const [isUploading, setIsUploading] = useState(false);
-  const [ocrData, setOcrData] = useState<InvoiceData | null>(null);
   const [pendingDocUri, setPendingDocUri] = useState<string | null>(null);
   const [pendingDocType, setPendingDocType] = useState<'pdf' | 'image'>('image');
-  const [pendingDocName, setPendingDocName] = useState<string>('');
+  const [pendingDocName, setPendingDocName] = useState('');
 
-  // Edit form state
-  const [editDate, setEditDate] = useState('');
-  const [editAmount, setEditAmount] = useState('');
-  const [editCategory, setEditCategory] = useState<string>('other');
-
-  // OCR inline edit state
-  const [editedMontant, setEditedMontant] = useState('');
-  const [editedDate, setEditedDate] = useState('');
+  // OCR edit state
   const [editedFournisseur, setEditedFournisseur] = useState('');
-  const [editedCategorie, setEditedCategorie] = useState('Autre');
+  const [editedDate, setEditedDate] = useState('');
+  const [editedMontant, setEditedMontant] = useState('');
   const [editedMontantHT, setEditedMontantHT] = useState('');
   const [editedMontantTVA, setEditedMontantTVA] = useState('');
+  const [editedCategorie, setEditedCategorie] = useState('Autre');
 
-  // Computed values
-  const filteredDocs = selectedCategory
-    ? documents.filter(d => d.category === selectedCategory)
-    : documents;
-  const total = filteredDocs.reduce((sum, d) => sum + (d.amount || 0), 0);
+  // ============ COMPUTED ============
+
+  const monthDocs = useMemo(() => {
+    return documents.filter(d => {
+      if (!d.date || d.date === '--') return false;
+      const [y, m] = d.date.split('-').map(Number);
+      return y === currentYear && m === currentMonth + 1;
+    });
+  }, [documents, currentMonth, currentYear]);
+
+  const monthTotal = useMemo(() => monthDocs.reduce((s, d) => s + (d.amount || 0), 0), [monthDocs]);
+
+  const categoryBreakdown = useMemo(() => {
+    const map: Record<string, number> = {};
+    monthDocs.forEach(d => {
+      const key = d.category || 'other';
+      map[key] = (map[key] || 0) + (d.amount || 0);
+    });
+    return Object.entries(map)
+      .map(([cat, total]) => ({ cat, total, pct: monthTotal > 0 ? (total / monthTotal) * 100 : 0 }))
+      .sort((a, b) => b.total - a.total);
+  }, [monthDocs, monthTotal]);
+
+  // Group documents by day
+  const groupedByDay = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const groups: { label: string; docs: Document[] }[] = [];
+    const sorted = [...monthDocs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const dayMap = new Map<string, Document[]>();
+    sorted.forEach(d => {
+      const key = d.date || 'unknown';
+      if (!dayMap.has(key)) dayMap.set(key, []);
+      dayMap.get(key)!.push(d);
+    });
+    dayMap.forEach((docs, date) => {
+      let label = date;
+      if (date === today) label = "Aujourd'hui";
+      else if (date === yesterday) label = 'Hier';
+      else {
+        const parts = date.split('-');
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          label = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+        }
+      }
+      groups.push({ label, docs });
+    });
+    return groups;
+  }, [monthDocs]);
 
   // ============ DATA LOADING ============
 
@@ -136,17 +150,17 @@ export default function DocumentsScreen() {
     try {
       const response = await api.get('/api/documents');
       const data = Array.isArray(response.data) ? response.data : [];
-      const docs = data.map((doc: any) => ({
+      const docs: Document[] = data.map((doc: any) => ({
         id: doc.id,
         name: doc.name || doc.fournisseur || 'Document',
         category: doc.category || 'other',
-        type: doc.fileType === 'pdf' ? 'pdf' : 'image',
-        size: doc.hasFile ? 'Fichier' : '--',
+        type: doc.fileType === 'pdf' ? 'pdf' as const : 'image' as const,
         date: doc.dateFacture || '--',
         amount: doc.montantTotal,
-        uri: doc.hasFile ? `/api/documents/${doc.id}/file` : undefined,
+        currency: doc.currency || 'EUR',
         fournisseur: doc.fournisseur,
         description: doc.description,
+        createdAt: doc.createdAt,
       }));
       setDocuments(docs);
     } catch (error) {
@@ -157,30 +171,45 @@ export default function DocumentsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadDocuments();
-  }, [loadDocuments]);
+  useEffect(() => { loadDocuments(); }, [loadDocuments]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadDocuments();
-  }, [loadDocuments]);
+  // ============ MONTH NAVIGATION ============
 
-  // ============ UPLOAD HANDLERS ============
+  const prevMonth = () => {
+    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1); }
+    else setCurrentMonth(m => m - 1);
+  };
+
+  const nextMonth = () => {
+    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(y => y + 1); }
+    else setCurrentMonth(m => m + 1);
+  };
+
+  // ============ UPLOAD / OCR ============
 
   const handleTakePhoto = async () => {
     setShowUploadModal(false);
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Autorisation d\'accès à la caméra nécessaire');
+      Alert.alert('Permission requise', 'Accès à la caméra nécessaire');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: 'images',
-      quality: 0.8,
-    });
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
       processDocumentWithOCR(result.assets[0].uri, 'image', `Photo_${Date.now()}.jpg`);
+    }
+  };
+
+  const handleSelectGallery = async () => {
+    setShowUploadModal(false);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission requise', 'Accès à la galerie nécessaire');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.8 });
+    if (!result.canceled && result.assets[0]) {
+      processDocumentWithOCR(result.assets[0].uri, 'image', `Galerie_${Date.now()}.jpg`);
     }
   };
 
@@ -193,7 +222,7 @@ export default function DocumentsScreen() {
       });
       if (!result.canceled && result.assets[0]) {
         const file = result.assets[0];
-        const type = file.mimeType?.includes('pdf') ? 'pdf' : 'image';
+        const type = file.mimeType?.includes('pdf') ? 'pdf' as const : 'image' as const;
         processDocumentWithOCR(file.uri, type, file.name || `Document_${Date.now()}`);
       }
     } catch (error) {
@@ -208,10 +237,7 @@ export default function DocumentsScreen() {
     setPendingDocName(name);
 
     try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
       const response = await api.post('/api/invoices/analyze-base64', {
         file_base64: base64,
         file_type: type,
@@ -220,54 +246,45 @@ export default function DocumentsScreen() {
 
       if (response.data.success && response.data.data) {
         const data = response.data.data;
-        setOcrData(data);
         setEditedFournisseur(data.fournisseur || '');
-        setEditedDate(data.dateFacture || '');
+        setEditedDate(data.dateFacture || new Date().toISOString().split('T')[0]);
         setEditedMontant(data.montantTotal?.toString() || '');
         setEditedMontantHT(data.montantHT?.toString() || '');
         setEditedMontantTVA(data.montantTVA?.toString() || '');
         setEditedCategorie(data.categorie || 'Autre');
         setShowVerificationModal(true);
       } else {
-        // OCR failed - create doc with manual entry
-        const newDoc: Document = {
-          id: `doc-${Date.now()}`,
-          name: name,
-          category: 'other',
-          type: type,
-          size: 'Fichier',
-          date: new Date().toISOString().split('T')[0],
-          uri: uri,
-        };
-        setDocuments(prev => [newDoc, ...prev]);
-        setSelectedDoc(newDoc);
-        setEditDate(newDoc.date);
-        setEditAmount('');
-        setEditCategory('other');
-        setShowEditModal(true);
+        // OCR failed - manual entry
+        setEditedFournisseur('');
+        setEditedDate(new Date().toISOString().split('T')[0]);
+        setEditedMontant('');
+        setEditedMontantHT('');
+        setEditedMontantTVA('');
+        setEditedCategorie('Autre');
+        setShowVerificationModal(true);
       }
     } catch (error) {
       console.error('OCR error:', error);
-      Alert.alert('Erreur', 'Analyse du document échouée');
+      // Still show form for manual entry
+      setEditedFournisseur('');
+      setEditedDate(new Date().toISOString().split('T')[0]);
+      setEditedMontant('');
+      setEditedCategorie('Autre');
+      setShowVerificationModal(true);
     } finally {
       setIsUploading(false);
     }
   };
 
-  // ============ VERIFICATION HANDLERS ============
-
-  const handleVerificationSave = async () => {
-    const mappedCategory = CATEGORY_MAP[editedCategorie] || 'other';
+  const handleSaveDocument = async () => {
     const parsedMontant = parseFloat(editedMontant.replace(',', '.')) || 0;
-    const parsedMontantHT = parseFloat(editedMontantHT.replace(',', '.')) || undefined;
-    const parsedMontantTVA = parseFloat(editedMontantTVA.replace(',', '.')) || undefined;
+    const parsedHT = parseFloat(editedMontantHT.replace(',', '.')) || undefined;
+    const parsedTVA = parseFloat(editedMontantTVA.replace(',', '.')) || undefined;
 
     try {
       let base64Data = null;
       if (pendingDocUri) {
-        base64Data = await FileSystem.readAsStringAsync(pendingDocUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
+        base64Data = await FileSystem.readAsStringAsync(pendingDocUri, { encoding: FileSystem.EncodingType.Base64 });
       }
 
       const response = await api.post('/api/documents', {
@@ -275,46 +292,37 @@ export default function DocumentsScreen() {
         name: editedFournisseur || pendingDocName,
         fournisseur: editedFournisseur,
         dateFacture: editedDate,
-        category: mappedCategory,
+        category: editedCategorie,
         montantTotal: parsedMontant,
-        montantHT: parsedMontantHT,
-        montantTVA: parsedMontantTVA,
-        devise: 'EUR',
+        montantHT: parsedHT,
+        montantTVA: parsedTVA,
+        currency: 'EUR',
         fileBase64: base64Data,
         fileType: pendingDocType,
-        fileName: pendingDocName,
       });
 
-      const savedDoc = response.data;
-      const newDoc: Document = {
-        id: savedDoc.id,
-        name: savedDoc.name,
-        category: savedDoc.category,
+      const saved = response.data;
+      setDocuments(prev => [{
+        id: saved.id,
+        name: saved.name,
+        category: saved.category,
         type: pendingDocType,
-        size: 'Fichier',
-        date: savedDoc.dateFacture || '--',
-        amount: savedDoc.montantTotal,
-        uri: `/api/documents/${savedDoc.id}/file`,
-        fournisseur: savedDoc.fournisseur,
-      };
+        date: saved.dateFacture || editedDate,
+        amount: saved.montantTotal,
+        currency: saved.currency || 'EUR',
+        fournisseur: saved.fournisseur,
+        createdAt: saved.createdAt,
+      }, ...prev]);
 
-      setDocuments(prev => [newDoc, ...prev]);
       setShowVerificationModal(false);
-      resetOCRState();
-      Alert.alert('Succès', 'Document enregistré');
+      resetOCR();
     } catch (error) {
       console.error('Save error:', error);
-      Alert.alert('Erreur', 'Échec de l\'enregistrement');
+      Alert.alert('Erreur', "Échec de l'enregistrement");
     }
   };
 
-  const handleVerificationCancel = () => {
-    setShowVerificationModal(false);
-    resetOCRState();
-  };
-
-  const resetOCRState = () => {
-    setOcrData(null);
+  const resetOCR = () => {
     setPendingDocUri(null);
     setPendingDocName('');
     setEditedFournisseur('');
@@ -325,644 +333,400 @@ export default function DocumentsScreen() {
     setEditedCategorie('Autre');
   };
 
-  // ============ EDIT HANDLERS ============
-
-  const handleViewDoc = (doc: Document) => {
-    setSelectedDoc(doc);
-    setShowViewModal(true);
-  };
-
-  const handleEditDoc = (doc: Document) => {
-    setSelectedDoc(doc);
-    setEditDate(doc.date || '');
-    setEditAmount(doc.amount?.toString() || '');
-    setEditCategory(doc.category || 'other');
-    setShowEditModal(true);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!selectedDoc) return;
-    try {
-      await api.put(`/api/documents/${selectedDoc.id}`, {
-        dateFacture: editDate,
-        montantTotal: parseFloat(editAmount.replace(',', '.')) || 0,
-        category: editCategory,
-      });
-
-      setDocuments(prev =>
-        prev.map(d =>
-          d.id === selectedDoc.id
-            ? { ...d, date: editDate, amount: parseFloat(editAmount) || 0, category: editCategory as any }
-            : d
-        )
-      );
-      setShowEditModal(false);
-    } catch (error) {
-      console.error('Update error:', error);
-      Alert.alert('Erreur', 'Échec de la mise à jour');
-    }
-  };
-
   const handleDeleteDoc = async (docId: string) => {
-    Alert.alert('Supprimer', 'Voulez-vous vraiment supprimer ce document ?', [
+    Alert.alert('Supprimer', 'Voulez-vous vraiment supprimer ce reçu ?', [
       { text: 'Annuler', style: 'cancel' },
       {
-        text: 'Supprimer',
-        style: 'destructive',
+        text: 'Supprimer', style: 'destructive',
         onPress: async () => {
           try {
             await api.delete(`/api/documents/${docId}`);
             setDocuments(prev => prev.filter(d => d.id !== docId));
-            setShowViewModal(false);
-            setShowEditModal(false);
-          } catch (error) {
-            Alert.alert('Erreur', 'Échec de la suppression');
-          }
+            setShowDocDetail(null);
+          } catch { Alert.alert('Erreur', 'Échec de la suppression'); }
         },
       },
     ]);
   };
 
-  // Date picker handler
-  const handleDateSelect = (date: Date) => {
-    const formatted = date.toISOString().split('T')[0];
-    setEditDate(formatted);
-    setShowDatePicker(false);
-  };
-
-  const parsedDate = React.useMemo(() => {
-    if (editDate) {
-      const parts = editDate.split('-');
-      if (parts.length === 3) {
-        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      }
-    }
-    return new Date();
-  }, [editDate]);
-
   // ============ RENDER ============
 
+  if (isLoading) {
+    return (
+      <View style={[s.container, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color="#1e3c72" style={{ marginTop: 60 }} />
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Documents</Text>
-        <Text style={styles.subtitle}>{documents.length} document{documents.length > 1 ? 's' : ''}</Text>
-      </View>
-
-      {/* Category Filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories}>
-        <TouchableOpacity
-          style={[styles.categoryChip, !selectedCategory && styles.categoryChipActive]}
-          onPress={() => setSelectedCategory(null)}
-        >
-          <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextActive]}>
-            Tous
-          </Text>
-        </TouchableOpacity>
-        {Object.entries(CATEGORIES).map(([key, cat]) => (
-          <TouchableOpacity
-            key={key}
-            style={[
-              styles.categoryChip,
-              selectedCategory === key && { backgroundColor: cat.color + '20', borderColor: cat.color }
-            ]}
-            onPress={() => setSelectedCategory(selectedCategory === key ? null : key)}
-          >
-            <Ionicons 
-              name={cat.icon} 
-              size={16} 
-              color={selectedCategory === key ? cat.color : Colors.text.secondary} 
-            />
-            <Text style={[
-              styles.categoryChipText,
-              selectedCategory === key && { color: cat.color }
-            ]}>
-              {cat.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Total */}
-      <View style={styles.totalContainer}>
-        <Text style={styles.totalLabel}>Total</Text>
-        <Text style={styles.totalAmount}>{total.toFixed(2)} €</Text>
-      </View>
-
-      {/* Documents List */}
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+    <View style={[s.container, { paddingTop: insets.top }]} data-testid="documents-screen">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadDocuments(); }} />}
+      >
+        {/* ── Month Header ── */}
+        <View style={s.monthHeader}>
+          <View>
+            <Text style={s.monthTitle}>{MONTHS_FR[currentMonth]} {currentYear}</Text>
+            <Text style={s.monthTotal}>{monthTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</Text>
+          </View>
+          <View style={s.monthNav}>
+            <TouchableOpacity onPress={prevMonth} style={s.monthBtn} data-testid="month-prev">
+              <Ionicons name="chevron-back" size={22} color="#1e3c72" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={nextMonth} style={s.monthBtn} data-testid="month-next">
+              <Ionicons name="chevron-forward" size={22} color="#1e3c72" />
+            </TouchableOpacity>
+          </View>
         </View>
-      ) : (
-        <ScrollView 
-          style={styles.list} 
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          {filteredDocs.length === 0 ? (
-            <View style={styles.empty}>
-              <Ionicons name="folder-open-outline" size={48} color={Colors.text.muted} />
-              <Text style={styles.emptyText}>Aucun document</Text>
-            </View>
-          ) : (
-            filteredDocs.map(doc => {
-              const cat = CATEGORIES[doc.category];
+
+        {/* ── Category Breakdown ── */}
+        {categoryBreakdown.length > 0 && (
+          <View style={s.section}>
+            {(showAllCategories ? categoryBreakdown : categoryBreakdown.slice(0, 3)).map(({ cat, total, pct }) => {
+              const cfg = getCatConfig(cat);
               return (
-                <View key={doc.id} style={styles.docCard}>
-                  <TouchableOpacity
-                    style={styles.docCardContent}
-                    onPress={() => handleViewDoc(doc)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.docIcon, { backgroundColor: cat.color + '15' }]}>
-                      <Ionicons
-                        name={doc.type === 'pdf' ? 'document-text' : 'image'}
-                        size={22}
-                        color={cat.color}
-                      />
+                <View key={cat} style={s.catRow}>
+                  <View style={s.catHeader}>
+                    <View style={s.catLeft}>
+                      <Ionicons name={cfg.icon as any} size={18} color={cfg.color} />
+                      <Text style={s.catLabel}>{cfg.label}</Text>
                     </View>
-                    <View style={styles.docInfo}>
-                      <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
-                      <Text style={styles.docMeta}>{doc.date} • {doc.size}</Text>
-                    </View>
-                  </TouchableOpacity>
-                  <View style={styles.docRight}>
-                    {doc.amount !== undefined && doc.amount > 0 ? (
-                      <Text style={styles.docAmount}>{doc.amount.toFixed(2)} €</Text>
-                    ) : (
-                      <Text style={styles.docAmountMissing}>-- €</Text>
-                    )}
-                    <TouchableOpacity
-                      style={styles.editBtn}
-                      onPress={() => handleEditDoc(doc)}
-                      activeOpacity={0.5}
-                    >
-                      <Ionicons name="create-outline" size={20} color="#f57c00" />
-                    </TouchableOpacity>
+                    <Text style={s.catPct}>{pct.toFixed(0)}%</Text>
                   </View>
+                  <View style={s.barBg}>
+                    <View style={[s.barFill, { width: `${Math.min(pct, 100)}%`, backgroundColor: cfg.color }]} />
+                  </View>
+                  <Text style={s.catAmount}>{total.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</Text>
                 </View>
               );
-            })
-          )}
-          <View style={{ height: 100 }} />
-        </ScrollView>
-      )}
-
-      {/* FAB */}
-      <Pressable
-        style={({ pressed }) => [styles.fab, pressed && { opacity: 0.8 }]}
-        onPress={() => setShowUploadModal(true)}
-        testID="fab-add-document"
-      >
-        {isUploading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Ionicons name="add" size={28} color="#fff" />
+            })}
+            {categoryBreakdown.length > 3 && (
+              <TouchableOpacity onPress={() => setShowAllCategories(!showAllCategories)} style={s.seeAllBtn}>
+                <Text style={s.seeAllText}>
+                  {showAllCategories ? 'Moins' : `Voir tout (${categoryBreakdown.length})`}
+                </Text>
+                <Ionicons name={showAllCategories ? 'chevron-up' : 'chevron-forward'} size={16} color="#1e3c72" />
+              </TouchableOpacity>
+            )}
+          </View>
         )}
-      </Pressable>
 
-      {/* Upload Modal */}
-      <Modal visible={showUploadModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Ajouter un document</Text>
-              <TouchableOpacity onPress={() => setShowUploadModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
+        {/* ── Receipts List ── */}
+        <View style={s.receiptsSection}>
+          <Text style={s.receiptsTitle}>Reçus du mois ({monthDocs.length})</Text>
+
+          {monthDocs.length === 0 ? (
+            <View style={s.emptyState}>
+              <Ionicons name="document-text-outline" size={48} color="#ccc" />
+              <Text style={s.emptyText}>Aucun reçu ce mois</Text>
+              <Text style={s.emptySubtext}>Scannez une facture pour commencer</Text>
             </View>
-
-            <TouchableOpacity style={styles.uploadOption} onPress={handleTakePhoto}>
-              <View style={[styles.uploadIcon, { backgroundColor: '#4CAF5015' }]}>
-                <Ionicons name="camera" size={28} color="#4CAF50" />
-              </View>
-              <View>
-                <Text style={styles.uploadLabel}>Prendre une photo</Text>
-                <Text style={styles.uploadDesc}>Le montant sera détecté automatiquement</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.uploadOption} onPress={handleSelectFile}>
-              <View style={[styles.uploadIcon, { backgroundColor: Colors.primary + '15' }]}>
-                <Ionicons name="document" size={28} color={Colors.primary} />
-              </View>
-              <View>
-                <Text style={styles.uploadLabel}>Sélectionner un fichier</Text>
-                <Text style={styles.uploadDesc}>PDF ou image depuis vos fichiers</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.infoBox}>
-              <Ionicons name="sparkles" size={18} color="#f57c00" />
-              <Text style={styles.infoText}>Les documents sont analysés automatiquement par OCR.</Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* View Document Modal */}
-      <Modal visible={showViewModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedDoc?.name}</Text>
-              <TouchableOpacity onPress={() => setShowViewModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {selectedDoc && (
-              <ScrollView>
-                {selectedDoc.uri && (
-                  <View style={styles.previewContainer}>
-                    {selectedDoc.type === 'pdf' ? (
-                      <View style={styles.pdfPlaceholder}>
-                        <Ionicons name="document-text" size={64} color={Colors.text.muted} />
-                        <Text style={styles.pdfText}>Fichier PDF</Text>
-                      </View>
-                    ) : (
-                      <Image source={{ uri: selectedDoc.uri }} style={styles.previewImage} resizeMode="contain" />
-                    )}
-                  </View>
-                )}
-
-                <View style={styles.detailsContainer}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Catégorie</Text>
-                    <Text style={styles.detailValue}>{CATEGORIES[selectedDoc.category]?.label}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Date</Text>
-                    <Text style={styles.detailValue}>{selectedDoc.date}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Montant</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedDoc.amount ? `${selectedDoc.amount.toFixed(2)} €` : '-- €'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity style={styles.actionBtnPrimary} onPress={() => { setShowViewModal(false); handleEditDoc(selectedDoc); }}>
-                    <Ionicons name="create" size={20} color="#fff" />
-                    <Text style={styles.actionBtnPrimaryText}>Modifier</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtnDanger} onPress={() => handleDeleteDoc(selectedDoc.id)}>
-                    <Ionicons name="trash" size={20} color="#e53935" />
-                    <Text style={styles.actionBtnDangerText}>Supprimer</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Edit Document Modal with Apple Date Picker */}
-      <Modal visible={showEditModal} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Modifier</Text>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {selectedDoc && (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Category */}
-                <Text style={styles.inputLabel}>Catégorie</Text>
-                <View style={styles.categoryPicker}>
-                  {Object.entries(CATEGORIES).map(([key, cat]) => (
+          ) : (
+            groupedByDay.map(group => (
+              <View key={group.label}>
+                <Text style={s.dayLabel}>{group.label}</Text>
+                {group.docs.map(doc => {
+                  const cfg = getCatConfig(doc.category);
+                  return (
                     <TouchableOpacity
-                      key={key}
-                      style={[
-                        styles.categoryOption,
-                        editCategory === key && { backgroundColor: cat.color + '20', borderColor: cat.color }
-                      ]}
-                      onPress={() => setEditCategory(key)}
+                      key={doc.id}
+                      style={s.receiptCard}
+                      onPress={() => setShowDocDetail(doc)}
+                      data-testid={`receipt-${doc.id}`}
                     >
-                      <Ionicons name={cat.icon} size={18} color={editCategory === key ? cat.color : Colors.text.secondary} />
-                      <Text style={[styles.categoryOptionText, editCategory === key && { color: cat.color }]}>
-                        {cat.label}
-                      </Text>
+                      <View style={[s.receiptIcon, { backgroundColor: cfg.color + '15' }]}>
+                        <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
+                      </View>
+                      <View style={s.receiptInfo}>
+                        <Text style={s.receiptName} numberOfLines={1}>{doc.name}</Text>
+                        {doc.fournisseur && doc.fournisseur !== doc.name && (
+                          <Text style={s.receiptSub} numberOfLines={1}>{doc.fournisseur}</Text>
+                        )}
+                      </View>
+                      <View style={s.receiptRight}>
+                        <Text style={s.receiptAmount}>
+                          {doc.amount ? `${doc.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €` : '--'}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
-                  ))}
+                  );
+                })}
+              </View>
+            ))
+          )}
+        </View>
+
+        <View style={{ height: 120 }} />
+      </ScrollView>
+
+      {/* ── FAB Camera ── */}
+      <TouchableOpacity
+        style={[s.fab, { bottom: insets.bottom + 80 }]}
+        onPress={() => setShowUploadModal(true)}
+        data-testid="fab-upload"
+      >
+        <Ionicons name="camera" size={28} color="#fff" />
+      </TouchableOpacity>
+
+      {/* ── Upload Modal ── */}
+      <Modal visible={showUploadModal} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={s.uploadSheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>Ajouter un reçu</Text>
+
+            <TouchableOpacity style={s.uploadOption} onPress={handleTakePhoto} data-testid="upload-camera">
+              <View style={[s.uploadIconWrap, { backgroundColor: '#e3f2fd' }]}>
+                <Ionicons name="camera" size={24} color="#1976d2" />
+              </View>
+              <View>
+                <Text style={s.uploadOptionTitle}>Prendre une photo</Text>
+                <Text style={s.uploadOptionSub}>Scanner une facture papier</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.uploadOption} onPress={handleSelectGallery} data-testid="upload-gallery">
+              <View style={[s.uploadIconWrap, { backgroundColor: '#e8f5e9' }]}>
+                <Ionicons name="images" size={24} color="#388e3c" />
+              </View>
+              <View>
+                <Text style={s.uploadOptionTitle}>Galerie photos</Text>
+                <Text style={s.uploadOptionSub}>Depuis vos photos</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.uploadOption} onPress={handleSelectFile} data-testid="upload-file">
+              <View style={[s.uploadIconWrap, { backgroundColor: '#fff3e0' }]}>
+                <Ionicons name="document" size={24} color="#e65100" />
+              </View>
+              <View>
+                <Text style={s.uploadOptionTitle}>Fichier PDF</Text>
+                <Text style={s.uploadOptionSub}>Depuis vos fichiers</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.cancelBtn} onPress={() => setShowUploadModal(false)}>
+              <Text style={s.cancelText}>Annuler</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── OCR Verification Modal ── */}
+      <Modal visible={showVerificationModal} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.modalOverlay}>
+          <View style={s.verifySheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>Vérifier le reçu</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={s.fieldLabel}>Fournisseur</Text>
+              <TextInput style={s.input} value={editedFournisseur} onChangeText={setEditedFournisseur} placeholder="Nom du fournisseur" />
+
+              <Text style={s.fieldLabel}>Montant TTC</Text>
+              <TextInput style={s.input} value={editedMontant} onChangeText={setEditedMontant} placeholder="0.00" keyboardType="decimal-pad" />
+
+              <View style={s.rowInputs}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.fieldLabel}>Montant HT</Text>
+                  <TextInput style={s.input} value={editedMontantHT} onChangeText={setEditedMontantHT} placeholder="--" keyboardType="decimal-pad" />
                 </View>
-
-                {/* Amount */}
-                <Text style={styles.inputLabel}>Montant (€)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editAmount}
-                  onChangeText={text => setEditAmount(text.replace(/[^0-9.,]/g, '').replace(',', '.'))}
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.text.muted}
-                  keyboardType="decimal-pad"
-                />
-
-                {/* Date with Apple Picker */}
-                <Text style={styles.inputLabel}>Date</Text>
-                <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
-                  <Ionicons name="calendar-outline" size={20} color="#666" />
-                  <Text style={styles.dateText}>{editDate || 'Sélectionner une date'}</Text>
-                </TouchableOpacity>
-
-                {/* Save Button */}
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}>
-                  <Ionicons name="checkmark-circle" size={22} color="#fff" />
-                  <Text style={styles.saveBtnText}>Enregistrer</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-
-            {/* Apple Date Picker Overlay */}
-            {showDatePicker && (
-              <View style={styles.datePickerOverlay}>
-                <View style={styles.datePickerContainer}>
-                  <View style={styles.datePickerHeader}>
-                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                      <Text style={styles.datePickerCancel}>Annuler</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.datePickerTitle}>Date du document</Text>
-                    <TouchableOpacity onPress={() => handleDateSelect(parsedDate)}>
-                      <Text style={styles.datePickerDone}>OK</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <AppleDatePickerFR value={parsedDate} onChange={handleDateSelect} minYear={2020} maxYear={2030} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.fieldLabel}>TVA</Text>
+                  <TextInput style={s.input} value={editedMontantTVA} onChangeText={setEditedMontantTVA} placeholder="--" keyboardType="decimal-pad" />
                 </View>
               </View>
-            )}
+
+              <Text style={s.fieldLabel}>Date</Text>
+              <TextInput style={s.input} value={editedDate} onChangeText={setEditedDate} placeholder="AAAA-MM-JJ" />
+
+              <Text style={s.fieldLabel}>Catégorie</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catPicker}>
+                {OCR_CATEGORIES.map(c => {
+                  const cfg = getCatConfig(c);
+                  const active = editedCategorie === c;
+                  return (
+                    <TouchableOpacity
+                      key={c}
+                      style={[s.catChip, active && { backgroundColor: cfg.color }]}
+                      onPress={() => setEditedCategorie(c)}
+                    >
+                      <Ionicons name={cfg.icon as any} size={14} color={active ? '#fff' : cfg.color} />
+                      <Text style={[s.catChipText, active && { color: '#fff' }]}>{cfg.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <TouchableOpacity style={s.saveBtn} onPress={handleSaveDocument} data-testid="save-document">
+                <Text style={s.saveBtnText}>Enregistrer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.cancelBtn} onPress={() => { setShowVerificationModal(false); resetOCR(); }}>
+                <Text style={s.cancelText}>Annuler</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* OCR Verification Modal */}
-      <Modal visible={showVerificationModal} animationType="slide">
-        {ocrData && (
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.verificationContainer}>
-            <View style={styles.verificationHeader}>
-              <TouchableOpacity onPress={handleVerificationCancel} style={styles.verificationCloseBtn}>
-                <Ionicons name="close" size={24} color={Colors.text.primary} />
-              </TouchableOpacity>
-              <View style={styles.verificationHeaderCenter}>
-                <Text style={styles.verificationTitle}>Vérifier les données</Text>
-                {ocrData.needsReview && (
-                  <View style={styles.reviewBadge}>
-                    <Ionicons name="alert-circle" size={14} color="#F44336" />
-                    <Text style={styles.reviewText}>Vérification requise</Text>
+      {/* ── Document Detail Modal ── */}
+      <Modal visible={!!showDocDetail} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={s.detailSheet}>
+            <View style={s.sheetHandle} />
+            {showDocDetail && (() => {
+              const cfg = getCatConfig(showDocDetail.category);
+              return (
+                <>
+                  <View style={s.detailHeader}>
+                    <View style={[s.detailIconWrap, { backgroundColor: cfg.color + '15' }]}>
+                      <Ionicons name={cfg.icon as any} size={28} color={cfg.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.detailName}>{showDocDetail.name}</Text>
+                      <Text style={s.detailSub}>{cfg.label} — {showDocDetail.date}</Text>
+                    </View>
                   </View>
-                )}
-              </View>
-              <TouchableOpacity onPress={handleVerificationSave} style={[styles.verificationCloseBtn, styles.verificationSaveBtn]}>
-                <Ionicons name="checkmark" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
 
-            <ScrollView style={styles.verificationContent} showsVerticalScrollIndicator={false}>
-              {/* Confidence */}
-              <View style={styles.confidenceCard}>
-                <Ionicons
-                  name={ocrData.confidence >= 0.7 ? 'sparkles' : 'warning'}
-                  size={20}
-                  color={ocrData.confidence >= 0.7 ? '#4CAF50' : '#FF9800'}
-                />
-                <Text style={styles.confidenceTitle}>
-                  Confiance: {Math.round(ocrData.confidence * 100)}%
-                </Text>
-              </View>
-
-              {/* Form fields */}
-              <Text style={styles.inputLabel}>Fournisseur</Text>
-              <TextInput
-                style={styles.input}
-                value={editedFournisseur}
-                onChangeText={setEditedFournisseur}
-                placeholder="Nom du fournisseur"
-                placeholderTextColor={Colors.text.muted}
-              />
-
-              <Text style={styles.inputLabel}>Date</Text>
-              <TextInput
-                style={styles.input}
-                value={editedDate}
-                onChangeText={setEditedDate}
-                placeholder="AAAA-MM-JJ"
-                placeholderTextColor={Colors.text.muted}
-              />
-
-              <Text style={styles.inputLabel}>Montant total (€)</Text>
-              <TextInput
-                style={styles.input}
-                value={editedMontant}
-                onChangeText={setEditedMontant}
-                placeholder="0.00"
-                placeholderTextColor={Colors.text.muted}
-                keyboardType="decimal-pad"
-              />
-
-              <Text style={styles.inputLabel}>Montant HT (€)</Text>
-              <TextInput
-                style={styles.input}
-                value={editedMontantHT}
-                onChangeText={setEditedMontantHT}
-                placeholder="0.00"
-                placeholderTextColor={Colors.text.muted}
-                keyboardType="decimal-pad"
-              />
-
-              <Text style={styles.inputLabel}>TVA (€)</Text>
-              <TextInput
-                style={styles.input}
-                value={editedMontantTVA}
-                onChangeText={setEditedMontantTVA}
-                placeholder="0.00"
-                placeholderTextColor={Colors.text.muted}
-                keyboardType="decimal-pad"
-              />
-
-              <Text style={styles.inputLabel}>Catégorie</Text>
-              <View style={styles.categoryPicker}>
-                {OCR_CATEGORIES.map(cat => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    style={[
-                      styles.categoryOption,
-                      editedCategorie === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color }
-                    ]}
-                    onPress={() => setEditedCategorie(cat.id)}
-                  >
-                    <Text style={[styles.categoryOptionText, editedCategorie === cat.id && { color: cat.color }]}>
-                      {cat.label}
+                  <View style={s.detailAmountBox}>
+                    <Text style={s.detailAmountLabel}>Montant TTC</Text>
+                    <Text style={s.detailAmount}>
+                      {showDocDetail.amount ? `${showDocDetail.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €` : '--'}
                     </Text>
+                  </View>
+
+                  {showDocDetail.fournisseur && (
+                    <View style={s.detailRow}>
+                      <Text style={s.detailRowLabel}>Fournisseur</Text>
+                      <Text style={s.detailRowValue}>{showDocDetail.fournisseur}</Text>
+                    </View>
+                  )}
+                  {showDocDetail.description && (
+                    <View style={s.detailRow}>
+                      <Text style={s.detailRowLabel}>Description</Text>
+                      <Text style={s.detailRowValue}>{showDocDetail.description}</Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity style={s.deleteBtn} onPress={() => handleDeleteDoc(showDocDetail.id)}>
+                    <Ionicons name="trash-outline" size={18} color="#E53935" />
+                    <Text style={s.deleteText}>Supprimer</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-
-              <TouchableOpacity style={styles.saveBtn} onPress={handleVerificationSave}>
-                <Ionicons name="checkmark-circle" size={22} color="#fff" />
-                <Text style={styles.saveBtnText}>Enregistrer le document</Text>
-              </TouchableOpacity>
-
-              <View style={{ height: 40 }} />
-            </ScrollView>
-          </KeyboardAvoidingView>
-        )}
+                  <TouchableOpacity style={s.cancelBtn} onPress={() => setShowDocDetail(null)}>
+                    <Text style={s.cancelText}>Fermer</Text>
+                  </TouchableOpacity>
+                </>
+              );
+            })()}
+          </View>
+        </View>
       </Modal>
+
+      {/* ── Uploading Overlay ── */}
+      {isUploading && (
+        <View style={s.uploadingOverlay}>
+          <View style={s.uploadingCard}>
+            <ActivityIndicator size="large" color="#1e3c72" />
+            <Text style={s.uploadingText}>Analyse en cours...</Text>
+            <Text style={s.uploadingSub}>Extraction des données de la facture</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 // ============ STYLES ============
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { padding: 16 },
-  title: { fontSize: 28, fontWeight: '700', color: Colors.text.primary },
-  subtitle: { fontSize: 14, color: Colors.text.secondary, marginTop: 2 },
-  categories: { paddingHorizontal: 16, marginBottom: 12 },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    gap: 6,
-  },
-  categoryChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  categoryChipText: { fontSize: 14, fontWeight: '500', color: Colors.text.secondary },
-  categoryChipTextActive: { color: '#fff' },
-  totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  totalLabel: { fontSize: 16, fontWeight: '600', color: Colors.text.secondary },
-  totalAmount: { fontSize: 20, fontWeight: '700', color: Colors.primary },
-  list: { flex: 1 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  empty: { alignItems: 'center', paddingVertical: 60 },
-  emptyText: { marginTop: 12, fontSize: 16, color: Colors.text.muted },
-  docCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  docCardContent: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  docIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  docInfo: { flex: 1 },
-  docName: { fontSize: 15, fontWeight: '600', color: Colors.text.primary, marginBottom: 2 },
-  docMeta: { fontSize: 13, color: Colors.text.muted },
-  docRight: { alignItems: 'flex-end', marginLeft: 10 },
-  docAmount: { fontSize: 15, fontWeight: '700', color: Colors.text.primary },
-  docAmountMissing: { fontSize: 15, fontWeight: '600', color: '#ccc' },
-  editBtn: { padding: 8, marginTop: 4 },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 30,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+
+  // Month Header
+  monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
+  monthTitle: { fontSize: 24, fontWeight: '700', color: '#1a1a1a' },
+  monthTotal: { fontSize: 28, fontWeight: '800', color: '#1e3c72', marginTop: 4 },
+  monthNav: { flexDirection: 'row', gap: 8 },
+  monthBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#e8f0fe', justifyContent: 'center', alignItems: 'center' },
+
+  // Category Breakdown
+  section: { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16, padding: 16, marginBottom: 16 },
+  catRow: { marginBottom: 14 },
+  catHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  catLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  catLabel: { fontSize: 15, fontWeight: '600', color: '#333' },
+  catPct: { fontSize: 13, fontWeight: '600', color: '#999' },
+  barBg: { height: 6, backgroundColor: '#f0f0f0', borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: 6, borderRadius: 3 },
+  catAmount: { fontSize: 14, fontWeight: '700', color: '#1a1a1a', marginTop: 4 },
+  seeAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: 8 },
+  seeAllText: { fontSize: 14, fontWeight: '600', color: '#1e3c72' },
+
+  // Receipts
+  receiptsSection: { paddingHorizontal: 16 },
+  receiptsTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginBottom: 16 },
+  dayLabel: { fontSize: 13, fontWeight: '600', color: '#999', marginTop: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  receiptCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 8 },
+  receiptIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  receiptInfo: { flex: 1 },
+  receiptName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
+  receiptSub: { fontSize: 12, color: '#999', marginTop: 2 },
+  receiptRight: { alignItems: 'flex-end' },
+  receiptAmount: { fontSize: 15, fontWeight: '700', color: '#1a1a1a' },
+
+  // Empty
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
+  emptyText: { fontSize: 16, fontWeight: '600', color: '#999', marginTop: 12 },
+  emptySubtext: { fontSize: 13, color: '#bbb', marginTop: 4 },
+
+  // FAB
+  fab: { position: 'absolute', right: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: '#1e3c72', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 8 },
+
+  // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: Colors.text.primary },
-  uploadOption: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#f8f9fa', borderRadius: 14, marginBottom: 12 },
-  uploadIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  uploadLabel: { fontSize: 16, fontWeight: '600', color: Colors.text.primary, marginBottom: 2 },
-  uploadDesc: { fontSize: 13, color: Colors.text.muted },
-  infoBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff8e6', padding: 12, borderRadius: 10, marginTop: 8, gap: 8 },
-  infoText: { flex: 1, fontSize: 13, color: '#f57c00' },
-  previewContainer: { height: 200, backgroundColor: '#f0f0f0', borderRadius: 12, marginBottom: 16, overflow: 'hidden' },
-  previewImage: { width: '100%', height: '100%' },
-  pdfPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  pdfText: { marginTop: 8, fontSize: 14, color: Colors.text.muted },
-  detailsContainer: { marginBottom: 20 },
+  uploadSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  verifySheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: '90%' },
+  detailSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  sheetHandle: { width: 40, height: 4, backgroundColor: '#ddd', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  sheetTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 20 },
+
+  // Upload options
+  uploadOption: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  uploadIconWrap: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  uploadOptionTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },
+  uploadOptionSub: { fontSize: 13, color: '#999', marginTop: 2 },
+
+  // Form
+  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#666', marginBottom: 6, marginTop: 14 },
+  input: { backgroundColor: '#f5f5f5', borderRadius: 12, padding: 14, fontSize: 16, color: '#1a1a1a' },
+  rowInputs: { flexDirection: 'row', gap: 12 },
+  catPicker: { flexDirection: 'row', marginVertical: 8 },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f0f0f0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
+  catChipText: { fontSize: 13, fontWeight: '500', color: '#666' },
+
+  // Buttons
+  saveBtn: { backgroundColor: '#1e3c72', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  cancelBtn: { padding: 14, alignItems: 'center', marginTop: 8 },
+  cancelText: { fontSize: 15, fontWeight: '600', color: '#999' },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, marginTop: 16, backgroundColor: '#ffebee', borderRadius: 12 },
+  deleteText: { fontSize: 15, fontWeight: '600', color: '#E53935' },
+
+  // Detail
+  detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
+  detailIconWrap: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  detailName: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  detailSub: { fontSize: 13, color: '#999', marginTop: 2 },
+  detailAmountBox: { backgroundColor: '#f8f9fa', borderRadius: 14, padding: 16, marginBottom: 16, alignItems: 'center' },
+  detailAmountLabel: { fontSize: 12, color: '#999', marginBottom: 4 },
+  detailAmount: { fontSize: 28, fontWeight: '800', color: '#1e3c72' },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  detailLabel: { fontSize: 14, color: Colors.text.secondary },
-  detailValue: { fontSize: 14, fontWeight: '600', color: Colors.text.primary },
-  actionButtons: { flexDirection: 'row', gap: 12 },
-  actionBtnPrimary: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, padding: 14, borderRadius: 12, gap: 8 },
-  actionBtnPrimaryText: { fontSize: 15, fontWeight: '600', color: '#fff' },
-  actionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffebee', padding: 14, borderRadius: 12, gap: 8 },
-  actionBtnDangerText: { fontSize: 15, fontWeight: '600', color: '#e53935' },
-  inputLabel: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary, marginBottom: 8, marginTop: 16 },
-  input: { padding: 14, backgroundColor: '#f5f5f5', borderRadius: 12, fontSize: 16, color: Colors.text.primary },
-  dateButton: { flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: '#f5f5f5', borderRadius: 12, gap: 10 },
-  dateText: { fontSize: 16, color: Colors.text.primary },
-  categoryPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  categoryOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#f5f5f5',
-    borderWidth: 2,
-    borderColor: 'transparent',
-    gap: 6,
-  },
-  categoryOptionText: { fontSize: 14, fontWeight: '500', color: Colors.text.secondary },
-  saveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 24,
-    gap: 8,
-  },
-  saveBtnText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  datePickerOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  datePickerContainer: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 30 },
-  datePickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  datePickerCancel: { fontSize: 16, color: Colors.text.muted },
-  datePickerTitle: { fontSize: 16, fontWeight: '600', color: Colors.text.primary },
-  datePickerDone: { fontSize: 16, fontWeight: '600', color: Colors.primary },
-  verificationContainer: { flex: 1, backgroundColor: '#fff' },
-  verificationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 50, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  verificationHeaderCenter: { flex: 1, alignItems: 'center' },
-  verificationTitle: { fontSize: 18, fontWeight: '700', color: Colors.text.primary },
-  reviewBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffebee', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginTop: 4, gap: 4 },
-  reviewText: { fontSize: 12, color: '#F44336' },
-  verificationCloseBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#f5f5f5', alignItems: 'center', justifyContent: 'center' },
-  verificationSaveBtn: { backgroundColor: '#4CAF50' },
-  verificationContent: { flex: 1, padding: 20 },
-  confidenceCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f9fa', padding: 16, borderRadius: 12, marginBottom: 16, gap: 8 },
-  confidenceTitle: { fontSize: 15, fontWeight: '600', color: Colors.text.primary },
+  detailRowLabel: { fontSize: 14, color: '#999' },
+  detailRowValue: { fontSize: 14, fontWeight: '600', color: '#1a1a1a', maxWidth: '60%', textAlign: 'right' },
+
+  // Uploading overlay
+  uploadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  uploadingCard: { backgroundColor: '#fff', borderRadius: 20, padding: 32, alignItems: 'center', width: '80%' },
+  uploadingText: { fontSize: 18, fontWeight: '600', color: '#1a1a1a', marginTop: 16 },
+  uploadingSub: { fontSize: 13, color: '#999', marginTop: 8, textAlign: 'center' },
 });
