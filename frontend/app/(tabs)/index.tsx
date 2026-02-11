@@ -906,6 +906,21 @@ export default function CalendarScreen() {
                     </TouchableOpacity>
                   ) : (
                     <>
+                      {/* Current status indicator */}
+                      {tournament.registration?.status && (
+                        <View style={styles.currentStatusRow}>
+                          <Ionicons name="checkmark-circle" size={16} color={
+                            tournament.registration.status === 'participating' ? '#4CAF50' :
+                            tournament.registration.status === 'declined' ? '#F44336' :
+                            tournament.registration.status === 'pending' ? '#FF9800' :
+                            '#1e3c72'
+                          } />
+                          <Text style={styles.currentStatusText}>
+                            {TOURNAMENT_STATUS_LABELS[tournament.registration.status]?.label || tournament.registration.status}
+                          </Text>
+                        </View>
+                      )}
+                      
                       {/* Registration buttons - simplified state machine */}
                       <View style={styles.registrationButtons}>
                         {tournament.registration?.status === 'pending' ? (
@@ -924,6 +939,14 @@ export default function CalendarScreen() {
                               <Text style={[styles.statusBtnText, { color: '#F44336' }]}>Décliné</Text>
                             </TouchableOpacity>
                           </>
+                        ) : tournament.registration?.status === 'participating' || tournament.registration?.status === 'declined' ? (
+                          // Terminal states: show reset option
+                          <TouchableOpacity
+                            style={[styles.statusBtn, { backgroundColor: '#f0f0f0' }]}
+                            onPress={() => handleRegisterTournament(tournament.id, 'interested')}
+                          >
+                            <Text style={[styles.statusBtnText, { color: '#666' }]}>Réinitialiser le statut</Text>
+                          </TouchableOpacity>
                         ) : (
                           // Default: interested / pending / participating
                           ['interested', 'pending', 'participating'].map(status => (
