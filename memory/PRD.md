@@ -15,39 +15,44 @@ Application professionnelle de tennis avec:
 - **3rd Party:** Resend (planned), reportlab (PDF)
 
 ## Completed Features
-- User onboarding (7 steps) with account creation in MongoDB
-- Profile page with edit functionality (classement, email, residenceFiscale)
-- Logout functionality
-- Staff invitation system (create, accept, manage)
-- Tournament database (228 tournaments: 60 ATP, 52 WTA, 116 ITF)
-- Tournament display with prize money on week cards and detail modal
-- Calendar with event creation and tournament marks
-- OCR document processing
-- Document management (vault) with modular components
+- User onboarding (7 steps) with account creation
+- Profile page with edit + logout
+- Staff invitation system
+- Tournament database (228 tournaments)
+- OCR document processing + modular vault
+- Calendar with event creation
 
-## Bug Fixes Completed (Feb 2026)
-1. **Account creation 422 error**: Root cause was Pydantic v2 rejecting `classement: 150` (number) instead of `"150"` (string). Fixed both frontend (String conversion) and backend (field_validator for coercion)
-2. **Logout**: Added "Se deconnecter" button in profile.tsx
-3. **Profile edit saving**: Fixed api.ts missing default export (axios instance)
-4. **Prize money display**: Added to tournament week cards in index.tsx (format K/M)
-5. **Null safety**: Added null check for userData in step7-password.tsx
-6. **useNativeDriver**: Fixed for web compatibility in step7 success animation
-7. **Error handling**: Added finally block with proper isCreating reset
+## Phase 1 Tournament Optimizations (Feb 2026)
+1. **Country flags** - Emoji flags (45+ countries) on tournament cards and detail modal
+2. **Future tournaments only** - Past tournaments filtered out from the scroll list
+3. **"Pas intéressé" option** - Hide/unhide tournaments via backend API + UI toggle
+4. **Country flag utility** - `src/utils/countryFlags.ts` with mapping for all tournament countries
+
+## Bug Fixes (Feb 2026)
+- Account creation 422: Pydantic v2 classement coercion (int→str)
+- Profile edit: api.ts missing default export
+- Expo Go tunnel: Fixed EXPO_PACKAGER_PROXY_URL pointing to dead tunnel
+- Step7 robustness: null safety, timeout, useNativeDriver web fix
 
 ## Key API Endpoints
-- POST /api/users/onboarding - Create user (accepts int or str classement)
-- PUT /api/users/profile/{user_id} - Update profile
-- GET /api/users/profile/email/{email} - Get profile by email
-- GET /api/tournaments?circuits=ATP - List tournaments
-- GET /api/tournaments/weeks?circuits=ATP - Tournaments by week
-- POST /api/tournaments/register - Register for tournament
+- POST /api/users/onboarding, PUT /api/users/profile/{user_id}
+- GET /api/tournaments/weeks?circuits=ATP
+- POST /api/tournaments/hide, DELETE /api/tournaments/hide/{id}
+- POST /api/tournaments/register
 
 ## Backlog
-### P1
+### Phase 2 (Tournament Optimizations)
+- Statuts simplifiés (pending → registered/declined)
+- Groupement par semaine amélioré
+
+### Phase 3 (Tournament Optimizations)
+- Détection de conflits avec le calendrier
+
+### P1 General
 - Document filtering by date in vault
 - PDF export on frontend
 
-### P2
+### P2 General
 - Send invitation emails via Resend
 - Push notifications
 - Tournament registration deadline reminders
