@@ -532,7 +532,7 @@ export default function CalendarScreen() {
         key={week.weekNumber}
         style={styles.weekCard}
         onPress={() => {
-          setSelectedWeek(week);
+          setSelectedWeekNumber(week.weekNumber);
           setShowTournamentModal(true);
         }}
         activeOpacity={0.7}
