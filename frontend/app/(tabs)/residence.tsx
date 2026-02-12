@@ -986,7 +986,6 @@ export default function ResidenceScreen() {
                   onChange={(event, date) => {
                     if (date) setBulkStartDate(date);
                   }}
-                  maximumDate={new Date()}
                   style={styles.iosDatePicker}
                 />
               </View>
@@ -1002,7 +1001,6 @@ export default function ResidenceScreen() {
                   setShowStartDatePicker(false);
                   if (date) setBulkStartDate(date);
                 }}
-                maximumDate={new Date()}
               />
             )}
 
@@ -1025,7 +1023,6 @@ export default function ResidenceScreen() {
                   onChange={(event, date) => {
                     if (date) setBulkEndDate(date);
                   }}
-                  maximumDate={new Date()}
                   style={styles.iosDatePicker}
                 />
               </View>
@@ -1041,7 +1038,6 @@ export default function ResidenceScreen() {
                   setShowEndDatePicker(false);
                   if (date) setBulkEndDate(date);
                 }}
-                maximumDate={new Date()}
               />
             )}
 
