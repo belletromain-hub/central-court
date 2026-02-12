@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime
 
 # Get BASE_URL from environment
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://serve-preview.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://tax-days-tracker.preview.emergentagent.com').rstrip('/')
 
 
 class TestDocumentsStats:
