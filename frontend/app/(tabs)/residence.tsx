@@ -1015,6 +1015,8 @@ export default function ResidenceScreen() {
                   onChange={(event, date) => {
                     if (date) setBulkStartDate(date);
                   }}
+                  themeVariant="dark"
+                  textColor="#FFFFFF"
                   style={styles.iosDatePicker}
                 />
               </View>
@@ -1052,6 +1054,8 @@ export default function ResidenceScreen() {
                   onChange={(event, date) => {
                     if (date) setBulkEndDate(date);
                   }}
+                  themeVariant="dark"
+                  textColor="#FFFFFF"
                   style={styles.iosDatePicker}
                 />
               </View>
@@ -1070,12 +1074,12 @@ export default function ResidenceScreen() {
               />
             )}
 
-            {/* Duration indicator */}
+            {/* Duration indicator - Using correct inclusive calculation */}
             {bulkEndDate >= bulkStartDate && (
               <View style={styles.durationIndicator}>
                 <Ionicons name="time-outline" size={16} color={Colors.primary} />
                 <Text style={styles.durationText}>
-                  {Math.ceil((bulkEndDate.getTime() - bulkStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1} jours
+                  {calculateDaysBetween(bulkStartDate, bulkEndDate)} jours
                 </Text>
               </View>
             )}
