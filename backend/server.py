@@ -32,6 +32,7 @@ app.add_middleware(
 from fastapi.responses import HTMLResponse
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/landing", response_class=HTMLResponse)
 async def root():
     return """<!DOCTYPE html>
 <html lang="fr">
