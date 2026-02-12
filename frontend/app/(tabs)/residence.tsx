@@ -107,6 +107,13 @@ export default function ResidenceScreen() {
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [submitting, setSubmitting] = useState(false);
   
+  // Country detail modal state
+  const [showCountryDetail, setShowCountryDetail] = useState(false);
+  const [selectedCountryStats, setSelectedCountryStats] = useState<CountryStats | null>(null);
+  const [countryDays, setCountryDays] = useState<DayPresence[]>([]);
+  const [loadingDays, setLoadingDays] = useState(false);
+  const [deletingDay, setDeletingDay] = useState<string | null>(null);
+  
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
@@ -122,6 +129,56 @@ export default function ResidenceScreen() {
     const diffTime = endDate.getTime() - startDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     return Math.max(1, diffDays);
+  };
+
+  // Open country detail modal
+  const openCountryDetail = async (countryStats: CountryStats) => {
+    setSelectedCountryStats(countryStats);
+    setShowCountryDetail(true);
+    setLoadingDays(true);
+    
+    try {
+      const days = await fetchDayPresences(currentYear);
+      // Filter days for this country
+      const filteredDays = days.filter(d => d.country === countryStats.country);
+      // Sort by date descending
+      filteredDays.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setCountryDays(filteredDays);
+    } catch (err) {
+      console.error('Error loading country days:', err);
+    } finally {
+      setLoadingDays(false);
+    }
+  };
+
+  // Delete a day
+  const handleDeleteDay = async (date: string) => {
+    Alert.alert(
+      'Supprimer ce jour ?',
+      `Voulez-vous vraiment supprimer le ${formatDateDisplay(new Date(date))} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingDay(date);
+            try {
+              await deleteDayPresence(date);
+              // Remove from local state
+              setCountryDays(prev => prev.filter(d => d.date !== date));
+              // Reload stats
+              loadData();
+            } catch (err) {
+              console.error('Error deleting day:', err);
+              Alert.alert('Erreur', 'Impossible de supprimer ce jour');
+            } finally {
+              setDeletingDay(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Load GPS settings on mount
