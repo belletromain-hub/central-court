@@ -869,6 +869,8 @@ export default function ResidenceScreen() {
                     if (date) setSingleDate(date);
                   }}
                   maximumDate={new Date()}
+                  themeVariant="dark"
+                  textColor="#FFFFFF"
                   style={styles.iosDatePicker}
                 />
               </View>
@@ -888,15 +890,34 @@ export default function ResidenceScreen() {
               />
             )}
 
-            <Text style={styles.inputLabel}>Notes (optionnel)</Text>
-            <TextInput
-              style={[styles.input, styles.inputMultiline]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Tournoi, entraînement, etc."
-              placeholderTextColor={Colors.text.muted}
-              multiline
-            />
+            {/* Collapsible Notes Field */}
+            <TouchableOpacity 
+              style={styles.notesToggle}
+              onPress={() => setShowNotesField(!showNotesField)}
+            >
+              <Ionicons name="create-outline" size={18} color={Colors.text.secondary} />
+              <Text style={styles.notesToggleText}>
+                {notes ? notes : 'Ajouter une note (optionnel)'}
+              </Text>
+              <Ionicons 
+                name={showNotesField ? "chevron-up" : "chevron-down"} 
+                size={18} 
+                color={Colors.text.muted} 
+              />
+            </TouchableOpacity>
+            
+            {showNotesField && (
+              <TextInput
+                style={styles.notesInput}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Ex: Tournoi, entraînement..."
+                placeholderTextColor={Colors.text.muted}
+                multiline
+                numberOfLines={2}
+                maxLength={200}
+              />
+            )}
 
             <TouchableOpacity
               style={[
