@@ -410,6 +410,116 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* Résidence Fiscale */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🌍 Résidence Fiscale</Text>
+            <TouchableOpacity 
+              style={styles.viewAllBtn} 
+              onPress={() => router.push('/(tabs)/residence')}
+              testID="btn-residence"
+            >
+              <Text style={styles.viewAllBtnText}>Voir tout</Text>
+              <Ionicons name="chevron-forward" size={16} color="#1e3c72" />
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.residenceCard}
+            onPress={() => router.push('/(tabs)/residence')}
+            activeOpacity={0.7}
+          >
+            {residenceStats ? (
+              <>
+                {/* Stats row */}
+                <View style={styles.residenceStatsRow}>
+                  <View style={styles.residenceStat}>
+                    <Text style={styles.residenceStatNumber}>{residenceStats.totalDaysTracked}</Text>
+                    <Text style={styles.residenceStatLabel}>jours suivis</Text>
+                  </View>
+                  <View style={styles.residenceStatDivider} />
+                  <View style={styles.residenceStat}>
+                    <Text style={styles.residenceStatNumber}>{residenceStats.countries?.length || 0}</Text>
+                    <Text style={styles.residenceStatLabel}>pays</Text>
+                  </View>
+                  <View style={styles.residenceStatDivider} />
+                  <View style={styles.residenceStat}>
+                    <Text style={[styles.residenceStatNumber, { color: '#1e3c72' }]}>
+                      {365 - residenceStats.totalDaysTracked}
+                    </Text>
+                    <Text style={styles.residenceStatLabel}>restants</Text>
+                  </View>
+                </View>
+
+                {/* Primary country */}
+                {residenceStats.primaryCountry && (
+                  <View style={styles.primaryCountryRow}>
+                    <View style={styles.primaryCountryInfo}>
+                      <Text style={styles.primaryCountryLabel}>Pays principal</Text>
+                      <Text style={styles.primaryCountryName}>
+                        {residenceStats.primaryCountry.countryName}
+                      </Text>
+                    </View>
+                    <View style={styles.primaryCountryProgress}>
+                      <Text style={styles.primaryCountryDays}>
+                        {residenceStats.primaryCountry.totalDays}
+                        <Text style={styles.primaryCountryLimit}>/183j</Text>
+                      </Text>
+                      <View style={styles.miniProgressBar}>
+                        <View 
+                          style={[
+                            styles.miniProgressFill,
+                            { 
+                              width: `${Math.min(residenceStats.primaryCountry.percentOfThreshold, 100)}%`,
+                              backgroundColor: residenceStats.primaryCountry.percentOfThreshold >= 100 
+                                ? '#E53935' 
+                                : residenceStats.primaryCountry.percentOfThreshold >= 75 
+                                  ? '#FF9800' 
+                                  : '#4CAF50'
+                            }
+                          ]} 
+                        />
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Warnings */}
+                {residenceStats.warnings && residenceStats.warnings.length > 0 && (
+                  <View style={styles.residenceWarning}>
+                    <Ionicons 
+                      name={residenceStats.warnings[0].severity === 'critical' ? 'alert-circle' : 'warning'} 
+                      size={16} 
+                      color={residenceStats.warnings[0].severity === 'critical' ? '#E53935' : '#FF9800'} 
+                    />
+                    <Text style={styles.residenceWarningText} numberOfLines={1}>
+                      {residenceStats.warnings[0].message}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Action hint */}
+                <View style={styles.residenceHint}>
+                  <Ionicons name="arrow-forward-circle" size={16} color="#999" />
+                  <Text style={styles.residenceHintText}>Appuyer pour gérer vos jours</Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.residenceEmpty}>
+                <Ionicons name="globe-outline" size={32} color="#999" />
+                <Text style={styles.residenceEmptyTitle}>Suivi de résidence</Text>
+                <Text style={styles.residenceEmptySubtitle}>
+                  Suivez vos jours par pays pour optimiser votre fiscalité
+                </Text>
+                <View style={styles.residenceStartBtn}>
+                  <Ionicons name="add" size={18} color="#fff" />
+                  <Text style={styles.residenceStartBtnText}>Commencer</Text>
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Équipe */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
