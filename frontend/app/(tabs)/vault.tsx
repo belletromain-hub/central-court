@@ -733,9 +733,20 @@ const s = StyleSheet.create({
   catPicker: { flexDirection: 'row', marginVertical: 8 },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f0f0f0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
   catChipText: { fontSize: 13, fontWeight: '500', color: '#666' },
+  
+  // Amount & Currency row
+  amountRow: { flexDirection: 'row', gap: 12 },
+  amountField: { flex: 2 },
+  currencyField: { flex: 3 },
+  currencyPicker: { flexDirection: 'row' },
+  currencyChip: { backgroundColor: '#f0f0f0', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, marginRight: 6 },
+  currencyChipActive: { backgroundColor: '#1e3c72' },
+  currencyChipText: { fontSize: 14, fontWeight: '600', color: '#666' },
+  currencyChipTextActive: { color: '#fff' },
 
   // Buttons
   saveBtn: { backgroundColor: '#1e3c72', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
+  saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
   cancelBtn: { padding: 14, alignItems: 'center', marginTop: 8 },
   cancelText: { fontSize: 15, fontWeight: '600', color: '#999' },
