@@ -474,13 +474,15 @@ export default function ResidenceScreen() {
     const isCritical = country.percentOfThreshold >= 100;
 
     return (
-      <View
+      <TouchableOpacity
         key={country.country}
         style={[
           styles.countryCard,
           isCritical && styles.countryCardCritical,
           isWarning && !isCritical && styles.countryCardWarning,
         ]}
+        onPress={() => openCountryDetail(country)}
+        activeOpacity={0.7}
       >
         {isCritical && (
           <View style={styles.alertBadge}>
@@ -534,7 +536,13 @@ export default function ResidenceScreen() {
             </Text>
           </View>
         )}
-      </View>
+
+        {/* Tap hint */}
+        <View style={styles.tapHint}>
+          <Text style={styles.tapHintText}>Appuyer pour voir les détails</Text>
+          <Ionicons name="chevron-forward" size={14} color={Colors.text.muted} />
+        </View>
+      </TouchableOpacity>
     );
   };
 
