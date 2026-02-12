@@ -108,7 +108,7 @@ h1{font-size:26px;color:#1e3c72;margin-bottom:6px}
     </a>
   </div>
 
-  <a class="open-btn" href="exp://serve-preview.emergent.host">
+  <a class="open-btn" href="exp://tax-days-tracker.serve-preview.emergent.host">
     Ouvrir Le Court Central
   </a>
 
