@@ -107,7 +107,7 @@ h1{font-size:26px;color:#1e3c72;margin-bottom:6px}
     </a>
   </div>
 
-  <a class="open-btn" href="exp://serve-preview.ngrok.io">
+  <a class="open-btn" href="exp://serve-preview.emergent.host">
     Ouvrir Le Court Central
   </a>
 
