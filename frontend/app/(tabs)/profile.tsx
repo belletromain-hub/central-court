@@ -81,6 +81,7 @@ export default function ProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [residenceStats, setResidenceStats] = useState<ResidenceStats | null>(null);
   
   // Modals
   const [showInviteModal, setShowInviteModal] = useState(false);
