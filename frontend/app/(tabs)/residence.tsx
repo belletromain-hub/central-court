@@ -112,6 +112,14 @@ export default function ResidenceScreen() {
   const [bulkStartDate, setBulkStartDate] = useState(new Date());
   const [bulkEndDate, setBulkEndDate] = useState(new Date());
   const [notes, setNotes] = useState('');
+  const [showNotesField, setShowNotesField] = useState(false);
+
+  // Calculate days between two dates (INCLUSIVE)
+  const calculateDaysBetween = (startDate: Date, endDate: Date): number => {
+    const diffTime = endDate.getTime() - startDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, diffDays);
+  };
 
   // Load GPS settings on mount
   useEffect(() => {
