@@ -118,6 +118,13 @@ export default function ResidenceScreen() {
     loadGpsSettings();
   }, []);
 
+  // Auto-fetch location when GPS is enabled and permission granted
+  useEffect(() => {
+    if (gpsEnabled && locationPermission === 'granted' && !currentLocation && !isLocating) {
+      getCurrentLocation();
+    }
+  }, [gpsEnabled, locationPermission, currentLocation, isLocating]);
+
   const loadGpsSettings = async () => {
     try {
       const [trackingEnabled, lastLog] = await Promise.all([
@@ -127,7 +134,9 @@ export default function ResidenceScreen() {
       
       if (trackingEnabled === 'true') {
         setGpsEnabled(true);
-        checkLocationPermission();
+        // Check permission and get location
+        const { status } = await Location.getForegroundPermissionsAsync();
+        setLocationPermission(status === 'granted' ? 'granted' : 'denied');
       }
       
       if (lastLog) {
