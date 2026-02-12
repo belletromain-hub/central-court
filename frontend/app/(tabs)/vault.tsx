@@ -327,9 +327,10 @@ export default function DocumentsScreen() {
 
       setShowVerificationModal(false);
       resetOCR();
-    } catch (error) {
+      Alert.alert('Succès', 'Document enregistré avec succès');
+    } catch (error: any) {
       console.error('Save error:', error);
-      Alert.alert('Erreur', "Échec de l'enregistrement");
+      Alert.alert('Erreur', error?.message || "Échec de l'enregistrement. Vérifiez votre connexion.");
     } finally {
       setIsSaving(false);
     }
