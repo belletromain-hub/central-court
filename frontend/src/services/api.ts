@@ -121,3 +121,85 @@ export const sendTournamentAlertEmail = (data: {
   tournament_country: string;
   start_date: string;
 }) => apiFetch<any>('/api/email/tournament-alert', { method: 'POST', body: JSON.stringify(data) });
+
+// ── Residence / Tax Tracking ──
+export interface DayPresence {
+  id: string;
+  date: string;
+  country: string;
+  countryName: string;
+  status: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CountryStats {
+  country: string;
+  countryName: string;
+  totalDays: number;
+  confirmedDays: number;
+  manualDays: number;
+  daysByMonth: Record<string, number>;
+  firstDay: string | null;
+  lastDay: string | null;
+  longestStreak: number;
+  threshold: number;
+  percentOfThreshold: number;
+}
+
+export interface ResidenceStats {
+  year: number;
+  totalDaysTracked: number;
+  countries: CountryStats[];
+  primaryCountry: CountryStats | null;
+  warnings: Array<{
+    type: string;
+    country: string;
+    countryName: string;
+    message: string;
+    severity: string;
+  }>;
+}
+
+export const fetchResidenceStats = (year: number = new Date().getFullYear()) =>
+  apiFetch<ResidenceStats>(`/api/residence/stats?year=${year}`);
+
+export const fetchDayPresences = (year: number, month?: number) =>
+  apiFetch<DayPresence[]>(
+    month
+      ? `/api/residence/days?year=${year}&month=${month}`
+      : `/api/residence/days?year=${year}`
+  );
+
+export const fetchCountries = () =>
+  apiFetch<Array<{ code: string; name: string }>>('/api/residence/countries');
+
+export const addDayPresence = (data: {
+  date: string;
+  country: string;
+  countryName: string;
+  status?: string;
+  notes?: string;
+}) =>
+  apiFetch<DayPresence>('/api/residence/days', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const deleteDayPresence = (date: string) =>
+  apiFetch<{ success: boolean }>(`/api/residence/days/${date}`, {
+    method: 'DELETE',
+  });
+
+export const addBulkDays = (data: {
+  startDate: string;
+  endDate: string;
+  country: string;
+  countryName: string;
+  notes?: string;
+}) =>
+  apiFetch<{ success: boolean; added: number }>('/api/residence/days/bulk', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
