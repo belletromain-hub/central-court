@@ -538,8 +538,26 @@ export default function DocumentsScreen() {
               <Text style={s.fieldLabel}>Fournisseur</Text>
               <TextInput style={s.input} value={editedFournisseur} onChangeText={setEditedFournisseur} placeholder="Nom du fournisseur" />
 
-              <Text style={s.fieldLabel}>Montant</Text>
-              <TextInput style={s.input} value={editedMontant} onChangeText={setEditedMontant} placeholder="0.00" keyboardType="decimal-pad" />
+              <View style={s.amountRow}>
+                <View style={s.amountField}>
+                  <Text style={s.fieldLabel}>Montant</Text>
+                  <TextInput style={s.input} value={editedMontant} onChangeText={setEditedMontant} placeholder="0.00" keyboardType="decimal-pad" />
+                </View>
+                <View style={s.currencyField}>
+                  <Text style={s.fieldLabel}>Devise</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.currencyPicker}>
+                    {CURRENCIES.map(cur => (
+                      <TouchableOpacity
+                        key={cur}
+                        style={[s.currencyChip, editedCurrency === cur && s.currencyChipActive]}
+                        onPress={() => setEditedCurrency(cur)}
+                      >
+                        <Text style={[s.currencyChipText, editedCurrency === cur && s.currencyChipTextActive]}>{cur}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
 
               <Text style={s.fieldLabel}>Date</Text>
               <TextInput style={s.input} value={editedDate} onChangeText={setEditedDate} placeholder="AAAA-MM-JJ" />
@@ -562,8 +580,17 @@ export default function DocumentsScreen() {
                 })}
               </ScrollView>
 
-              <TouchableOpacity style={s.saveBtn} onPress={handleSaveDocument} data-testid="save-document">
-                <Text style={s.saveBtnText}>Enregistrer</Text>
+              <TouchableOpacity 
+                style={[s.saveBtn, isSaving && s.saveBtnDisabled]} 
+                onPress={handleSaveDocument} 
+                disabled={isSaving}
+                data-testid="save-document"
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={s.saveBtnText}>Enregistrer</Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity style={s.cancelBtn} onPress={() => { setShowVerificationModal(false); resetOCR(); }}>
                 <Text style={s.cancelText}>Annuler</Text>
