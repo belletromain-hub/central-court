@@ -1201,6 +1201,126 @@ export default function ResidenceScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Country Detail Modal */}
+      <Modal visible={showCountryDetail} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.countryDetailSheet}>
+            <View style={styles.sheetHandle} />
+            
+            {/* Header */}
+            <View style={styles.countryDetailHeader}>
+              <View style={styles.countryDetailTitleRow}>
+                <Text style={styles.countryDetailFlag}>
+                  {selectedCountryStats ? countryFlags[selectedCountryStats.country] || '🌍' : '🌍'}
+                </Text>
+                <View>
+                  <Text style={styles.countryDetailTitle}>
+                    {selectedCountryStats?.countryName || 'Pays'}
+                  </Text>
+                  <Text style={styles.countryDetailSubtitle}>
+                    {selectedCountryStats?.totalDays || 0} jours en {currentYear}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.countryDetailClose}
+                onPress={() => {
+                  setShowCountryDetail(false);
+                  setSelectedCountryStats(null);
+                  setCountryDays([]);
+                }}
+              >
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Days List */}
+            {loadingDays ? (
+              <View style={styles.countryDetailLoading}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.countryDetailLoadingText}>Chargement...</Text>
+              </View>
+            ) : countryDays.length > 0 ? (
+              <ScrollView style={styles.daysList} showsVerticalScrollIndicator={false}>
+                <Text style={styles.daysListTitle}>
+                  {countryDays.length} jour{countryDays.length > 1 ? 's' : ''} enregistré{countryDays.length > 1 ? 's' : ''}
+                </Text>
+                
+                {countryDays.map((day) => (
+                  <View key={day.id} style={styles.dayItem}>
+                    <View style={styles.dayItemLeft}>
+                      <Text style={styles.dayItemDate}>
+                        {new Date(day.date).toLocaleDateString('fr-FR', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                      {day.notes && (
+                        <Text style={styles.dayItemNotes}>{day.notes}</Text>
+                      )}
+                      <View style={styles.dayItemStatus}>
+                        <Ionicons 
+                          name={day.status === 'confirmed' ? 'location' : 'create-outline'} 
+                          size={12} 
+                          color={day.status === 'confirmed' ? Colors.success : Colors.text.muted} 
+                        />
+                        <Text style={[
+                          styles.dayItemStatusText,
+                          { color: day.status === 'confirmed' ? Colors.success : Colors.text.muted }
+                        ]}>
+                          {day.status === 'confirmed' ? 'GPS' : 'Manuel'}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={styles.dayItemDelete}
+                      onPress={() => handleDeleteDay(day.date)}
+                      disabled={deletingDay === day.date}
+                    >
+                      {deletingDay === day.date ? (
+                        <ActivityIndicator size="small" color={Colors.danger} />
+                      ) : (
+                        <Ionicons name="trash-outline" size={20} color={Colors.danger} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            ) : (
+              <View style={styles.noDaysMessage}>
+                <Ionicons name="calendar-outline" size={48} color={Colors.text.muted} />
+                <Text style={styles.noDaysText}>Aucun jour enregistré</Text>
+              </View>
+            )}
+
+            {/* Add more days button */}
+            <View style={styles.countryDetailActions}>
+              <TouchableOpacity
+                style={styles.addMoreDaysBtn}
+                onPress={() => {
+                  setShowCountryDetail(false);
+                  if (selectedCountryStats) {
+                    const country = countries.find(c => c.code === selectedCountryStats.country);
+                    if (country) {
+                      setSelectedCountry(country);
+                      setShowBulkModal(true);
+                    }
+                  }
+                }}
+              >
+                <Ionicons name="add-circle" size={20} color="#fff" />
+                <Text style={styles.addMoreDaysBtnText}>Ajouter des jours</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
