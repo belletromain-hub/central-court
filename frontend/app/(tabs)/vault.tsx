@@ -295,7 +295,7 @@ export default function DocumentsScreen() {
     try {
       let base64Data = null;
       if (pendingDocUri) {
-        base64Data = await FileSystem.readAsStringAsync(pendingDocUri, { encoding: FileSystem.EncodingType.Base64 });
+        base64Data = await FileSystem.readAsStringAsync(pendingDocUri, { encoding: 'base64' });
       }
 
       const response = await api.post('/api/documents', {
