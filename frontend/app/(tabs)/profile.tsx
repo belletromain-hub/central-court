@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../../src/services/api';
+import api, { fetchResidenceStats, ResidenceStats } from '../../src/services/api';
 
 // ============ CONSTANTS ============
 
