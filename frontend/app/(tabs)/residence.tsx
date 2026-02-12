@@ -1787,6 +1787,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.primary,
   },
+  // iOS DatePicker styles
+  iosDatePickerContainer: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 12,
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  iosDatePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.light,
+    backgroundColor: Colors.background.tertiary,
+  },
+  iosDatePickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  iosDatePickerCancel: {
+    fontSize: 15,
+    color: Colors.danger,
+  },
+  iosDatePickerDone: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  iosDatePicker: {
+    height: 180,
+  },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
