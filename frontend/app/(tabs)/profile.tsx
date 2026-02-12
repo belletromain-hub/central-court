@@ -106,14 +106,19 @@ export default function ProfileScreen() {
         return;
       }
 
-      const response = await api.get(`/api/users/profile/email/${encodeURIComponent(savedEmail)}`);
-      if (response.data) {
-        setUserProfile(response.data);
+      // Load profile and residence stats in parallel
+      const [profileResponse, residenceData] = await Promise.all([
+        api.get(`/api/users/profile/email/${encodeURIComponent(savedEmail)}`),
+        fetchResidenceStats(new Date().getFullYear()).catch(() => null),
+      ]);
+
+      if (profileResponse.data) {
+        setUserProfile(profileResponse.data);
         
         // Load team from backend
         const [staffRes, invitesRes] = await Promise.all([
-          api.get(`/api/invitations/staff/player/${response.data.id}`).catch(() => ({ data: { staff: [] } })),
-          api.get(`/api/invitations/player/${response.data.id}`).catch(() => ({ data: { invitations: [] } })),
+          api.get(`/api/invitations/staff/player/${profileResponse.data.id}`).catch(() => ({ data: { staff: [] } })),
+          api.get(`/api/invitations/player/${profileResponse.data.id}`).catch(() => ({ data: { invitations: [] } })),
         ]);
         
         const activeStaff = (staffRes.data.staff || []).map((s: any) => ({
@@ -135,6 +140,10 @@ export default function ProfileScreen() {
           }));
         
         setTeam([...activeStaff, ...pendingInvites]);
+      }
+
+      if (residenceData) {
+        setResidenceStats(residenceData);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
