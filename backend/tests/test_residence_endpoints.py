@@ -370,5 +370,107 @@ class TestResidenceIntegration:
         assert final_stats.status_code == 200
 
 
+class TestResidencePhase2GPS:
+    """Phase 2 tests: GPS tracking with status=confirmed"""
+    
+    def test_add_day_with_confirmed_status(self):
+        """POST /api/residence/days with status=confirmed (GPS feature)"""
+        test_date = "2026-12-20"
+        payload = {
+            "date": test_date,
+            "country": "FR",
+            "countryName": "France",
+            "status": "confirmed",
+            "notes": "GPS - Paris"
+        }
+        
+        response = requests.post(f"{BASE_URL}/api/residence/days", json=payload)
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["status"] == "confirmed"
+        assert data["notes"] == "GPS - Paris"
+        
+        # Cleanup
+        requests.delete(f"{BASE_URL}/api/residence/days/{test_date}")
+        
+    def test_stats_track_confirmed_vs_manual_days(self):
+        """Stats correctly count confirmed vs manual days"""
+        test_date_confirmed = "2026-12-21"
+        test_date_manual = "2026-12-22"
+        
+        # Add confirmed day (GPS)
+        requests.post(f"{BASE_URL}/api/residence/days", json={
+            "date": test_date_confirmed,
+            "country": "GB",
+            "countryName": "Royaume-Uni",
+            "status": "confirmed",
+            "notes": "GPS - London"
+        })
+        
+        # Add manual day
+        requests.post(f"{BASE_URL}/api/residence/days", json={
+            "date": test_date_manual,
+            "country": "GB",
+            "countryName": "Royaume-Uni",
+            "status": "manual",
+            "notes": "Manual entry"
+        })
+        
+        # Check stats
+        response = requests.get(f"{BASE_URL}/api/residence/stats?year=2026")
+        assert response.status_code == 200
+        
+        data = response.json()
+        gb_stats = next((c for c in data["countries"] if c["country"] == "GB"), None)
+        assert gb_stats is not None
+        assert gb_stats["confirmedDays"] >= 1
+        assert gb_stats["manualDays"] >= 1
+        
+        # Cleanup
+        requests.delete(f"{BASE_URL}/api/residence/days/{test_date_confirmed}")
+        requests.delete(f"{BASE_URL}/api/residence/days/{test_date_manual}")
+        
+    def test_double_registration_updates_existing(self):
+        """Adding same date twice updates existing entry (prevents duplicates)"""
+        test_date = "2026-12-23"
+        
+        # First add with confirmed status
+        response1 = requests.post(f"{BASE_URL}/api/residence/days", json={
+            "date": test_date,
+            "country": "FR",
+            "countryName": "France",
+            "status": "confirmed",
+            "notes": "GPS - First entry"
+        })
+        assert response1.status_code == 200
+        first_id = response1.json().get("id")
+        
+        # Second add same date - should update, not create duplicate
+        response2 = requests.post(f"{BASE_URL}/api/residence/days", json={
+            "date": test_date,
+            "country": "ES",
+            "countryName": "Espagne",
+            "status": "manual",
+            "notes": "Updated entry"
+        })
+        assert response2.status_code == 200
+        
+        data = response2.json()
+        assert data["country"] == "ES"
+        assert data["status"] == "manual"
+        # ID should be preserved (same record updated)
+        assert data.get("id") == first_id
+        
+        # Verify only one entry exists for this date
+        days_response = requests.get(f"{BASE_URL}/api/residence/days?year=2026")
+        days = days_response.json()
+        matching_days = [d for d in days if d["date"] == test_date]
+        assert len(matching_days) == 1
+        
+        # Cleanup
+        requests.delete(f"{BASE_URL}/api/residence/days/{test_date}")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
