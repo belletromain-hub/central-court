@@ -841,13 +841,39 @@ export default function ResidenceScreen() {
               <Ionicons name="chevron-down" size={20} color={Colors.text.muted} />
             </TouchableOpacity>
 
-            {showDatePicker && (
+            {/* iOS Date Picker */}
+            {showDatePicker && Platform.OS === 'ios' && (
+              <View style={styles.iosDatePickerContainer}>
+                <View style={styles.iosDatePickerHeader}>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                    <Text style={styles.iosDatePickerCancel}>Annuler</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.iosDatePickerTitle}>Sélectionner une date</Text>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                    <Text style={styles.iosDatePickerDone}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={singleDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={(event, date) => {
+                    if (date) setSingleDate(date);
+                  }}
+                  maximumDate={new Date()}
+                  style={styles.iosDatePicker}
+                />
+              </View>
+            )}
+
+            {/* Android Date Picker */}
+            {showDatePicker && Platform.OS === 'android' && (
               <DateTimePicker
                 value={singleDate}
                 mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display="default"
                 onChange={(event, date) => {
-                  setShowDatePicker(Platform.OS === 'ios');
+                  setShowDatePicker(false);
                   if (date) setSingleDate(date);
                 }}
                 maximumDate={new Date()}
