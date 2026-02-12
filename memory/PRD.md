@@ -23,23 +23,28 @@ Application professionnelle de tennis: FastAPI + MongoDB + React Native (Expo)
 - FAB camera button for quick receipt scanning
 - OCR integration with verification modal
 - Upload: camera, gallery, PDF file picker
-- Document detail modal with delete
-- "Voir tout" toggle for category list
 
-### Résidence Fiscale - Phase 1 (NEW - Feb 12, 2026)
+### Résidence Fiscale - Phase 1 (Feb 12, 2026)
 - Nouvel onglet "Résidence" dans la tab bar avec icône globe
 - Dashboard des jours par pays avec barres de progression
 - Alertes visuelles pour seuils fiscaux (75% warning, 100% critical)
-- API Backend complète:
-  - GET /api/residence/countries (40 pays disponibles)
-  - GET /api/residence/stats?year=YYYY (stats + warnings)
-  - POST /api/residence/days (ajouter un jour)
-  - POST /api/residence/days/bulk (ajouter un séjour, max 90 jours)
-  - DELETE /api/residence/days/{date}
-- Modal d'ajout de jour unique
-- Modal d'ajout de séjour (plage de dates)
-- Affichage des séries consécutives (longest streak)
+- API Backend complète pour CRUD des jours de présence
 - Calcul automatique des pourcentages de seuil (183 jours)
+
+### Résidence Fiscale - Phase 2 (Feb 12, 2026) ✅ NEW
+- **GPS Tracking automatique** :
+  - Détection du pays actuel via expo-location
+  - Bouton "Aujourd'hui" pour enregistrer la présence GPS en 1 clic
+  - Prévention de double enregistrement le même jour
+  - Status "confirmed" pour GPS vs "manual" pour saisie manuelle
+- **Saisie facilitée** :
+  - DatePicker natif pour sélection de dates
+  - Indicateur de durée pour les séjours (bulk)
+  - Suggestion GPS dans le modal d'ajout de jour
+- **Paramètres GPS** :
+  - Modal de configuration avec Switch on/off
+  - Affichage du statut de permission
+  - Message de confidentialité des données
 
 ## Key API Endpoints
 - POST /api/users/onboarding, PUT /api/users/profile/{user_id}
@@ -52,8 +57,7 @@ Application professionnelle de tennis: FastAPI + MongoDB + React Native (Expo)
 
 ## Backlog
 
-### P0 - In Progress
-- **Phase 2 - Résidence Fiscale**: Saisie manuelle facilitée + tracking automatique GPS (avec consentement)
+### P0 - Next
 - **Phase 3 - Résidence Fiscale**: Alertes push + génération de rapports PDF
 
 ### P1
@@ -64,24 +68,28 @@ Application professionnelle de tennis: FastAPI + MongoDB + React Native (Expo)
 - Invitation emails via Resend
 - Push notifications
 - Deadline reminders
-- "Pas intéressé" - demander la raison (conflit calendrier, surface, etc.)
+- "Pas intéressé" - demander la raison
 - UI de reprogrammation des conflits de calendrier
 
 ## Architecture
 ```
 /app
 ├── frontend/          # React Native (Expo)
-│   ├── app/(tabs)/    # Écrans principaux
-│   │   ├── index.tsx  # Calendrier/Tournois
-│   │   ├── vault.tsx  # Documents
-│   │   ├── residence.tsx  # Résidence fiscale (NEW)
+│   ├── app/(tabs)/
+│   │   ├── index.tsx     # Calendrier/Tournois
+│   │   ├── vault.tsx     # Documents
+│   │   ├── residence.tsx # Résidence fiscale (GPS + manual)
 │   │   └── profile.tsx
-│   └── src/services/api.ts  # Appels API
-├── backend/           # FastAPI + MongoDB
-│   ├── server.py      # Entry point
+│   └── src/services/api.ts
+├── backend/
+│   ├── server.py
 │   └── routes/
-│       ├── residence_routes.py (NEW)
+│       ├── residence_routes.py
 │       ├── tournament_routes.py
 │       ├── documents.py
 │       └── user_routes.py
 ```
+
+## Test Reports
+- /app/test_reports/iteration_16.json - Phase 1 (20/20 tests)
+- /app/test_reports/iteration_17.json - Phase 2 (23/23 tests)
