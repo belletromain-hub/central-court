@@ -257,6 +257,7 @@ export default function DocumentsScreen() {
         setEditedMontantHT(data.montantHT?.toString() || '');
         setEditedMontantTVA(data.montantTVA?.toString() || '');
         setEditedCategorie(data.categorie || 'Autre');
+        setEditedCurrency(data.currency || 'EUR');
         setShowVerificationModal(true);
       } else {
         // OCR failed - manual entry
@@ -266,6 +267,7 @@ export default function DocumentsScreen() {
         setEditedMontantHT('');
         setEditedMontantTVA('');
         setEditedCategorie('Autre');
+        setEditedCurrency('EUR');
         setShowVerificationModal(true);
       }
     } catch (error) {
@@ -275,6 +277,7 @@ export default function DocumentsScreen() {
       setEditedDate(new Date().toISOString().split('T')[0]);
       setEditedMontant('');
       setEditedCategorie('Autre');
+      setEditedCurrency('EUR');
       setShowVerificationModal(true);
     } finally {
       setIsUploading(false);
