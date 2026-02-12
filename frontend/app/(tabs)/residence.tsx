@@ -941,26 +941,78 @@ export default function ResidenceScreen() {
               </View>
             </View>
 
-            {showStartDatePicker && (
+            {/* iOS Date Picker - Start Date */}
+            {showStartDatePicker && Platform.OS === 'ios' && (
+              <View style={styles.iosDatePickerContainer}>
+                <View style={styles.iosDatePickerHeader}>
+                  <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
+                    <Text style={styles.iosDatePickerCancel}>Annuler</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.iosDatePickerTitle}>Date début</Text>
+                  <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
+                    <Text style={styles.iosDatePickerDone}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={bulkStartDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={(event, date) => {
+                    if (date) setBulkStartDate(date);
+                  }}
+                  maximumDate={new Date()}
+                  style={styles.iosDatePicker}
+                />
+              </View>
+            )}
+
+            {/* Android Date Picker - Start Date */}
+            {showStartDatePicker && Platform.OS === 'android' && (
               <DateTimePicker
                 value={bulkStartDate}
                 mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display="default"
                 onChange={(event, date) => {
-                  setShowStartDatePicker(Platform.OS === 'ios');
+                  setShowStartDatePicker(false);
                   if (date) setBulkStartDate(date);
                 }}
                 maximumDate={new Date()}
               />
             )}
 
-            {showEndDatePicker && (
+            {/* iOS Date Picker - End Date */}
+            {showEndDatePicker && Platform.OS === 'ios' && (
+              <View style={styles.iosDatePickerContainer}>
+                <View style={styles.iosDatePickerHeader}>
+                  <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
+                    <Text style={styles.iosDatePickerCancel}>Annuler</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.iosDatePickerTitle}>Date fin</Text>
+                  <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
+                    <Text style={styles.iosDatePickerDone}>OK</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={bulkEndDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={(event, date) => {
+                    if (date) setBulkEndDate(date);
+                  }}
+                  maximumDate={new Date()}
+                  style={styles.iosDatePicker}
+                />
+              </View>
+            )}
+
+            {/* Android Date Picker - End Date */}
+            {showEndDatePicker && Platform.OS === 'android' && (
               <DateTimePicker
                 value={bulkEndDate}
                 mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display="default"
                 onChange={(event, date) => {
-                  setShowEndDatePicker(Platform.OS === 'ios');
+                  setShowEndDatePicker(false);
                   if (date) setBulkEndDate(date);
                 }}
                 maximumDate={new Date()}
