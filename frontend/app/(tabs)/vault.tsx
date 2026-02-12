@@ -92,6 +92,11 @@ export default function DocumentsScreen() {
   const [editedMontantHT, setEditedMontantHT] = useState('');
   const [editedMontantTVA, setEditedMontantTVA] = useState('');
   const [editedCategorie, setEditedCategorie] = useState('Autre');
+  const [editedCurrency, setEditedCurrency] = useState('EUR');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Available currencies
+  const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'AUD', 'CAD', 'AED'];
 
   // ============ COMPUTED ============
 
