@@ -339,6 +339,7 @@ export default function DocumentsScreen() {
     setEditedMontantHT('');
     setEditedMontantTVA('');
     setEditedCategorie('Autre');
+    setEditedCurrency('EUR');
   };
 
   const handleDeleteDoc = async (docId: string) => {
