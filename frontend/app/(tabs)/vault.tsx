@@ -285,10 +285,13 @@ export default function DocumentsScreen() {
   };
 
   const handleSaveDocument = async () => {
+    if (isSaving) return; // Prevent double submission
+    
     const parsedMontant = parseFloat(editedMontant.replace(',', '.')) || 0;
     const parsedHT = parseFloat(editedMontantHT.replace(',', '.')) || undefined;
     const parsedTVA = parseFloat(editedMontantTVA.replace(',', '.')) || undefined;
 
+    setIsSaving(true);
     try {
       let base64Data = null;
       if (pendingDocUri) {
@@ -304,7 +307,7 @@ export default function DocumentsScreen() {
         montantTotal: parsedMontant,
         montantHT: parsedHT,
         montantTVA: parsedTVA,
-        currency: 'EUR',
+        currency: editedCurrency,
         fileBase64: base64Data,
         fileType: pendingDocType,
       });
