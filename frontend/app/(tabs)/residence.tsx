@@ -1835,14 +1835,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.primary,
   },
-  // iOS DatePicker styles
+  // iOS DatePicker styles - DARK THEME for visibility
   iosDatePickerContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1A1A1A',
     borderRadius: 12,
     marginTop: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border.light,
+    borderColor: '#333333',
   },
   iosDatePickerHeader: {
     flexDirection: 'row',
@@ -1850,22 +1850,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.light,
-    backgroundColor: '#f8f9fa',
+    borderBottomColor: '#333333',
+    backgroundColor: '#2A2A2A',
   },
   iosDatePickerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.text.primary,
+    color: '#FFFFFF',
   },
   iosDatePickerCancel: {
     fontSize: 15,
-    color: Colors.danger,
+    color: '#FF6B6B',
   },
   iosDatePickerDone: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.primary,
+    color: '#10B981',
   },
   iosDatePicker: {
     height: 180,
