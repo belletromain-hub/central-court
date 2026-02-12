@@ -242,7 +242,7 @@ export default function DocumentsScreen() {
     setPendingDocName(name);
 
     try {
-      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       const response = await api.post('/api/invoices/analyze-base64', {
         file_base64: base64,
         file_type: type,
