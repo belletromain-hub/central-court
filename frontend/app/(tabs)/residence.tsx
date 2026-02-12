@@ -24,10 +24,13 @@ import Colors from '../../src/constants/colors';
 import {
   fetchResidenceStats,
   fetchCountries,
+  fetchDayPresences,
   addDayPresence,
   addBulkDays,
+  deleteDayPresence,
   ResidenceStats,
   CountryStats,
+  DayPresence,
 } from '../../src/services/api';
 
 const TAX_LIMIT = 183;
