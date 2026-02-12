@@ -320,7 +320,7 @@ export default function DocumentsScreen() {
         type: pendingDocType,
         date: saved.dateFacture || editedDate,
         amount: saved.montantTotal,
-        currency: saved.currency || 'EUR',
+        currency: saved.currency || editedCurrency,
         fournisseur: saved.fournisseur,
         createdAt: saved.createdAt,
       }, ...prev]);
@@ -330,6 +330,8 @@ export default function DocumentsScreen() {
     } catch (error) {
       console.error('Save error:', error);
       Alert.alert('Erreur', "Échec de l'enregistrement");
+    } finally {
+      setIsSaving(false);
     }
   };
 
