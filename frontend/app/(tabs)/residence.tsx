@@ -1869,7 +1869,37 @@ const styles = StyleSheet.create({
   },
   iosDatePicker: {
     height: 180,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1A1A1A',
+  },
+  // Notes field - Collapsible
+  notesToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.background.secondary,
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  notesToggleText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text.secondary,
+  },
+  notesInput: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    color: Colors.text.primary,
+    marginTop: 8,
+    minHeight: 60,
+    maxHeight: 100,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: Colors.border.light,
   },
   submitBtn: {
     flexDirection: 'row',
