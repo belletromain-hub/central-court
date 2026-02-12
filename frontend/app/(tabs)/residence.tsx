@@ -1789,10 +1789,12 @@ const styles = StyleSheet.create({
   },
   // iOS DatePicker styles
   iosDatePickerContainer: {
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     marginTop: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border.light,
   },
   iosDatePickerHeader: {
     flexDirection: 'row',
@@ -1801,7 +1803,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.light,
-    backgroundColor: Colors.background.tertiary,
+    backgroundColor: '#f8f9fa',
   },
   iosDatePickerTitle: {
     fontSize: 16,
@@ -1819,6 +1821,7 @@ const styles = StyleSheet.create({
   },
   iosDatePicker: {
     height: 180,
+    backgroundColor: '#ffffff',
   },
   submitBtn: {
     flexDirection: 'row',
