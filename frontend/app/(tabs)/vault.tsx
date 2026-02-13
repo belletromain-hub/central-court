@@ -568,16 +568,6 @@ export default function DocumentsScreen() {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={s.uploadOption} onPress={handleSelectFile} data-testid="upload-file">
-              <View style={[s.uploadIconWrap, { backgroundColor: '#fff3e0' }]}>
-                <Ionicons name="document" size={24} color="#e65100" />
-              </View>
-              <View>
-                <Text style={s.uploadOptionTitle}>Fichier PDF</Text>
-                <Text style={s.uploadOptionSub}>Depuis vos fichiers</Text>
-              </View>
-            </TouchableOpacity>
-
             <TouchableOpacity style={s.cancelBtn} onPress={() => setShowUploadModal(false)}>
               <Text style={s.cancelText}>Annuler</Text>
             </TouchableOpacity>
