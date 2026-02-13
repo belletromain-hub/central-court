@@ -192,29 +192,98 @@ export default function DocumentsScreen() {
 
   // ============ UPLOAD / OCR ============
 
+  // Guard anti-double-clic
+  const isProcessingRef = useRef(false);
+
   const handleTakePhoto = async () => {
-    setShowUploadModal(false);
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Accès à la caméra nécessaire');
+    // Guard anti-double-clic
+    if (isProcessingRef.current) {
+      console.log('⚠️ Action déjà en cours, ignoré');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      processDocumentWithOCR(result.assets[0].uri, 'image', `Photo_${Date.now()}.jpg`);
+    isProcessingRef.current = true;
+    setShowUploadModal(false);
+
+    try {
+      console.log('📸 Ouverture caméra...');
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission requise',
+          'Autorisez l\'accès à la caméra pour scanner les reçus.',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Paramètres', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        console.log('✅ Photo prise:', result.assets[0].uri);
+        processDocumentWithOCR(result.assets[0].uri, 'image', `Photo_${Date.now()}.jpg`);
+      } else {
+        console.log('❌ Photo annulée');
+      }
+    } catch (error) {
+      console.error('Erreur caméra:', error);
+      Alert.alert('Erreur', 'Impossible d\'ouvrir la caméra');
+    } finally {
+      setTimeout(() => { isProcessingRef.current = false; }, 500);
     }
   };
 
   const handleSelectGallery = async () => {
-    setShowUploadModal(false);
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Accès à la galerie nécessaire');
+    // Guard anti-double-clic
+    if (isProcessingRef.current) {
+      console.log('⚠️ Action déjà en cours, ignoré');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      processDocumentWithOCR(result.assets[0].uri, 'image', `Galerie_${Date.now()}.jpg`);
+    isProcessingRef.current = true;
+    setShowUploadModal(false);
+
+    try {
+      console.log('🖼️ Ouverture galerie...');
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission requise',
+          'Autorisez l\'accès à la galerie.',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Paramètres', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        console.log('✅ Image sélectionnée:', result.assets[0].uri);
+        processDocumentWithOCR(result.assets[0].uri, 'image', `Galerie_${Date.now()}.jpg`);
+      } else {
+        console.log('❌ Sélection annulée');
+      }
+    } catch (error) {
+      console.error('Erreur galerie:', error);
+      Alert.alert('Erreur', 'Impossible d\'ouvrir la galerie');
+    } finally {
+      setTimeout(() => { isProcessingRef.current = false; }, 500);
     }
   };
 
