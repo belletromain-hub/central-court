@@ -19,7 +19,8 @@ import io
 
 load_dotenv()
 
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+# Clé Emergent LLM pour OpenAI (Universal Key)
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-56a3f663d91F5Ae936')
 
 # Catégories disponibles avec mots-clés
 CATEGORIES = {
