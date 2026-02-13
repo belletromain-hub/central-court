@@ -28,6 +28,7 @@ import {
   addDayPresence,
   addBulkDays,
   deleteDayPresence,
+  updateDayPresence,
   ResidenceStats,
   CountryStats,
   DayPresence,
