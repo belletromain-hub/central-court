@@ -101,6 +101,34 @@ async def add_day_presence(data: DayPresenceCreate):
     return doc
 
 
+@router.put("/days/{date}")
+async def update_day_presence(date: str, data: DayPresenceUpdate):
+    """Update a day of presence"""
+    existing = await db.day_presences.find_one({"date": date})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Day not found")
+    
+    update_fields = {}
+    if data.country is not None:
+        update_fields["country"] = data.country
+    if data.countryName is not None:
+        update_fields["countryName"] = data.countryName
+    if data.status is not None:
+        update_fields["status"] = data.status
+    if data.notes is not None:
+        update_fields["notes"] = data.notes
+    
+    update_fields["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.day_presences.update_one(
+        {"date": date},
+        {"$set": update_fields}
+    )
+    
+    updated = await db.day_presences.find_one({"date": date}, {"_id": 0})
+    return updated
+
+
 @router.delete("/days/{date}")
 async def delete_day_presence(date: str):
     """Delete a day of presence"""
