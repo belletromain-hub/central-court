@@ -107,3 +107,4 @@ Application professionnelle de tennis: FastAPI + MongoDB + React Native (Expo)
 ## Test Reports
 - /app/test_reports/iteration_16.json - Phase 1 (20/20 tests)
 - /app/test_reports/iteration_17.json - Phase 2 (23/23 tests)
+- /app/test_reports/iteration_18.json - Bug Fix P1 (62/62 tests) ✅ NEW
