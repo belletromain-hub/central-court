@@ -192,6 +192,17 @@ export const deleteDayPresence = (date: string) =>
     method: 'DELETE',
   });
 
+export const updateDayPresence = (date: string, data: {
+  country?: string;
+  countryName?: string;
+  status?: string;
+  notes?: string;
+}) =>
+  apiFetch<DayPresence>(`/api/residence/days/${date}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+
 export const addBulkDays = (data: {
   startDate: string;
   endDate: string;
