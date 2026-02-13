@@ -1383,6 +1383,94 @@ export default function ResidenceScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Day Modal */}
+      <Modal visible={showEditModal} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Modifier le jour</Text>
+              <TouchableOpacity onPress={() => {
+                setShowEditModal(false);
+                setEditingDay(null);
+                setEditCountry(null);
+                setEditNotes('');
+              }}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {editingDay && (
+              <>
+                {/* Date display (read-only) */}
+                <View style={styles.editDateDisplay}>
+                  <Ionicons name="calendar" size={20} color={Colors.primary} />
+                  <Text style={styles.editDateText}>
+                    {new Date(editingDay.date).toLocaleDateString('fr-FR', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </Text>
+                </View>
+
+                <Text style={styles.inputLabel}>Pays</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.countrySelector}>
+                  {countries.map(country => (
+                    <TouchableOpacity
+                      key={country.code}
+                      style={[
+                        styles.countryOption,
+                        editCountry?.code === country.code && styles.countryOptionSelected,
+                      ]}
+                      onPress={() => setEditCountry(country)}
+                    >
+                      <Text style={styles.countryOptionFlag}>
+                        {countryFlags[country.code] || '🌍'}
+                      </Text>
+                      <Text style={styles.countryOptionCode}>{country.code}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <Text style={styles.inputLabel}>Notes (optionnel)</Text>
+                <TextInput
+                  style={[styles.input, styles.editNotesInput]}
+                  value={editNotes}
+                  onChangeText={setEditNotes}
+                  placeholder="Ex: Tournoi, entraînement..."
+                  placeholderTextColor={Colors.text.muted}
+                  multiline
+                  numberOfLines={2}
+                  maxLength={200}
+                />
+
+                <TouchableOpacity
+                  style={[
+                    styles.submitBtn,
+                    (!editCountry || savingEdit) && styles.submitBtnDisabled,
+                  ]}
+                  onPress={handleSaveEdit}
+                  disabled={!editCountry || savingEdit}
+                >
+                  {savingEdit ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                      <Text style={styles.submitBtnText}>Enregistrer les modifications</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
