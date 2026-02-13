@@ -189,6 +189,51 @@ export default function ResidenceScreen() {
     );
   };
 
+  // Open edit modal for a day
+  const handleEditDay = (day: DayPresence) => {
+    const country = countries.find(c => c.code === day.country);
+    setEditingDay(day);
+    setEditCountry(country || null);
+    setEditNotes(day.notes || '');
+    setShowEditModal(true);
+  };
+
+  // Save edited day
+  const handleSaveEdit = async () => {
+    if (!editingDay || !editCountry) return;
+    
+    setSavingEdit(true);
+    try {
+      await updateDayPresence(editingDay.date, {
+        country: editCountry.code,
+        countryName: editCountry.name,
+        notes: editNotes || undefined,
+      });
+      
+      // Update local state
+      setCountryDays(prev => prev.map(d => 
+        d.date === editingDay.date 
+          ? { ...d, country: editCountry.code, countryName: editCountry.name, notes: editNotes }
+          : d
+      ));
+      
+      setShowEditModal(false);
+      setEditingDay(null);
+      setEditCountry(null);
+      setEditNotes('');
+      
+      // Reload stats to update counters
+      loadData();
+      
+      Alert.alert('Succès', 'Jour modifié avec succès');
+    } catch (err) {
+      console.error('Error updating day:', err);
+      Alert.alert('Erreur', 'Impossible de modifier ce jour');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   // Load GPS settings on mount
   useEffect(() => {
     loadGpsSettings();
