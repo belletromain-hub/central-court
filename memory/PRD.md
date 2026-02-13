@@ -65,12 +65,14 @@ Application professionnelle de tennis: FastAPI + MongoDB + React Native (Expo)
 - POST /api/invoices/analyze-base64 (OCR)
 - GET /api/residence/countries, /stats, /days
 - POST /api/residence/days, /days/bulk
+- PUT /api/residence/days/{date} ✅ NEW
 - DELETE /api/residence/days/{date}
 
 ## Backlog
 
 ### P0 - Next
 - **Phase 3 - Résidence Fiscale**: Alertes push + génération de rapports PDF
+- **Bug P0 - Sauvegarde dépenses**: Backend vérifié OK - peut être un problème de cache client Expo Go. Surveiller les rapports utilisateur.
 
 ### P1
 - PDF export of documents
