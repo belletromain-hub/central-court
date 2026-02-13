@@ -330,7 +330,8 @@ export default function DocumentsScreen() {
       Alert.alert('Succès', 'Document enregistré avec succès');
     } catch (error: any) {
       console.error('Save error:', error);
-      Alert.alert('Erreur', error?.message || "Échec de l'enregistrement. Vérifiez votre connexion.");
+      const errorMsg = error?.response?.data?.detail || error?.message || "Échec de l'enregistrement. Vérifiez votre connexion.";
+      Alert.alert('Erreur', errorMsg);
     } finally {
       setIsSaving(false);
     }
