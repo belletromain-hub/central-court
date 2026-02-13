@@ -46,6 +46,18 @@ Application professionnelle de tennis: FastAPI + MongoDB + React Native (Expo)
   - Affichage du statut de permission
   - Message de confidentialité des données
 
+### Bug Fix P1 - Modification des périodes (Feb 13, 2026) ✅ NEW
+- **Backend** : Nouvel endpoint PUT /api/residence/days/{date}
+  - Modification du pays, notes, statut d'un jour existant
+  - Validation d'existence (404 si jour non trouvé)
+  - Mise à jour automatique du timestamp updatedAt
+- **Frontend** : Modal d'édition dans residence.tsx
+  - Bouton édition (crayon) à côté de chaque jour
+  - Sélecteur de pays avec drapeaux
+  - Champ notes modifiable
+  - Affichage de la date (non modifiable)
+- **API** : updateDayPresence() dans api.ts
+
 ## Key API Endpoints
 - POST /api/users/onboarding, PUT /api/users/profile/{user_id}
 - GET /api/tournaments/weeks, /conflicts/{id}, /register, /hide
