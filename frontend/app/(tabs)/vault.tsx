@@ -287,22 +287,8 @@ export default function DocumentsScreen() {
     }
   };
 
-  const handleSelectFile = async () => {
-    setShowUploadModal(false);
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'application/pdf'],
-        copyToCacheDirectory: true,
-      });
-      if (!result.canceled && result.assets[0]) {
-        const file = result.assets[0];
-        const type = file.mimeType?.includes('pdf') ? 'pdf' as const : 'image' as const;
-        processDocumentWithOCR(file.uri, type, file.name || `Document_${Date.now()}`);
-      }
-    } catch (error) {
-      console.error('Document picker error:', error);
-    }
-  };
+  // Note: handleSelectFile supprimé - utiliser ImagePicker pour les images
+  // DocumentPicker cause des problèmes "picker in progress"
 
   const processDocumentWithOCR = async (uri: string, type: 'pdf' | 'image', name: string) => {
     setIsUploading(true);
