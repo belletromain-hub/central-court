@@ -115,6 +115,13 @@ export default function ResidenceScreen() {
   const [loadingDays, setLoadingDays] = useState(false);
   const [deletingDay, setDeletingDay] = useState<string | null>(null);
   
+  // Edit day modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingDay, setEditingDay] = useState<DayPresence | null>(null);
+  const [editCountry, setEditCountry] = useState<Country | null>(null);
+  const [editNotes, setEditNotes] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
