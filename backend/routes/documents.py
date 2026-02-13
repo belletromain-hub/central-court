@@ -210,7 +210,7 @@ async def get_documents(
     
     if userId:
         # Support both userId and user_id field names for flexibility
-        query["$or"] = [{"userId": userId}, {"user_id": userId}]
+        query["user_id"] = userId
     
     if category:
         query["category"] = category
@@ -225,8 +225,10 @@ async def get_documents(
         if date_query:
             query["dateFacture"] = date_query
     
+    print(f"[DEBUG] Documents query: {query}")
     cursor = db.documents.find(query, {"fileBase64": 0}).sort("createdAt", -1).skip(skip).limit(limit)
     documents = await cursor.to_list(length=limit)
+    print(f"[DEBUG] Found {len(documents)} documents")
     
     return [serialize_document(doc) for doc in documents]
 
