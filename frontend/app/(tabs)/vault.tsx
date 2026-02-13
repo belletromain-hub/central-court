@@ -192,31 +192,20 @@ export default function DocumentsScreen() {
 
   // ============ UPLOAD / OCR ============
 
-  // Guard anti-double-clic
-  const isProcessingRef = useRef(false);
-
   const handleTakePhoto = async () => {
-    // Debug alert
     console.log('=== CAMERA BUTTON PRESSED ===');
-    
-    // Guard anti-double-clic
-    if (isProcessingRef.current) {
-      console.log('⚠️ Action déjà en cours, ignoré');
-      Alert.alert('Patientez', 'Action en cours...');
-      return;
-    }
-    isProcessingRef.current = true;
     setShowUploadModal(false);
 
     try {
-      console.log('📸 Demande permission caméra...');
+      // 1. Demander permission AVANT tout
+      console.log('Demande permission caméra...');
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
       console.log('Permission status:', permissionResult.status);
       
       if (permissionResult.status !== 'granted') {
         Alert.alert(
           'Permission requise',
-          'L\'app a besoin d\'accéder à la caméra pour scanner les reçus. Veuillez autoriser l\'accès dans les paramètres.',
+          'Autorisez l\'accès à la caméra pour scanner les reçus.',
           [
             { text: 'Annuler', style: 'cancel' },
             { 
@@ -234,8 +223,9 @@ export default function DocumentsScreen() {
         return;
       }
 
-      console.log('✅ Permission accordée, ouverture caméra...');
+      console.log('Permission OK, ouverture caméra...');
       
+      // 2. Ouvrir caméra
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -243,44 +233,32 @@ export default function DocumentsScreen() {
         quality: 0.8,
       });
 
-      console.log('Camera result:', JSON.stringify(result, null, 2));
+      console.log('Camera result canceled:', result.canceled);
 
       if (!result.canceled && result.assets && result.assets[0]) {
-        console.log('✅ Photo prise:', result.assets[0].uri);
+        console.log('Photo prise:', result.assets[0].uri);
         processDocumentWithOCR(result.assets[0].uri, 'image', `Photo_${Date.now()}.jpg`);
-      } else {
-        console.log('❌ Photo annulée par utilisateur');
       }
     } catch (error: any) {
-      console.error('❌ Erreur caméra:', error);
-      Alert.alert('Erreur', `Impossible d'ouvrir la caméra: ${error?.message || 'Erreur inconnue'}`);
-    } finally {
-      setTimeout(() => { isProcessingRef.current = false; }, 500);
+      console.error('Erreur caméra:', error);
+      Alert.alert('Erreur', error?.message || 'Impossible d\'ouvrir la caméra');
     }
   };
 
   const handleSelectGallery = async () => {
-    // Debug alert
     console.log('=== GALLERY BUTTON PRESSED ===');
-    
-    // Guard anti-double-clic
-    if (isProcessingRef.current) {
-      console.log('⚠️ Action déjà en cours, ignoré');
-      Alert.alert('Patientez', 'Action en cours...');
-      return;
-    }
-    isProcessingRef.current = true;
     setShowUploadModal(false);
 
     try {
-      console.log('🖼️ Demande permission galerie...');
+      // 1. Demander permission AVANT tout
+      console.log('Demande permission galerie...');
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       console.log('Permission status:', permissionResult.status);
       
       if (permissionResult.status !== 'granted') {
         Alert.alert(
           'Permission requise',
-          'L\'app a besoin d\'accéder à vos photos. Veuillez autoriser l\'accès dans les paramètres.',
+          'Autorisez l\'accès à la galerie pour sélectionner des photos.',
           [
             { text: 'Annuler', style: 'cancel' },
             { 
@@ -298,8 +276,9 @@ export default function DocumentsScreen() {
         return;
       }
 
-      console.log('✅ Permission accordée, ouverture galerie...');
+      console.log('Permission OK, ouverture galerie...');
 
+      // 2. Ouvrir galerie
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -307,19 +286,15 @@ export default function DocumentsScreen() {
         quality: 0.8,
       });
 
-      console.log('Gallery result:', JSON.stringify(result, null, 2));
+      console.log('Gallery result canceled:', result.canceled);
 
       if (!result.canceled && result.assets && result.assets[0]) {
-        console.log('✅ Image sélectionnée:', result.assets[0].uri);
+        console.log('Image sélectionnée:', result.assets[0].uri);
         processDocumentWithOCR(result.assets[0].uri, 'image', `Galerie_${Date.now()}.jpg`);
-      } else {
-        console.log('❌ Sélection annulée par utilisateur');
       }
     } catch (error: any) {
-      console.error('❌ Erreur galerie:', error);
-      Alert.alert('Erreur', `Impossible d'ouvrir la galerie: ${error?.message || 'Erreur inconnue'}`);
-    } finally {
-      setTimeout(() => { isProcessingRef.current = false; }, 500);
+      console.error('Erreur galerie:', error);
+      Alert.alert('Erreur', error?.message || 'Impossible d\'ouvrir la galerie');
     }
   };
 
