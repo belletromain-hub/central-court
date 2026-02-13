@@ -58,6 +58,21 @@ Application professionnelle de tennis: FastAPI + MongoDB + React Native (Expo)
   - Affichage de la date (non modifiable)
 - **API** : updateDayPresence() dans api.ts
 
+### OCR Module - Correction (Feb 13, 2026) ✅ NEW
+- **Problème** : Clé OpenAI invalide causait des erreurs d'authentification
+- **Solution** : Migration vers Emergent LLM Key (clé universelle)
+  - Utilise `sk-emergent-xxx` au lieu de `sk-proj-xxx`
+  - GPT-4o Vision pour analyse d'images de factures
+  - Logs détaillés pour debug
+- **Fonctionnalités** :
+  - Extraction du montant total TTC (priorité absolue)
+  - Date de facture en format JJ/MM/AAAA
+  - Montants HT et TVA avec validation
+  - Détection automatique de catégorie
+  - Lignes de facture détaillées
+  - Score de confiance 0-1
+- **Test** : 100% succès avec ticket restaurant test (29.50€, confidence 0.95)
+
 ## Key API Endpoints
 - POST /api/users/onboarding, PUT /api/users/profile/{user_id}
 - GET /api/tournaments/weeks, /conflicts/{id}, /register, /hide
