@@ -2375,9 +2375,36 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  dayItemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dayItemEdit: {
+    padding: 10,
+  },
   dayItemDelete: {
     padding: 10,
-    marginLeft: 10,
+  },
+  // Edit Modal
+  editDateDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.primary + '10',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  editDateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    textTransform: 'capitalize',
+  },
+  editNotesInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
   noDaysMessage: {
     flex: 1,
