@@ -209,7 +209,8 @@ async def get_documents(
     query = {}
     
     if userId:
-        query["userId"] = userId
+        # Support both userId and user_id field names for flexibility
+        query["$or"] = [{"userId": userId}, {"user_id": userId}]
     
     if category:
         query["category"] = category
