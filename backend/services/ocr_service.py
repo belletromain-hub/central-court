@@ -312,14 +312,9 @@ def validate_extracted_data(data: Dict[str, Any]) -> Dict[str, Any]:
 async def extract_invoice_data_with_openai(image_base64: str, filename: str = "") -> Dict[str, Any]:
     """
     Extraction haute précision via OpenAI Vision (GPT-4o)
+    Utilise Emergent LLM Key pour l'authentification
     Prompt ultra-optimisé pour taux de réussite >95%
     """
-    if not OPENAI_API_KEY:
-        return {
-            'success': False,
-            'error': 'OpenAI API key not configured'
-        }
-    
     # Import emergentintegrations
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     
@@ -411,10 +406,14 @@ RÉPONDS UNIQUEMENT avec ce JSON (pas de texte avant ou après):
 
 🔴 CRITIQUE: Le montantTotal doit être exact. C'est la donnée la plus importante!"""
 
+    response = None
+    
     try:
-        # Initialiser le chat avec emergentintegrations
+        print(f"[OCR] Starting GPT-4o Vision analysis...")
+        
+        # Initialiser le chat avec emergentintegrations et la clé Emergent LLM
         chat = LlmChat(
-            api_key=OPENAI_API_KEY,
+            api_key=EMERGENT_LLM_KEY,
             session_id=f"ocr-invoice-{datetime.now().timestamp()}",
             system_message=system_prompt
         ).with_model("openai", "gpt-4o")
@@ -428,7 +427,10 @@ RÉPONDS UNIQUEMENT avec ce JSON (pas de texte avant ou après):
             file_contents=[image_content]
         )
         
+        print(f"[OCR] Sending request to GPT-4o Vision...")
         response = await chat.send_message(user_message)
+        
+        print(f"[OCR] Response received, parsing JSON...")
         
         # Parser la réponse JSON
         cleaned = response.strip()
@@ -448,6 +450,8 @@ RÉPONDS UNIQUEMENT avec ce JSON (pas de texte avant ou après):
         
         result = json.loads(cleaned)
         
+        print(f"[OCR] Parsed result: montantTotal={result.get('montantTotal')}, fournisseur={result.get('fournisseur')}")
+        
         # Valider et nettoyer les données
         result = validate_extracted_data(result)
         
@@ -458,20 +462,22 @@ RÉPONDS UNIQUEMENT avec ce JSON (pas de texte avant ou après):
             if detected != 'Autre':
                 result['categorie'] = detected
         
+        print(f"[OCR] SUCCESS - Final data: {json.dumps(result, ensure_ascii=False)[:200]}...")
+        
         return {
             'success': True,
             'data': result
         }
         
     except json.JSONDecodeError as e:
-        print(f"JSON Parse Error: {e}")
-        print(f"Raw response: {response if 'response' in dir() else 'N/A'}")
+        print(f"[OCR] JSON Parse Error: {e}")
+        print(f"[OCR] Raw response: {response if response else 'N/A'}")
         
         # Tentative d'extraction de secours
-        return extract_fallback_data(response if 'response' in dir() else '', filename)
+        return extract_fallback_data(response if response else '', filename)
         
     except Exception as e:
-        print(f"OpenAI OCR Error: {e}")
+        print(f"[OCR] Error: {e}")
         import traceback
         traceback.print_exc()
         return {
