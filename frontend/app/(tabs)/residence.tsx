@@ -1329,17 +1329,26 @@ export default function ResidenceScreen() {
                       </View>
                     </View>
                     
-                    <TouchableOpacity
-                      style={styles.dayItemDelete}
-                      onPress={() => handleDeleteDay(day.date)}
-                      disabled={deletingDay === day.date}
-                    >
-                      {deletingDay === day.date ? (
-                        <ActivityIndicator size="small" color={Colors.danger} />
-                      ) : (
-                        <Ionicons name="trash-outline" size={20} color={Colors.danger} />
-                      )}
-                    </TouchableOpacity>
+                    <View style={styles.dayItemActions}>
+                      <TouchableOpacity
+                        style={styles.dayItemEdit}
+                        onPress={() => handleEditDay(day)}
+                      >
+                        <Ionicons name="pencil" size={18} color={Colors.primary} />
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={styles.dayItemDelete}
+                        onPress={() => handleDeleteDay(day.date)}
+                        disabled={deletingDay === day.date}
+                      >
+                        {deletingDay === day.date ? (
+                          <ActivityIndicator size="small" color={Colors.danger} />
+                        ) : (
+                          <Ionicons name="trash-outline" size={20} color={Colors.danger} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
                 
