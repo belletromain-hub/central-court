@@ -92,9 +92,10 @@ async def create_event(req: CreateEventRequest):
 
 @router.put("/{event_id}")
 async def update_event(event_id: str, req: UpdateEventRequest):
-    update_data = {k: v for k, v in req.dict().items() if v is not None}
+    update_data = {k: v for k, v in req.dict(exclude_unset=True).items()}
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
+    update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result = await db.events.update_one({"id": event_id}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Event not found")

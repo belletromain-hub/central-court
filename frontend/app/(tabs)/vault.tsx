@@ -55,7 +55,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: stri
   'other': { label: 'Autre', icon: 'document', color: '#757575' },
 };
 
-const OCR_CATEGORIES = ['Transport', 'Hébergement', 'Restauration', 'Médical', 'Matériel', 'Services', 'Autre'];
+const OCR_CATEGORIES = ['Transport', 'Hébergement', 'Restauration', 'Médical', 'Matériel', 'Équipement', 'Services', 'Autre'];
 
 const getCatConfig = (cat: string) => CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['other'] || { label: cat || 'Autre', icon: 'document', color: '#757575' };
 
@@ -186,6 +186,9 @@ export default function DocumentsScreen() {
   };
 
   const nextMonth = () => {
+    const now = new Date();
+    const isCurrentMonth = currentYear === now.getFullYear() && currentMonth === now.getMonth();
+    if (isCurrentMonth) return; // Can't navigate to future months
     if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(y => y + 1); }
     else setCurrentMonth(m => m + 1);
   };
@@ -309,24 +312,31 @@ export default function DocumentsScreen() {
 
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-      const response = await api.post('/api/invoices/analyze-base64', {
-        file_base64: base64,
-        file_type: type,
-        file_name: name,
-      });
+      let ocrFailed = false;
+      try {
+        const response = await api.post('/api/invoices/analyze-base64', {
+          image_base64: base64,
+          filename: name,
+        });
 
-      if (response.data.success && response.data.data) {
-        const data = response.data.data;
-        setEditedFournisseur(data.fournisseur || '');
-        setEditedDate(data.dateFacture || new Date().toISOString().split('T')[0]);
-        setEditedMontant(data.montantTotal?.toString() || '');
-        setEditedMontantHT(data.montantHT?.toString() || '');
-        setEditedMontantTVA(data.montantTVA?.toString() || '');
-        setEditedCategorie(data.categorie || 'Autre');
-        setEditedCurrency(data.currency || 'EUR');
-        setShowVerificationModal(true);
-      } else {
-        // OCR failed - manual entry
+        if (response.data.success && response.data.data) {
+          const data = response.data.data;
+          setEditedFournisseur(data.fournisseur || '');
+          setEditedDate(data.dateFacture || new Date().toISOString().split('T')[0]);
+          setEditedMontant(data.montantTotal?.toString() || '');
+          setEditedMontantHT(data.montantHT?.toString() || '');
+          setEditedMontantTVA(data.montantTVA?.toString() || '');
+          setEditedCategorie(data.categorie || 'Autre');
+          setEditedCurrency(data.currency || 'EUR');
+        } else {
+          ocrFailed = true;
+        }
+      } catch {
+        ocrFailed = true;
+      }
+
+      if (ocrFailed) {
+        // Reset fields for manual entry
         setEditedFournisseur('');
         setEditedDate(new Date().toISOString().split('T')[0]);
         setEditedMontant('');
@@ -334,16 +344,12 @@ export default function DocumentsScreen() {
         setEditedMontantTVA('');
         setEditedCategorie('Autre');
         setEditedCurrency('EUR');
-        setShowVerificationModal(true);
+        Alert.alert(
+          'Saisie manuelle',
+          "L'analyse automatique n'a pas pu extraire les données. Veuillez remplir les champs manuellement.",
+          [{ text: 'OK' }]
+        );
       }
-    } catch (error) {
-      console.error('OCR error:', error);
-      // Still show form for manual entry
-      setEditedFournisseur('');
-      setEditedDate(new Date().toISOString().split('T')[0]);
-      setEditedMontant('');
-      setEditedCategorie('Autre');
-      setEditedCurrency('EUR');
       setShowVerificationModal(true);
     } finally {
       setIsUploading(false);
@@ -354,8 +360,10 @@ export default function DocumentsScreen() {
     if (isSaving) return; // Prevent double submission
     
     const parsedMontant = parseFloat(editedMontant.replace(',', '.')) || 0;
-    const parsedHT = parseFloat(editedMontantHT.replace(',', '.')) || undefined;
-    const parsedTVA = parseFloat(editedMontantTVA.replace(',', '.')) || undefined;
+    const _ht = editedMontantHT.trim();
+    const parsedHT = _ht !== '' ? (parseFloat(_ht.replace(',', '.')) || 0) : undefined;
+    const _tva = editedMontantTVA.trim();
+    const parsedTVA = _tva !== '' ? (parseFloat(_tva.replace(',', '.')) || 0) : undefined;
 
     setIsSaving(true);
     try {
@@ -680,7 +688,9 @@ export default function DocumentsScreen() {
                   <View style={s.detailAmountBox}>
                     <Text style={s.detailAmountLabel}>Montant</Text>
                     <Text style={s.detailAmount}>
-                      {showDocDetail.amount ? `${showDocDetail.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €` : '--'}
+                      {showDocDetail.amount != null
+                        ? `${showDocDetail.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ${showDocDetail.currency || 'EUR'}`
+                        : '--'}
                     </Text>
                   </View>
 

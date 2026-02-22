@@ -100,7 +100,7 @@ async def check_tournament_conflicts(tournament_id: str):
     # Also check for other tournaments in the same period that are registered
     conflicting_tournaments = []
     regs = await db.tournament_registrations.find(
-        {"status": {"$in": ["pending", "participating", "interested"]}},
+        {"status": {"$in": ["pending", "accepted", "participating", "interested"]}},
         {"_id": 0}
     ).to_list(200)
     

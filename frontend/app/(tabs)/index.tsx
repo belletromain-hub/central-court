@@ -193,7 +193,7 @@ export default function CalendarScreen() {
   const router = useRouter();
   
   // Core state
-  const [currentMonth, setCurrentMonth] = useState('2026-02');
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().toISOString().substring(0, 7));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [tournamentWeeks, setTournamentWeeks] = useState<TournamentWeek[]>([]);
@@ -229,6 +229,9 @@ export default function CalendarScreen() {
   const [conflictData, setConflictData] = useState<any>(null);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [pendingRegistration, setPendingRegistration] = useState<{tournamentId: string, status: string} | null>(null);
+
+  // Registration loading state: tournamentId being processed
+  const [registeringId, setRegisteringId] = useState<string | null>(null);
 
   // ============ DATA LOADING ============
 
@@ -434,6 +437,9 @@ export default function CalendarScreen() {
   // ============ ACTIONS ============
 
   const handleRegisterTournament = async (tournamentId: string, status: string) => {
+    if (registeringId) return; // Prevent concurrent registrations
+    setRegisteringId(tournamentId);
+
     // For advancing statuses (pending/participating), check for conflicts first
     if (status === 'pending' || status === 'participating') {
       try {
@@ -442,6 +448,7 @@ export default function CalendarScreen() {
           setConflictData(conflicts);
           setPendingRegistration({ tournamentId, status });
           setShowConflictModal(true);
+          setRegisteringId(null);
           return;
         }
       } catch (e) {
@@ -449,10 +456,14 @@ export default function CalendarScreen() {
         console.warn('Conflict check failed, proceeding:', e);
       }
     }
-    
-    await executeRegistration(tournamentId, status);
+
+    try {
+      await executeRegistration(tournamentId, status);
+    } finally {
+      setRegisteringId(null);
+    }
   };
-  
+
   const executeRegistration = async (tournamentId: string, status: string) => {
     try {
       await apiRegisterTournament(tournamentId, status);
@@ -902,7 +913,9 @@ export default function CalendarScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {selectedWeek?.tournaments?.[0]?.name || 'Tournoi'}
+                {selectedWeek?.tournaments && selectedWeek.tournaments.length > 1
+                  ? `Semaine ${selectedWeek.weekNumber} — ${selectedWeek.tournaments.length} tournois`
+                  : selectedWeek?.tournaments?.[0]?.name || 'Tournoi'}
               </Text>
               <TouchableOpacity onPress={() => setShowTournamentModal(false)}>
                 <Ionicons name="close" size={24} color="#1a1a1a" />
@@ -971,18 +984,22 @@ export default function CalendarScreen() {
                       
                       {/* Registration buttons - simplified state machine */}
                       <View style={styles.registrationButtons}>
-                        {tournament.registration?.status === 'pending' ? (
+                        {registeringId === tournament.id ? (
+                          <ActivityIndicator size="small" color="#1e3c72" style={{ marginVertical: 8 }} />
+                        ) : tournament.registration?.status === 'pending' ? (
                           // From pending: only "Participant" or "Décliné"
                           <>
                             <TouchableOpacity
                               style={[styles.statusBtn, { backgroundColor: '#4CAF50' + '20', borderWidth: 1, borderColor: '#4CAF50' }]}
                               onPress={() => handleRegisterTournament(tournament.id, 'participating')}
+                              disabled={!!registeringId}
                             >
                               <Text style={[styles.statusBtnText, { color: '#4CAF50' }]}>Participant</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={[styles.statusBtn, { backgroundColor: '#F44336' + '20', borderWidth: 1, borderColor: '#F44336' }]}
                               onPress={() => handleRegisterTournament(tournament.id, 'declined')}
+                              disabled={!!registeringId}
                             >
                               <Text style={[styles.statusBtnText, { color: '#F44336' }]}>Décliné</Text>
                             </TouchableOpacity>
@@ -992,6 +1009,7 @@ export default function CalendarScreen() {
                           <TouchableOpacity
                             style={[styles.statusBtn, { backgroundColor: '#f0f0f0' }]}
                             onPress={() => handleRegisterTournament(tournament.id, 'interested')}
+                            disabled={!!registeringId}
                           >
                             <Text style={[styles.statusBtnText, { color: '#666' }]}>Réinitialiser le statut</Text>
                           </TouchableOpacity>
@@ -1005,6 +1023,7 @@ export default function CalendarScreen() {
                                 tournament.registration?.status === status && styles.statusBtnActive
                               ]}
                               onPress={() => handleRegisterTournament(tournament.id, status)}
+                              disabled={!!registeringId}
                             >
                               <Text style={[
                                 styles.statusBtnText,

@@ -139,7 +139,7 @@ async def delete_day_presence(date: str):
 
 
 @router.get("/days")
-async def get_day_presences(year: int = 2026, month: Optional[int] = None):
+async def get_day_presences(year: int = datetime.now().year, month: Optional[int] = None):
     """Get all day presences for a year (optionally filtered by month)"""
     query = {"date": {"$regex": f"^{year}"}}
     if month:
@@ -152,7 +152,7 @@ async def get_day_presences(year: int = 2026, month: Optional[int] = None):
 # ── Stats ──
 
 @router.get("/stats")
-async def get_residence_stats(year: int = 2026):
+async def get_residence_stats(year: int = datetime.now().year):
     """Calculate country stats for the year"""
     days = await db.day_presences.find(
         {"date": {"$regex": f"^{year}"}},

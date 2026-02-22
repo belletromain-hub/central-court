@@ -131,6 +131,8 @@ export default function ResidenceScreen() {
   const [bulkEndDate, setBulkEndDate] = useState(new Date());
   const [notes, setNotes] = useState('');
   const [showNotesField, setShowNotesField] = useState(false);
+  const [bulkNotes, setBulkNotes] = useState('');
+  const [showBulkNotesField, setShowBulkNotesField] = useState(false);
 
   // Calculate days between two dates (INCLUSIVE)
   const calculateDaysBetween = (startDate: Date, endDate: Date): number => {
@@ -161,9 +163,12 @@ export default function ResidenceScreen() {
 
   // Delete a day
   const handleDeleteDay = async (date: string) => {
+    // Parse date as local time to avoid UTC offset shifting the display date
+    const [y, mo, d] = date.split('-').map(Number);
+    const localDate = new Date(y, mo - 1, d);
     Alert.alert(
       'Supprimer ce jour ?',
-      `Voulez-vous vraiment supprimer le ${formatDateDisplay(new Date(date))} ?`,
+      `Voulez-vous vraiment supprimer le ${formatDateDisplay(localDate)} ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -462,10 +467,12 @@ export default function ResidenceScreen() {
       setShowAddModal(false);
       setSingleDate(new Date());
       setNotes('');
+      setShowNotesField(false);
       setSelectedCountry(null);
       loadData();
     } catch (err) {
       console.error('Error adding day:', err);
+      Alert.alert('Erreur', 'Impossible d\'enregistrer ce jour. Vérifiez votre connexion.');
     } finally {
       setSubmitting(false);
     }
@@ -482,22 +489,25 @@ export default function ResidenceScreen() {
     
     setSubmitting(true);
     try {
-      await addBulkDays({
+      const result = await addBulkDays({
         startDate: formatDate(bulkStartDate),
         endDate: formatDate(bulkEndDate),
         country: selectedCountry.code,
         countryName: selectedCountry.name,
-        notes: notes || undefined,
+        notes: bulkNotes || undefined,
       });
       setShowBulkModal(false);
       setBulkStartDate(new Date());
       setBulkEndDate(new Date());
-      setNotes('');
+      setBulkNotes('');
+      setShowBulkNotesField(false);
       setSelectedCountry(null);
       loadData();
+      const added = result?.added ?? calculateDaysBetween(bulkStartDate, bulkEndDate);
+      Alert.alert('Séjour enregistré', `${added} jour${added > 1 ? 's' : ''} ajouté${added > 1 ? 's' : ''} avec succès.`);
     } catch (err) {
       console.error('Error adding bulk days:', err);
-      Alert.alert('Erreur', 'Maximum 90 jours par séjour.');
+      Alert.alert('Erreur', 'Maximum 90 jours par séjour. Vérifiez les dates et votre connexion.');
     } finally {
       setSubmitting(false);
     }
@@ -956,6 +966,7 @@ export default function ResidenceScreen() {
                     {countryFlags[country.code] || '🌍'}
                   </Text>
                   <Text style={styles.countryOptionCode}>{country.code}</Text>
+                  <Text style={styles.countryOptionName} numberOfLines={1}>{country.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -1090,6 +1101,7 @@ export default function ResidenceScreen() {
                     {countryFlags[country.code] || '🌍'}
                   </Text>
                   <Text style={styles.countryOptionCode}>{country.code}</Text>
+                  <Text style={styles.countryOptionName} numberOfLines={1}>{country.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -1097,7 +1109,7 @@ export default function ResidenceScreen() {
             <View style={styles.dateRow}>
               <View style={styles.dateField}>
                 <Text style={styles.inputLabel}>Date début</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.datePickerBtn}
                   onPress={() => setShowStartDatePicker(true)}
                 >
@@ -1107,7 +1119,7 @@ export default function ResidenceScreen() {
               </View>
               <View style={styles.dateField}>
                 <Text style={styles.inputLabel}>Date fin</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.datePickerBtn}
                   onPress={() => setShowEndDatePicker(true)}
                 >
@@ -1136,6 +1148,7 @@ export default function ResidenceScreen() {
                   onChange={(event, date) => {
                     if (date) setBulkStartDate(date);
                   }}
+                  maximumDate={new Date()}
                   themeVariant="dark"
                   textColor="#FFFFFF"
                   style={styles.iosDatePicker}
@@ -1153,6 +1166,7 @@ export default function ResidenceScreen() {
                   setShowStartDatePicker(false);
                   if (date) setBulkStartDate(date);
                 }}
+                maximumDate={new Date()}
               />
             )}
 
@@ -1175,6 +1189,7 @@ export default function ResidenceScreen() {
                   onChange={(event, date) => {
                     if (date) setBulkEndDate(date);
                   }}
+                  maximumDate={new Date()}
                   themeVariant="dark"
                   textColor="#FFFFFF"
                   style={styles.iosDatePicker}
@@ -1192,6 +1207,7 @@ export default function ResidenceScreen() {
                   setShowEndDatePicker(false);
                   if (date) setBulkEndDate(date);
                 }}
+                maximumDate={new Date()}
               />
             )}
 
@@ -1205,27 +1221,27 @@ export default function ResidenceScreen() {
               </View>
             )}
 
-            {/* Collapsible Notes Field */}
-            <TouchableOpacity 
+            {/* Collapsible Notes Field - uses separate bulkNotes state */}
+            <TouchableOpacity
               style={styles.notesToggle}
-              onPress={() => setShowNotesField(!showNotesField)}
+              onPress={() => setShowBulkNotesField(!showBulkNotesField)}
             >
               <Ionicons name="create-outline" size={18} color={Colors.text.secondary} />
               <Text style={styles.notesToggleText}>
-                {notes ? notes : 'Ajouter une note (optionnel)'}
+                {bulkNotes ? bulkNotes : 'Ajouter une note (optionnel)'}
               </Text>
-              <Ionicons 
-                name={showNotesField ? "chevron-up" : "chevron-down"} 
-                size={18} 
-                color={Colors.text.muted} 
+              <Ionicons
+                name={showBulkNotesField ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={Colors.text.muted}
               />
             </TouchableOpacity>
-            
-            {showNotesField && (
+
+            {showBulkNotesField && (
               <TextInput
                 style={styles.notesInput}
-                value={notes}
-                onChangeText={setNotes}
+                value={bulkNotes}
+                onChangeText={setBulkNotes}
                 placeholder="Ex: Tournoi Open d'Australie"
                 placeholderTextColor={Colors.text.muted}
                 multiline
@@ -1304,12 +1320,12 @@ export default function ResidenceScreen() {
                   <View key={day.id} style={styles.dayItem}>
                     <View style={styles.dayItemLeft}>
                       <Text style={styles.dayItemDate}>
-                        {new Date(day.date).toLocaleDateString('fr-FR', {
-                          weekday: 'short',
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                        {(() => {
+                          const [dy, dm, dd] = day.date.split('-').map(Number);
+                          return new Date(dy, dm - 1, dd).toLocaleDateString('fr-FR', {
+                            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+                          });
+                        })()}
                       </Text>
                       {day.notes && (
                         <Text style={styles.dayItemNotes}>{day.notes}</Text>
@@ -1433,6 +1449,7 @@ export default function ResidenceScreen() {
                         {countryFlags[country.code] || '🌍'}
                       </Text>
                       <Text style={styles.countryOptionCode}>{country.code}</Text>
+                      <Text style={styles.countryOptionName} numberOfLines={1}>{country.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -2129,6 +2146,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.text.secondary,
     marginTop: 2,
+  },
+  countryOptionName: {
+    fontSize: 10,
+    color: Colors.text.muted,
+    marginTop: 1,
+    maxWidth: 60,
+    textAlign: 'center',
   },
   // Date picker
   datePickerBtn: {
