@@ -209,8 +209,7 @@ async def get_documents(
     query = {}
     
     if userId:
-        # Support both userId and user_id field names for flexibility
-        query["user_id"] = userId
+        query["userId"] = userId
     
     if category:
         query["category"] = category
@@ -225,10 +224,8 @@ async def get_documents(
         if date_query:
             query["dateFacture"] = date_query
     
-    print(f"[DEBUG] Documents query: {query}")
     cursor = db.documents.find(query, {"fileBase64": 0}).sort("createdAt", -1).skip(skip).limit(limit)
     documents = await cursor.to_list(length=limit)
-    print(f"[DEBUG] Found {len(documents)} documents")
     
     return [serialize_document(doc) for doc in documents]
 
@@ -360,8 +357,8 @@ async def update_document(document_id: str, update: DocumentUpdate):
     except:
         raise HTTPException(status_code=400, detail="Invalid document ID")
     
-    # Build update dict with only non-None values
-    update_dict = {k: v for k, v in update.dict().items() if v is not None}
+    # Build update dict with only explicitly set (non-None) values
+    update_dict = {k: v for k, v in update.dict(exclude_unset=True).items()}
     
     if update_dict.get("lignes"):
         update_dict["lignes"] = [l.dict() if hasattr(l, 'dict') else l for l in update_dict["lignes"]]

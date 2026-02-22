@@ -79,6 +79,7 @@ export default function ProfileScreen() {
   // State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [residenceStats, setResidenceStats] = useState<ResidenceStats | null>(null);
@@ -147,6 +148,7 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+      setLoadError(true);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -210,6 +212,11 @@ export default function ProfileScreen() {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail)) {
+      Alert.alert('Email invalide', 'Veuillez entrer une adresse email valide.');
+      return;
+    }
     
     setIsSaving(true);
     try {
@@ -222,7 +229,8 @@ export default function ProfileScreen() {
       
       const invitation = response.data;
       const roleInfo = STAFF_ROLES.find(r => r.id === selectedRole);
-      const webUrl = `https://taxdays.preview.emergentagent.com/join/${invitation.token}`;
+      const appBaseUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://lecourtcentral.app';
+      const webUrl = `${appBaseUrl}/join/${invitation.token}`;
       
       // Add to local team
       setTeam(prev => [...prev, {
@@ -352,6 +360,23 @@ export default function ProfileScreen() {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#1e3c72" />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Ionicons name="cloud-offline-outline" size={48} color="#ccc" />
+        <Text style={{ fontSize: 16, color: '#666', marginTop: 16, marginBottom: 24 }}>
+          Impossible de charger le profil
+        </Text>
+        <TouchableOpacity
+          onPress={() => { setLoadError(false); setIsLoading(true); loadProfile(); }}
+          style={{ backgroundColor: '#1e3c72', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600' }}>Réessayer</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -541,10 +566,9 @@ export default function ProfileScreen() {
               {team.map((member, index) => {
                 const roleInfo = getRoleInfo(member.role);
                 return (
-                  <TouchableOpacity
+                  <View
                     key={member.id}
                     style={[styles.teamMember, index < team.length - 1 && styles.teamMemberBorder]}
-                    onLongPress={() => handleRemoveMember(member)}
                   >
                     <View style={[styles.memberAvatar, { backgroundColor: roleInfo.color + '20' }]}>
                       <Text style={styles.memberEmoji}>{roleInfo.emoji}</Text>
@@ -561,12 +585,18 @@ export default function ProfileScreen() {
                         <Ionicons name="time-outline" size={14} color="#ff9800" />
                       </View>
                     )}
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveMember(member)}
+                      style={{ padding: 8 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#E53935" />
+                    </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>
           )}
-          <Text style={styles.hint}>Appuyez longuement pour retirer un membre</Text>
         </View>
 
         {/* Actions rapides */}
